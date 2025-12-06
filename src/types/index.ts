@@ -61,6 +61,12 @@ export interface PackageRepository {
 export interface PackageDependency {
   name: string;
   version: string;
+  /**
+   * Optional list of registry-relative file paths to install for this dependency.
+   * When provided (non-empty), installs are partial and limited to these paths.
+   * When omitted, installs include the full package payload.
+   */
+  files?: string[];
 }
 
 export interface PackageYml {

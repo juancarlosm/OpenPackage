@@ -6,7 +6,7 @@ import { runBulkInstallPipeline } from '../core/install/bulk-install-pipeline.js
 import { runInstallPipeline, determineResolutionMode } from '../core/install/install-pipeline.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { normalizePlatforms } from '../utils/platform-mapper.js';
-import { parsePackageInput } from '../utils/package-name.js';
+import { parsePackageInstallSpec } from '../utils/package-name.js';
 import { logger } from '../utils/logger.js';
 import { normalizePathForProcessing } from '../utils/path-normalization.js';
 
@@ -45,11 +45,12 @@ async function installCommand(
     return await runBulkInstallPipeline(targetDir, options);
   }
 
-  const { name, version } = parsePackageInput(packageName);
+  const { name, version, registryPath } = parsePackageInstallSpec(packageName);
   return await runInstallPipeline({
     ...options,
     packageName: name,
     version,
+    registryPath,
     targetDir
   });
 }

@@ -5,7 +5,7 @@ import { parsePackageYml, writePackageYml } from './package-yml.js';
 import { exists, ensureDir } from './fs.js';
 import { logger } from './logger.js';
 import { getLocalOpenPackageDir, getLocalPackageYmlPath, getLocalPackagesDir, getLocalPackageDir } from './paths.js';
-import { DEPENDENCY_ARRAYS } from '../constants/index.js';
+import { DEPENDENCY_ARRAYS, FILE_PATTERNS, PACKAGE_PATHS } from '../constants/index.js';
 import { createCaretRange, hasExplicitPrereleaseIntent, isPrereleaseVersion } from './version-ranges.js';
 import { extractBaseVersion } from './version-generator.js';
 import { normalizePackageName, arePackageNamesEquivalent } from './package-name.js';
@@ -144,7 +144,8 @@ export async function addPackageToYml(
   packageVersion: string,
   isDev: boolean = false,
   originalVersion?: string, // The original version/range that was requested
-  silent: boolean = false
+  silent: boolean = false,
+  files?: string[] | null
 ): Promise<void> {
   const packageYmlPath = getLocalPackageYmlPath(cwd);
   
@@ -214,9 +215,23 @@ export async function addPackageToYml(
     }
   }
 
+  const existingDep =
+    currentLocation && existingIndex >= 0 ? config[currentLocation]![existingIndex] : null;
+
+  let filesToWrite: string[] | undefined;
+  if (files === undefined) {
+    filesToWrite = existingDep?.files;
+  } else if (files === null) {
+    filesToWrite = undefined;
+  } else {
+    const unique = Array.from(new Set(files));
+    filesToWrite = unique.length > 0 ? unique : undefined;
+  }
+
   const dependency: PackageDependency = {
     name: normalizedPackageName,
-    version: versionToWrite
+    version: versionToWrite,
+    ...(filesToWrite ? { files: filesToWrite } : {})
   };
   
   // Determine target location (packages vs dev-packages)
@@ -245,9 +260,10 @@ export async function addPackageToYml(
     currentLocation === targetArray ? findIndex(targetArrayRef) : -1;
   
   if (existingTargetIndex >= 0) {
-    const existingDep = targetArrayRef[existingTargetIndex];
-    const versionChanged = existingDep.version !== dependency.version;
-    if (versionChanged) {
+    const existingDepForTarget = targetArrayRef[existingTargetIndex];
+    const versionChanged = existingDepForTarget.version !== dependency.version;
+    const filesChanged = JSON.stringify(existingDepForTarget.files ?? []) !== JSON.stringify(filesToWrite ?? []);
+    if (versionChanged || filesChanged) {
       targetArrayRef[existingTargetIndex] = dependency;
       if (!silent) {
         logger.info(`Updated existing package dependency: ${packageName}@${packageVersion}`);
@@ -280,6 +296,72 @@ export async function writeLocalPackageFromRegistry(
   await writePackageFilesToDirectory(localPackageDir, pkg.files, {
     preserveIndexFile: true
   });
+}
+
+/**
+ * Copy a subset of package files from the local registry into the project cache (.openpackage/packages/<pkg>/),
+ * always including package.yml. Used for partial installs.
+ */
+export async function writePartialLocalPackageFromRegistry(
+  cwd: string,
+  packageName: string,
+  version: string,
+  includePaths: string[]
+): Promise<void> {
+  const pkg = await packageManager.loadPackage(packageName, version);
+  const localPackageDir = getLocalPackageDir(cwd, packageName);
+
+  const normalizedIncludes = new Set(
+    includePaths
+      .filter(Boolean)
+      .map(p => (p.startsWith('/') ? p.slice(1) : p))
+  );
+
+  const filteredFiles = pkg.files.filter(file => {
+    const p = file.path.startsWith('/') ? file.path.slice(1) : file.path;
+    if (p === FILE_PATTERNS.PACKAGE_YML) return true; // always keep manifest
+    if (p === PACKAGE_PATHS.INDEX_RELATIVE) return false; // never copy index from registry
+    if (normalizedIncludes.size === 0) return true;
+    return normalizedIncludes.has(p);
+  });
+
+  await writePackageFilesToDirectory(localPackageDir, filteredFiles, {
+    preserveIndexFile: true
+  });
+}
+
+/**
+ * Update only the files list for an existing dependency in package.yml.
+ * - files: string[] => set/dedupe
+ * - files: null     => clear files field
+ * - files: undefined => no-op
+ */
+export async function updatePackageDependencyFiles(
+  cwd: string,
+  packageName: string,
+  target: 'packages' | 'dev-packages',
+  files: string[] | null | undefined
+): Promise<void> {
+  if (files === undefined) return;
+
+  const packageYmlPath = getLocalPackageYmlPath(cwd);
+  if (!(await exists(packageYmlPath))) return;
+
+  const config = await parsePackageYml(packageYmlPath);
+  const arr = config[target];
+  if (!arr) return;
+
+  const idx = arr.findIndex(dep => arePackageNamesEquivalent(dep.name, packageName));
+  if (idx === -1) return;
+
+  const unique = files === null ? undefined : Array.from(new Set(files));
+  if (unique && unique.length > 0) {
+    arr[idx].files = unique;
+  } else {
+    delete arr[idx].files;
+  }
+
+  await writePackageYml(packageYmlPath, config);
 }
 
 function rangeIncludesVersion(range: string, version: string): boolean {

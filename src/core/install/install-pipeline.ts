@@ -19,17 +19,20 @@ import { pullMissingDependenciesIfNeeded } from './remote-flow.js';
 import { handleDryRunMode } from './dry-run.js';
 import { displayInstallationResults, formatSelectionSummary } from './install-reporting.js';
 import { buildNoVersionFoundError } from './install-errors.js';
-import { createWorkspacePackageYml, addPackageToYml, writeLocalPackageFromRegistry } from '../../utils/package-management.js';
+import { createWorkspacePackageYml, addPackageToYml, writeLocalPackageFromRegistry, updatePackageDependencyFiles } from '../../utils/package-management.js';
 import { resolvePlatforms } from './platform-resolution.js';
 import { getLocalPackageYmlPath, getInstallRootDir, isRootPackage } from '../../utils/paths.js';
 import { exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { PackageNotFoundError } from '../../utils/errors.js';
+import { safePrompts } from '../../utils/prompts.js';
+import { normalizeRegistryPath } from '../../utils/registry-entry-filter.js';
 
 export interface InstallPipelineOptions extends InstallOptions {
   packageName: string;
   version?: string;
   targetDir: string;
+  registryPath?: string;
 }
 
 export interface InstallPipelineResult {
@@ -58,6 +61,54 @@ export function determineResolutionMode(
   }
 
   return 'default';
+}
+
+function dedupeRegistryPaths(paths: string[]): string[] {
+  return Array.from(new Set(paths.map(p => normalizeRegistryPath(p))));
+}
+
+async function resolveInstallIntent(args: {
+  packageName: string;
+  dependencyState: 'fresh' | 'existing';
+  existingFiles?: string[];
+  normalizedRegistryPath?: string;
+  dryRun: boolean;
+  canPrompt: boolean;
+}): Promise<{ installPaths?: string[]; persistFiles?: string[] | null }> {
+  const { packageName, dependencyState, existingFiles, normalizedRegistryPath, dryRun, canPrompt } = args;
+
+  // Path-based request
+  if (normalizedRegistryPath) {
+    if (dependencyState === 'existing' && !existingFiles) {
+      throw new Error(
+        `${packageName} is already a full dependency. To install a subset, uninstall the package first and re-install subset.`
+      );
+    }
+    const base = existingFiles ?? [];
+    const next = dedupeRegistryPaths([...base, normalizedRegistryPath]);
+    return { installPaths: next, persistFiles: next };
+  }
+
+  // Existing partial dependency, no path provided
+  if (existingFiles) {
+    if (!dryRun && canPrompt) {
+      const prompt = await safePrompts({
+        type: 'confirm',
+        name: 'confirmFull',
+        message: `Switch ${packageName} to full install? This will reinstall with full package content.`,
+        initial: false
+      });
+      const switchToFull = Boolean((prompt as any).confirmFull);
+      if (switchToFull) {
+        return { installPaths: undefined, persistFiles: null };
+      }
+      return { installPaths: existingFiles, persistFiles: existingFiles };
+    }
+    return { installPaths: existingFiles, persistFiles: existingFiles };
+  }
+
+  // Default full install
+  return { installPaths: undefined, persistFiles: undefined };
 }
 
 export async function runInstallPipeline(
@@ -100,6 +151,24 @@ export async function runInstallPipeline(
   if (canonicalPlan.compatibilityMessage) {
     console.log(`ℹ️  ${canonicalPlan.compatibilityMessage}`);
   }
+
+  const normalizedRegistryPath = options.registryPath
+    ? normalizeRegistryPath(options.registryPath)
+    : undefined;
+
+  const existingFiles =
+    canonicalPlan.dependencyFiles && canonicalPlan.dependencyFiles.length > 0
+      ? dedupeRegistryPaths(canonicalPlan.dependencyFiles)
+      : undefined;
+
+  const { installPaths, persistFiles } = await resolveInstallIntent({
+    packageName: options.packageName,
+    dependencyState: canonicalPlan.dependencyState,
+    existingFiles,
+    normalizedRegistryPath,
+    dryRun,
+    canPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY)
+  });
 
   const selectionOptions = options.stable ? { preferStable: true } : undefined;
   const preselection = await selectInstallVersionUnified({
@@ -267,30 +336,58 @@ export async function runInstallPipeline(
     : await resolvePlatforms(cwd, specifiedPlatforms, { interactive: canPromptForPlatforms });
   const createdDirs = await createPlatformDirectories(cwd, finalPlatforms as Platform[]);
 
+  const fileFilters =
+    installPaths && installPaths.length > 0 ? { [options.packageName]: installPaths } : undefined;
+
   const installationOutcome = await performIndexBasedInstallationPhases({
     cwd,
     packages: finalResolvedPackages,
     platforms: finalPlatforms as Platform[],
     conflictResult,
     options,
-    targetDir: options.targetDir
+    targetDir: options.targetDir,
+    fileFilters
   });
 
   for (const resolved of finalResolvedPackages) {
+    const partialPaths = fileFilters?.[resolved.name];
+    if (partialPaths && partialPaths.length > 0) {
+      continue; // Skip writing full local copy for partial installs
+    }
     await writeLocalPackageFromRegistry(cwd, resolved.name, resolved.version);
   }
 
   const mainPackage = finalResolvedPackages.find(pkg => pkg.isRoot);
   if (packageYmlExists && mainPackage) {
     const persistTarget = resolvePersistRange(canonicalPlan.persistDecision, mainPackage.version);
+    const filesTarget =
+      persistFiles === undefined
+        ? undefined
+        : persistFiles === null
+          ? null
+          : dedupeRegistryPaths(persistFiles);
+
+    const targetDependencyArray =
+      persistTarget?.target ??
+      canonicalPlan.canonicalTarget ??
+      ((options.dev ?? false) ? 'dev-packages' : 'packages');
+
     if (persistTarget) {
       await addPackageToYml(
         cwd,
         options.packageName,
         mainPackage.version,
-        persistTarget.target === 'dev-packages',
+        targetDependencyArray === 'dev-packages',
         persistTarget.range,
-        true
+        true,
+        filesTarget ?? undefined
+      );
+    } else if (filesTarget !== undefined) {
+      await updatePackageDependencyFiles(
+        cwd,
+        options.packageName,
+        targetDependencyArray,
+        filesTarget
       );
     }
   }

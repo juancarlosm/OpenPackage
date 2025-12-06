@@ -19,6 +19,7 @@ export interface CanonicalInstallPlan {
   dependencyState: 'fresh' | 'existing';
   canonicalRange?: string;
   canonicalTarget?: DependencyTarget;
+  dependencyFiles?: string[];
   persistDecision: PersistDecision;
   compatibilityMessage?: string;
 }
@@ -55,6 +56,7 @@ export async function determineCanonicalInstallPlan(args: CanonicalPlanArgs): Pr
         dependencyState: 'existing',
         canonicalRange: existing.range,
         canonicalTarget: existing.target,
+        dependencyFiles: existing.files,
         persistDecision: { type: 'none' },
         compatibilityMessage: `Using version range from package.yml (${existing.range}); CLI spec '${cliConstraint.displayRange}' is compatible.`
       };
@@ -65,6 +67,7 @@ export async function determineCanonicalInstallPlan(args: CanonicalPlanArgs): Pr
       dependencyState: 'existing',
       canonicalRange: existing.range,
       canonicalTarget: existing.target,
+      dependencyFiles: existing.files,
       persistDecision: { type: 'none' }
     };
   }
@@ -96,7 +99,7 @@ export async function determineCanonicalInstallPlan(args: CanonicalPlanArgs): Pr
 export async function findCanonicalDependency(
   cwd: string,
   packageName: string
-): Promise<{ range: string; target: DependencyTarget } | null> {
+): Promise<{ range: string; target: DependencyTarget; files?: string[] } | null> {
   const packageYmlPath = getLocalPackageYmlPath(cwd);
   if (!(await exists(packageYmlPath))) {
     return null;
@@ -118,7 +121,7 @@ function locateDependencyInArray(
   deps: PackageYml['packages'],
   packageName: string,
   target: DependencyTarget
-): { range: string; target: DependencyTarget } | null {
+): { range: string; target: DependencyTarget; files?: string[] } | null {
   if (!deps) {
     return null;
   }
@@ -136,7 +139,8 @@ function locateDependencyInArray(
 
   return {
     range: entry.version.trim(),
-    target
+    target,
+    files: entry.files && entry.files.length > 0 ? [...entry.files] : undefined
   };
 }
 

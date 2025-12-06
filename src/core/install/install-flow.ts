@@ -42,6 +42,7 @@ export interface InstallationPhasesParams {
   conflictResult: ConflictSummary;
   options: InstallOptions;
   targetDir: string;
+  fileFilters?: Record<string, string[] | undefined>;
 }
 
 export interface InstallationPhasesResult {
@@ -190,7 +191,7 @@ export async function processConflictResolution(
  * Perform the index-based installation process
  */
 export async function performIndexBasedInstallationPhases(params: InstallationPhasesParams): Promise<InstallationPhasesResult> {
-  const { cwd, packages, platforms, conflictResult, options, targetDir } = params;
+  const { cwd, packages, platforms, conflictResult, options, targetDir, fileFilters } = params;
 
   // Install each package using index-based installer
   let totalInstalled = 0;
@@ -205,12 +206,14 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
     try {
       logger.debug(`Installing ${resolved.name}@${resolved.version} using index-based installer`);
 
+      const filtersForPackage = fileFilters?.[resolved.name];
       const installResult: IndexInstallResult = await installPackageByIndex(
         cwd,
         resolved.name,
         resolved.version,
         platforms,
-        options
+        options,
+        filtersForPackage
       );
 
       totalInstalled += installResult.installed;
@@ -243,7 +246,13 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
 
   for (const resolved of packages) {
     try {
-      const categorized = await discoverAndCategorizeFiles(resolved.name, resolved.version, platforms);
+      const filtersForPackage = fileFilters?.[resolved.name];
+      const categorized = await discoverAndCategorizeFiles(
+        resolved.name,
+        resolved.version,
+        platforms,
+        filtersForPackage
+      );
       const installResult = await installRootFilesFromMap(
         cwd,
         resolved.name,
