@@ -1,8 +1,5 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
-import { getOpenPackageDirectories } from './directory.js';
 import { logger } from '../utils/logger.js';
-import { exists } from '../utils/fs.js';
+import { ConfigError } from '../utils/errors.js';
 
 type KeytarModule = {
 	getPassword(service: string, account: string): Promise<string | null>;
@@ -26,9 +23,13 @@ export interface TokenStore {
 	delete(profileName: string): Promise<void>;
 }
 
+const KEYCHAIN_REQUIRED_MESSAGE =
+	'OS keychain unavailable. Install optional "keytar" dependency to store tokens securely (file-based token storage has been removed).';
+
 /**
- * Primary implementation: store tokens in OS keychain (preferred).
- * Uses a dynamic import so the CLI still runs if keytar is unavailable.
+ * Token storage implementation using the OS keychain (via keytar).
+ * Uses a dynamic import so the CLI still starts even if keytar is missing,
+ * but operations will fail with a ConfigError until keytar is installed.
  */
 export class KeychainTokenStore implements TokenStore {
 	private keytar: KeytarModule | null = null;
@@ -43,8 +44,7 @@ export class KeychainTokenStore implements TokenStore {
 	}
 
 	async get(profileName: string): Promise<StoredToken | null> {
-		const keytar = await this.ensureKeytar();
-		if (!keytar) return null;
+		const keytar = await this.requireKeytar();
 
 		const raw = await keytar.getPassword(this.service, profileName);
 		if (!raw) return null;
@@ -59,17 +59,21 @@ export class KeychainTokenStore implements TokenStore {
 	}
 
 	async set(profileName: string, value: StoredToken): Promise<void> {
-		const keytar = await this.ensureKeytar();
-		if (!keytar) {
-			throw new Error('Keychain unavailable');
-		}
+		const keytar = await this.requireKeytar();
 		await keytar.setPassword(this.service, profileName, JSON.stringify(value));
 	}
 
 	async delete(profileName: string): Promise<void> {
-		const keytar = await this.ensureKeytar();
-		if (!keytar) return;
+		const keytar = await this.requireKeytar();
 		await keytar.deletePassword(this.service, profileName);
+	}
+
+	private async requireKeytar(): Promise<KeytarModule> {
+		const keytar = await this.ensureKeytar();
+		if (!keytar) {
+			throw new ConfigError(KEYCHAIN_REQUIRED_MESSAGE);
+		}
+		return keytar;
 	}
 
 	private async ensureKeytar(): Promise<KeytarModule | null> {
@@ -82,7 +86,7 @@ export class KeychainTokenStore implements TokenStore {
 			this.keytar = mod;
 			return mod;
 		} catch (error) {
-			logger.debug('Keychain (keytar) not available, fallback will be used', { error });
+			logger.warn('Keychain (keytar) not available', { error });
 			this.keytar = null;
 			return null;
 		}
@@ -90,66 +94,8 @@ export class KeychainTokenStore implements TokenStore {
 }
 
 /**
- * Fallback implementation: writes a JSON file in the config directory.
- * Prefer using KeychainTokenStore; this is a compatibility fallback.
- */
-export class FileTokenStore implements TokenStore {
-	private readonly filePath: string;
-
-	constructor(filePath?: string) {
-		const dirs = getOpenPackageDirectories();
-		this.filePath = filePath ?? join(dirs.config, 'tokens.json');
-	}
-
-	available(): boolean {
-		return true;
-	}
-
-	async get(profileName: string): Promise<StoredToken | null> {
-		const data = await this.readAll();
-		return data[profileName] ?? null;
-	}
-
-	async set(profileName: string, value: StoredToken): Promise<void> {
-		const data = await this.readAll();
-		data[profileName] = value;
-		await this.writeAll(data);
-	}
-
-	async delete(profileName: string): Promise<void> {
-		const data = await this.readAll();
-		if (profileName in data) {
-			delete data[profileName];
-			await this.writeAll(data);
-		}
-	}
-
-	private async readAll(): Promise<Record<string, StoredToken>> {
-		try {
-			if (!(await exists(this.filePath))) {
-				return {};
-			}
-			const raw = await readFile(this.filePath, 'utf-8');
-			return raw ? (JSON.parse(raw) as Record<string, StoredToken>) : {};
-		} catch (error) {
-			logger.warn('Failed to read token file store, recreating', { error });
-			return {};
-		}
-	}
-
-	private async writeAll(data: Record<string, StoredToken>): Promise<void> {
-		try {
-			await mkdir(dirname(this.filePath), { recursive: true });
-			await writeFile(this.filePath, JSON.stringify(data, null, 2), 'utf-8');
-		} catch (error) {
-			logger.error('Failed to write token file store', { error });
-			throw error;
-		}
-	}
-}
-
-/**
- * Factory to select the best available token store.
+ * Factory that returns a keychain-backed token store.
+ * Throws a ConfigError when the OS keychain/keytar is unavailable.
  */
 export async function createTokenStore(): Promise<TokenStore> {
 	const keychainStore = new KeychainTokenStore();
@@ -157,7 +103,6 @@ export async function createTokenStore(): Promise<TokenStore> {
 		return keychainStore;
 	}
 
-	logger.debug('Using file-based token store fallback');
-	return new FileTokenStore();
+	throw new ConfigError(KEYCHAIN_REQUIRED_MESSAGE);
 }
 
