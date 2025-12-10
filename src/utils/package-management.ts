@@ -14,6 +14,7 @@ import { packageManager } from '../core/package.js';
 import { promptPackageDetailsForNamed } from './prompts.js';
 import { writePackageFilesToDirectory } from './package-copy.js';
 import { getPackageFilesDir, getPackageYmlPath } from '../core/package-context.js';
+import { buildNormalizedIncludeSet, isManifestPath, normalizePackagePath } from './manifest-paths.js';
 
 /**
  * Ensure local OpenPackage directory structure exists
@@ -345,17 +346,13 @@ export async function writePartialLocalPackageFromRegistry(
   const pkg = await packageManager.loadPackage(packageName, version);
   const localPackageDir = getLocalPackageDir(cwd, packageName);
 
-  const normalizedIncludes = new Set(
-    includePaths
-      .filter(Boolean)
-      .map(p => (p.startsWith('/') ? p.slice(1) : p))
-  );
+  const normalizedIncludes = buildNormalizedIncludeSet(includePaths);
 
   const filteredFiles = pkg.files.filter(file => {
-    const p = file.path.startsWith('/') ? file.path.slice(1) : file.path;
-    if (p === FILE_PATTERNS.PACKAGE_YML) return true; // always keep manifest
+    const p = normalizePackagePath(file.path);
+    if (isManifestPath(p)) return true; // always keep manifest
     if (p === PACKAGE_PATHS.INDEX_RELATIVE) return false; // never copy index from registry
-    if (normalizedIncludes.size === 0) return true;
+    if (!normalizedIncludes) return true;
     return normalizedIncludes.has(p);
   });
 

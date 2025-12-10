@@ -19,7 +19,13 @@ import { pullMissingDependenciesIfNeeded } from './remote-flow.js';
 import { handleDryRunMode } from './dry-run.js';
 import { displayInstallationResults, formatSelectionSummary } from './install-reporting.js';
 import { buildNoVersionFoundError } from './install-errors.js';
-import { createWorkspacePackageYml, addPackageToYml, writeLocalPackageFromRegistry, updatePackageDependencyInclude } from '../../utils/package-management.js';
+import {
+  createWorkspacePackageYml,
+  addPackageToYml,
+  writeLocalPackageFromRegistry,
+  writePartialLocalPackageFromRegistry,
+  updatePackageDependencyInclude
+} from '../../utils/package-management.js';
 import { resolvePlatforms } from './platform-resolution.js';
 import { getLocalPackageYmlPath, getInstallRootDir, isRootPackage } from '../../utils/paths.js';
 import { exists } from '../../utils/fs.js';
@@ -352,7 +358,8 @@ export async function runInstallPipeline(
   for (const resolved of finalResolvedPackages) {
     const partialPaths = fileFilters?.[resolved.name];
     if (partialPaths && partialPaths.length > 0) {
-      continue; // Skip writing full local copy for partial installs
+      await writePartialLocalPackageFromRegistry(cwd, resolved.name, resolved.version, partialPaths);
+      continue;
     }
     await writeLocalPackageFromRegistry(cwd, resolved.name, resolved.version);
   }

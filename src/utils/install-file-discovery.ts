@@ -2,6 +2,7 @@ import { packageManager } from '../core/package.js';
 import { FILE_PATTERNS, PACKAGE_PATHS } from '../constants/index.js';
 import type { PackageFile } from '../types/index.js';
 import { getPlatformDefinition, type Platform } from '../core/platforms.js';
+import { buildNormalizedIncludeSet, isManifestPath, normalizePackagePath } from './manifest-paths.js';
 
 export interface CategorizedInstallFiles {
   pathBasedFiles: PackageFile[];
@@ -17,16 +18,10 @@ export async function discoverAndCategorizeFiles(
   // Load once
   const pkg = await packageManager.loadPackage(packageName, version);
 
-  const normalizePath = (path: string): string =>
-    path.startsWith('/') ? path.slice(1) : path;
-
-  const normalizedIncludes =
-    includePaths && includePaths.length > 0
-      ? new Set(includePaths.map(normalizePath))
-      : null;
+  const normalizedIncludes = buildNormalizedIncludeSet(includePaths);
 
   const shouldInclude = (path: string): boolean =>
-    !normalizedIncludes || normalizedIncludes.has(normalizePath(path));
+    !normalizedIncludes || normalizedIncludes.has(normalizePackagePath(path));
 
   // Precompute platform root filenames
   const platformRootNames = new Set<string>();
@@ -41,7 +36,7 @@ export async function discoverAndCategorizeFiles(
   for (const file of pkg.files) {
     const p = file.path;
     // Never install registry package metadata files
-    if (p === FILE_PATTERNS.PACKAGE_YML || p === PACKAGE_PATHS.INDEX_RELATIVE) continue;
+    if (isManifestPath(p) || normalizePackagePath(p) === PACKAGE_PATHS.INDEX_RELATIVE) continue;
     if (!shouldInclude(p)) continue;
 
     pathBasedFiles.push(file);
