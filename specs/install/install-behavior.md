@@ -8,6 +8,14 @@ This document defines the **user-facing behavior** of the `install` command, ass
 
 ---
 
+## 0. Workspace Context
+The `install` command operates on the **workspace root** determined by the effective current working directory (`cwd` from shell or overridden by global `--cwd <dir>` flag; see [../../cli-options.md]). This affects:
+- Detection of `.openpackage/package.yml` (must exist at effective cwd for root package ops).
+- Target location for file installations (universal content to `.openpackage/<subdir>/`, root files to cwd root).
+- Dependency resolution from workspace `package.yml`.
+
+If no package detected at effective cwd, errors with "No package project found" (unless dry-run or flags allow).
+
 ## 1. Command shapes
 
 - **`opkg install`**

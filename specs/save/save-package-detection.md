@@ -22,7 +22,7 @@ Any directory that contains `.openpackage/package.yml` is considered a **valid p
   - Uses its `package.yml` as the configuration source.
 - If not found:
   - The pipeline **aborts** with a user‑friendly message describing:
-    - That no package was detected at `cwd`.
+    - That no package was detected at effective `cwd` (shell dir or `--cwd <dir>`; see [../../cli-options.md]).
     - That a `.openpackage/package.yml` file is required.
     - How to initialize a package or specify a name explicitly.
 

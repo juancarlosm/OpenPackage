@@ -39,7 +39,7 @@ The pipeline runs in one of two **modes**:
 
 #### 3. Inputs
 
-- **Working directory (`cwd`)** – establishes the workspace.
+- **Working directory (`effective cwd` via shell dir or global `--cwd <dir>` flag)** – establishes the workspace root for file discovery, package detection, and saving (see [../cli-options.md]).
 - **Package name argument (optional)** – may be omitted (context detection) or provided explicitly.
 - **Optional path argument (when package is provided)** – `opkg save <package> <path>` first runs the add pipeline for that path (including conflict handling and optional platform-specific transforms) and then saves the package snapshot.
 

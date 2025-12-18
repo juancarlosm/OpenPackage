@@ -1,5 +1,13 @@
 ## Push command behavior
 
+### Effective Working Directory
+The command determines the source package via the **effective cwd** (shell `cwd` or global `--cwd <dir>` override; see [../../cli-options.md]):
+- Detects package context at effective cwd (root `.openpackage/package.yml` or nested `packages/<name>/`).
+- Packs from that dir's content/layout.
+- Enables monorepo pushes: `opkg push --cwd ./sub-pkg` targets sub-dir package without `cd`.
+
+If no valid package detected, errors early ("No package project at <dir>").
+
 ### Overview
 
 The `opkg push` command uploads a local package version from the **local registry** to the **remote registry**.

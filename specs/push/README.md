@@ -3,6 +3,7 @@
 This directory contains specifications for the `push` command, with a focus on:
 
 - **Stable-only pushes (no prereleases)**
+- **Source package detection**: At effective cwd (shell or --cwd; see [../../cli-options.md])
 - **Local-version selection and scoping behavior**
 - **Consistent, helpful CLI UX and error messaging**
 

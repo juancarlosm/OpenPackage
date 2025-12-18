@@ -49,8 +49,8 @@ All package roots have **identical internal structure**:
 
 A package directory can be **moved or copied 1:1** between:
 
-- Workspace root packages (`cwd/`)
-- Nested workspace packages (`cwd/.openpackage/packages/<name>/`)
+- Workspace root packages (effective `cwd/` via shell or `--cwd`; see [../../cli-options.md])
+- Nested workspace packages (effective `cwd/.openpackage/packages/<name>/`)
 - Local registry copies (`~/.openpackage/registry/<name>/<version>/`)
 
 …while preserving the same internal layout and invariants.

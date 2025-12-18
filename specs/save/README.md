@@ -4,6 +4,8 @@ This directory contains specifications for the **save pipeline** that powers bot
 
 These docs are **behavioral**: they describe features and logic, not specific modules or functions.
 
+Key integration: Save ops use effective cwd (shell or --cwd; see [../../cli-options.md]) for workspace/package detection.
+
 ---
 
 #### Pipeline Flow

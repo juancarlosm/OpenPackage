@@ -2,6 +2,9 @@
 
 import { Command } from 'commander';
 import { logger } from './utils/logger.js';
+import * as path from 'path';
+import fs from 'fs/promises';
+import { constants } from 'fs';
 import { ensureOpenPackageDirectories } from './core/directory.js';
 import { getVersion } from './utils/package.js';
 
@@ -39,6 +42,7 @@ program
   .alias('opkg ')
   .description('OpenPackage - The Package Manager for AI Coding')
   .version(getVersion())
+  .option('--cwd <dir>', 'set the working directory (affects path resolution, package detection, and file ops; defaults to current dir)')
   .configureHelp({
     sortSubcommands: true,
   });
@@ -67,6 +71,27 @@ setupPullCommand(program);
 setupConfigureCommand(program);
 setupLoginCommand(program);
 setupLogoutCommand(program);
+
+program.hook('preAction', async (thisCommand) => {
+  const opts = program.opts();
+  if (opts.cwd) {
+    const resolvedCwd = path.resolve(process.cwd(), opts.cwd);
+    try {
+      const stats = await fs.stat(resolvedCwd);
+      if (!stats.isDirectory()) {
+        throw new Error(`'${opts.cwd}' is not a directory`);
+      }
+      await fs.access(resolvedCwd, constants.R_OK | constants.W_OK);
+      process.chdir(resolvedCwd);
+      logger.info(`Changed working directory to: ${resolvedCwd}`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error('Invalid --cwd provided', { error: errMsg, cwd: opts.cwd });
+      console.error(`❌ Invalid --cwd '${opts.cwd}': Directory must exist, be accessible, and writable. Details: ${errMsg}`);
+      process.exit(1);
+    }
+  }
+});
 
 // === GLOBAL ERROR HANDLING ===
 

@@ -47,7 +47,7 @@ Every package root directory (workspace root, nested, or registry) uses this str
 
 #### Concrete Examples
 
-**Workspace root package** (package root = `cwd/`):
+**Workspace root package** (package root = effective `cwd` or `--cwd` target dir):
 
 ```text
 cwd/
