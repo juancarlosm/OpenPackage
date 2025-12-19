@@ -4,9 +4,10 @@ import type { CommandResult, InstallOptions } from '../types/index.js';
 import { DIR_PATTERNS, PACKAGE_PATHS } from '../constants/index.js';
 import { runBulkInstallPipeline } from '../core/install/bulk-install-pipeline.js';
 import { runInstallPipeline, determineResolutionMode } from '../core/install/install-pipeline.js';
+import { runPathInstallPipeline } from '../core/install/path-install-pipeline.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { normalizePlatforms } from '../utils/platform-mapper.js';
-import { parsePackageInstallSpec } from '../utils/package-name.js';
+import { classifyPackageInput } from '../utils/package-input.js';
 import { logger } from '../utils/logger.js';
 import { normalizePathForProcessing } from '../utils/path-normalization.js';
 
@@ -33,22 +34,36 @@ export function validateResolutionFlags(options: InstallOptions & { local?: bool
 }
 
 async function installCommand(
-  packageName: string | undefined,
+  packageInput: string | undefined,
   options: InstallOptions
 ): Promise<CommandResult> {
   const targetDir = '.';
+  const cwd = process.cwd();
   assertTargetDirOutsideMetadata(targetDir);
   options.resolutionMode = determineResolutionMode(options);
   logger.debug('Install resolution mode selected', { mode: options.resolutionMode });
 
-  if (!packageName) {
+  if (!packageInput) {
     return await runBulkInstallPipeline(options);
   }
 
-  const { name, version, registryPath } = parsePackageInstallSpec(packageName);
+  // Classify the input to determine if it's a registry name, directory, or tarball
+  const classification = await classifyPackageInput(packageInput, cwd);
+  
+  if (classification.type === 'directory' || classification.type === 'tarball') {
+    return await runPathInstallPipeline({
+      ...options,
+      sourcePath: classification.resolvedPath!,
+      sourceType: classification.type,
+      targetDir
+    });
+  }
+  
+  // Registry-based install (existing flow)
+  const { name, version, registryPath } = classification;
   return await runInstallPipeline({
     ...options,
-    packageName: name,
+    packageName: name!,
     version,
     registryPath,
     targetDir

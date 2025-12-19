@@ -75,6 +75,16 @@ export interface PackageDependency {
    * When omitted, installs include the full package payload.
    */
   include?: string[];
+  /**
+   * Path to local directory or tarball file.
+   * - If ends with .tgz/.tar.gz: treated as tarball
+   * - Otherwise: treated as directory
+   * - If omitted: resolved from registry by name+version
+   * 
+   * Relative paths are resolved from the workspace root (for root package.yml)
+   * or from the parent package's directory (for transitive dependencies).
+   */
+  path?: string;
 }
 
 export interface PackageYml {

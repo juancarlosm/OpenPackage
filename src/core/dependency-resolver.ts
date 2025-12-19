@@ -1,11 +1,12 @@
 import * as yaml from 'js-yaml';
 import * as semver from 'semver';
+import { resolve, dirname } from 'path';
 import { safePrompts } from '../utils/prompts.js';
 import { PackageYml, Package } from '../types/index.js';
 import { packageManager } from './package.js';
 import { getInstalledPackageVersion, scanOpenPackagePackages } from './openpackage.js';
 import { logger } from '../utils/logger.js';
-import { PackageNotFoundError, PackageVersionNotFoundError, VersionConflictError } from '../utils/errors.js';
+import { PackageNotFoundError, VersionConflictError } from '../utils/errors.js';
 import { hasExplicitPrereleaseIntent } from '../utils/version-ranges.js';
 import { listPackageVersions } from './directory.js';
 import { registryManager } from './registry.js';
@@ -14,6 +15,7 @@ import { InstallResolutionMode, type PackageRemoteResolutionOutcome } from './in
 import { extractRemoteErrorReason } from '../utils/error-reasons.js';
 import { PACKAGE_PATHS } from '../constants/index.js';
 import { formatVersionLabel } from '../utils/package-versioning.js';
+import { loadPackageFromPath } from './install/path-package-loader.js';
 
 /**
  * Resolved package interface for dependency resolution
@@ -27,11 +29,12 @@ export interface ResolvedPackage {
    * Where the selected version came from during resolution.
    * - 'local'  => resolved purely from local registry data
    * - 'remote' => required remote metadata/versions to satisfy constraints
+   * - 'path'   => loaded directly from a local directory or tarball path
    *
    * This is used for UX-only surfaces (e.g. install summaries) and does not
    * affect any resolution logic.
    */
-  source?: 'local' | 'remote';
+  source?: 'local' | 'remote' | 'path';
   conflictResolution?: 'kept' | 'overwritten' | 'skipped';
   requiredVersion?: string; // The version required by the parent package
   requiredRange?: string; // The version range required by the parent package
@@ -90,7 +93,8 @@ export async function resolveDependencies(
   globalConstraints?: Map<string, string[]>,
   rootOverrides?: Map<string, string[]>,
   resolverOptions: DependencyResolverOptions = {},
-  remoteOutcomes: Map<string, PackageRemoteResolutionOutcome> = new Map()
+  remoteOutcomes: Map<string, PackageRemoteResolutionOutcome> = new Map(),
+  currentPackageSourcePath?: string  // Path to the package that declared this dependency (for resolving relative paths)
 ): Promise<ResolveDependenciesResult> {
   // Track missing dependencies for this invocation subtree
   const missing = new Set<string>();
@@ -452,29 +456,55 @@ export async function resolveDependencies(
     // Only process 'packages' array (NOT 'dev-packages' for transitive dependencies)
     const dependencies = config.packages || [];
     
-    for (const dep of dependencies) {
-      // Pass the required version from the dependency specification
-      const child = await resolveDependencies(
-        dep.name,
-        targetDir,
-        false,
-        visitedStack,
-        resolvedPackages,
-        dep.version,
-        requiredVersions,
-        globalConstraints,
-        rootOverrides,
-        resolverOptions,
-        remoteOutcomes
-      );
-      for (const m of child.missingPackages) missing.add(m);
-    }
+    // Determine the source directory for resolving relative paths
+    // If currentPackageSourcePath is provided, use its directory; otherwise use targetDir
+    const baseDir = currentPackageSourcePath ? dirname(currentPackageSourcePath) : targetDir;
     
-    // For root package, also process dev-packages
-    if (isRoot) {
-      const devDependencies = config['dev-packages'] || [];
-      for (const dep of devDependencies) {
-        // Pass the required version from the dev dependency specification
+    for (const dep of dependencies) {
+      // Check if this is a path-based dependency
+      if (dep.path) {
+        // Resolve path relative to the current package's location
+        const resolvedPath = resolve(baseDir, dep.path);
+        
+        try {
+          // Load package from path
+          const pathPackage = await loadPackageFromPath(resolvedPath);
+          
+          // Check if already resolved (avoid duplicates)
+          if (!resolvedPackages.has(pathPackage.metadata.name)) {
+            resolvedPackages.set(pathPackage.metadata.name, {
+              name: pathPackage.metadata.name,
+              version: pathPackage.metadata.version || '0.0.0',
+              pkg: pathPackage,
+              isRoot: false,
+              source: 'path',
+              requiredVersion: pathPackage.metadata.version,
+              requiredRange: dep.version
+            });
+            
+            // Recurse into this package's dependencies
+            const child = await resolveDependencies(
+              pathPackage.metadata.name,
+              targetDir,
+              false,
+              visitedStack,
+              resolvedPackages,
+              pathPackage.metadata.version,
+              requiredVersions,
+              globalConstraints,
+              rootOverrides,
+              resolverOptions,
+              remoteOutcomes,
+              resolvedPath  // Pass the source path for relative resolution
+            );
+            for (const m of child.missingPackages) missing.add(m);
+          }
+        } catch (error) {
+          logger.error(`Failed to load path-based dependency '${dep.name}' from '${dep.path}': ${error}`);
+          missing.add(dep.name);
+        }
+      } else {
+        // Standard registry-based dependency resolution
         const child = await resolveDependencies(
           dep.name,
           targetDir,
@@ -489,6 +519,72 @@ export async function resolveDependencies(
           remoteOutcomes
         );
         for (const m of child.missingPackages) missing.add(m);
+      }
+    }
+    
+    // For root package, also process dev-packages
+    if (isRoot) {
+      const devDependencies = config['dev-packages'] || [];
+      for (const dep of devDependencies) {
+        // Check if this is a path-based dependency
+        if (dep.path) {
+          // Resolve path relative to the current package's location
+          const resolvedPath = resolve(baseDir, dep.path);
+          
+          try {
+            // Load package from path
+            const pathPackage = await loadPackageFromPath(resolvedPath);
+            
+            // Check if already resolved (avoid duplicates)
+            if (!resolvedPackages.has(pathPackage.metadata.name)) {
+              resolvedPackages.set(pathPackage.metadata.name, {
+                name: pathPackage.metadata.name,
+                version: pathPackage.metadata.version || '0.0.0',
+                pkg: pathPackage,
+                isRoot: false,
+                source: 'path',
+                requiredVersion: pathPackage.metadata.version,
+                requiredRange: dep.version
+              });
+              
+              // Recurse into this package's dependencies
+              const child = await resolveDependencies(
+                pathPackage.metadata.name,
+                targetDir,
+                false,
+                visitedStack,
+                resolvedPackages,
+                pathPackage.metadata.version,
+                requiredVersions,
+                globalConstraints,
+                rootOverrides,
+                resolverOptions,
+                remoteOutcomes,
+                resolvedPath  // Pass the source path for relative resolution
+              );
+              for (const m of child.missingPackages) missing.add(m);
+            }
+          } catch (error) {
+            logger.error(`Failed to load path-based dev dependency '${dep.name}' from '${dep.path}': ${error}`);
+            missing.add(dep.name);
+          }
+        } else {
+          // Standard registry-based dependency resolution
+          const child = await resolveDependencies(
+            dep.name,
+            targetDir,
+            false,
+            visitedStack,
+            resolvedPackages,
+            dep.version,
+            requiredVersions,
+            globalConstraints,
+            rootOverrides,
+            resolverOptions,
+            remoteOutcomes
+          );
+          for (const m of child.missingPackages) missing.add(m);
+        }
       }
     }
     

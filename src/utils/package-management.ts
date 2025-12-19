@@ -173,7 +173,8 @@ export async function addPackageToYml(
   isDev: boolean = false,
   originalVersion?: string, // The original version/range that was requested
   silent: boolean = false,
-  include?: string[] | null
+  include?: string[] | null,
+  path?: string  // Path to local directory or tarball (for path-based dependencies)
 ): Promise<void> {
   const packageYmlPath = getLocalPackageYmlPath(cwd);
   
@@ -265,7 +266,8 @@ export async function addPackageToYml(
   const dependency: PackageDependency = {
     name: normalizedPackageName,
     ...(versionToWrite ? { version: versionToWrite } : {}),
-    ...(includeToWrite ? { include: includeToWrite } : {})
+    ...(includeToWrite ? { include: includeToWrite } : {}),
+    ...(path ? { path } : {})
   };
   
   // Determine target location (packages vs dev-packages)
@@ -401,6 +403,26 @@ function rangeIncludesVersion(range: string, version: string): boolean {
   }
   try {
     return semver.satisfies(version, range, { includePrerelease: true });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a package is a path-based dependency in the workspace package.yml.
+ * Path-based dependencies should be skipped during save operations.
+ */
+export async function isPathBasedDependency(cwd: string, packageName: string): Promise<boolean> {
+  const packageYmlPath = getLocalPackageYmlPath(cwd);
+  if (!(await exists(packageYmlPath))) {
+    return false;
+  }
+
+  try {
+    const config = await parsePackageYml(packageYmlPath);
+    const allDeps = [...(config.packages || []), ...(config['dev-packages'] || [])];
+    const dep = allDeps.find(d => arePackageNamesEquivalent(d.name, packageName));
+    return Boolean(dep?.path);
   } catch {
     return false;
   }

@@ -7,8 +7,8 @@ import { arePackageNamesEquivalent } from './package-name.js';
 /**
  * Extract packages from package.yml configuration
  */
-export function extractPackagesFromConfig(config: PackageYml): Array<{ name: string; version?: string; isDev: boolean }> {
-  const packages: Array<{ name: string; version?: string; isDev: boolean }> = [];
+export function extractPackagesFromConfig(config: PackageYml): Array<{ name: string; version?: string; path?: string; isDev: boolean }> {
+  const packages: Array<{ name: string; version?: string; path?: string; isDev: boolean }> = [];
   
   // Extract regular packages
   if (config.packages) {
@@ -16,6 +16,7 @@ export function extractPackagesFromConfig(config: PackageYml): Array<{ name: str
       packages.push({
         name: pkg.name,
         version: pkg.version,
+        path: pkg.path,
         isDev: false
       });
     }
@@ -27,6 +28,7 @@ export function extractPackagesFromConfig(config: PackageYml): Array<{ name: str
       packages.push({
         name: pkg.name,
         version: pkg.version,
+        path: pkg.path,
         isDev: true
       });
     }

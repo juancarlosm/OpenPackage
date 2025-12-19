@@ -1,5 +1,6 @@
 import type { CommandResult, InstallOptions, PackageYml } from '../../types/index.js';
 
+import { resolve } from 'path';
 import { ensureRegistryDirectories, listPackageVersions } from '../directory.js';
 import { createWorkspacePackageYml } from '../../utils/package-management.js';
 import { getLocalPackageYmlPath } from '../../utils/paths.js';
@@ -12,14 +13,17 @@ import { logger } from '../../utils/logger.js';
 import { normalizePlatforms } from '../../utils/platform-mapper.js';
 import { resolvePlatforms } from './platform-resolution.js';
 import { runInstallPipeline } from './install-pipeline.js';
+import { runPathInstallPipeline } from './path-install-pipeline.js';
 import { displayInstallationSummary } from './install-reporting.js';
 import { planConflictsForPackage } from '../../utils/index-based-installer.js';
 import { safePrompts } from '../../utils/prompts.js';
 import { resolveVersionRange, isExactVersion } from '../../utils/version-ranges.js';
+import { inferSourceType } from './path-package-loader.js';
 
 interface BulkPackageEntry {
   name: string;
   version?: string;
+  path?: string;
   isDev: boolean;
 }
 
@@ -92,7 +96,7 @@ export async function runBulkInstallPipeline(
 
   for (const pkg of packagesToInstall) {
     try {
-      const label = pkg.version ? `${pkg.name}@${pkg.version}` : pkg.name;
+      const label = pkg.path ? `${pkg.name} (from ${pkg.path})` : (pkg.version ? `${pkg.name}@${pkg.version}` : pkg.name);
 
       const baseConflictDecisions = options.conflictDecisions
         ? { ...options.conflictDecisions }
@@ -105,6 +109,37 @@ export async function runBulkInstallPipeline(
         conflictDecisions: baseConflictDecisions
       };
 
+      // Handle path-based packages
+      if (pkg.path) {
+        const resolvedPath = resolve(cwd, pkg.path);
+        const sourceType = inferSourceType(pkg.path);
+        
+        console.log(`\n🔧 Installing ${pkg.isDev ? '[dev] ' : ''}${label}...`);
+
+        const result = await runPathInstallPipeline({
+          ...installOptions,
+          sourcePath: resolvedPath,
+          sourceType,
+          targetDir
+        });
+
+        if (result.success) {
+          totalInstalled++;
+          results.push({ name: pkg.name, success: true });
+          console.log(`✓ Successfully installed ${pkg.name}`);
+
+          if (result.warnings && result.warnings.length > 0) {
+            result.warnings.forEach(warning => aggregateWarnings.add(warning));
+          }
+        } else {
+          totalSkipped++;
+          results.push({ name: pkg.name, success: false, error: result.error });
+          console.log(`❌ Failed to install ${pkg.name}: ${result.error}`);
+        }
+        continue;
+      }
+
+      // Registry-based packages (existing flow)
       let conflictPlanningVersion = pkg.version;
       if (pkg.version && !isExactVersion(pkg.version)) {
         try {

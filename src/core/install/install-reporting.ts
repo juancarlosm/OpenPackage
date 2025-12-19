@@ -2,12 +2,13 @@ import type { PackageRemoteResolutionOutcome } from './types.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';
 
 export function formatSelectionSummary(
-  source: 'local' | 'remote',
+  source: 'local' | 'remote' | 'path',
   packageName: string,
   version: string
 ): string {
   const packageSpecifier = packageName.startsWith('@') ? packageName : `@${packageName}`;
-  return `✓ Selected ${source} ${packageSpecifier}@${version}`;
+  const sourceLabel = source === 'path' ? 'local path' : source;
+  return `✓ Selected ${sourceLabel} ${packageSpecifier}@${version}`;
 }
 
 export function displayInstallationSummary(

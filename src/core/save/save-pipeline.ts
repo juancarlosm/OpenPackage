@@ -2,7 +2,7 @@ import { CommandResult, PackageFile } from '../../types/index.js';
 import { PACKAGE_PATHS, UNVERSIONED } from '../../constants/index.js';
 import { ensureRegistryDirectories } from '../directory.js';
 import { logger } from '../../utils/logger.js';
-import { addPackageToYml, createWorkspacePackageYml } from '../../utils/package-management.js';
+import { addPackageToYml, createWorkspacePackageYml, isPathBasedDependency } from '../../utils/package-management.js';
 import { performPlatformSync, PlatformSyncResult } from '../sync/platform-sync.js';
 import { LOG_PREFIXES, ERROR_MESSAGES, MODE_LABELS } from './constants.js';
 import { isPackageTransitivelyCovered } from '../../utils/dependency-coverage.js';
@@ -182,6 +182,20 @@ export async function runSavePipeline(
   );
 
   if (packageContext.location !== 'root') {
+    // Skip saving path-based dependencies - they're linked, not copied
+    const isPathBased = await isPathBasedDependency(cwd, effectiveConfig.name);
+    if (isPathBased) {
+      console.log(`ℹ️  Skipping '${effectiveConfig.name}' (linked from path)`);
+      return {
+        success: true,
+        data: {
+          config: effectiveConfig,
+          packageFiles,
+          syncResult
+        }
+      };
+    }
+
     const covered = await isPackageTransitivelyCovered(cwd, effectiveConfig.name);
     if (!covered) {
       const versionForYml = isUnversioned ? undefined : effectiveConfig.version;
