@@ -1,4 +1,6 @@
 import * as yaml from 'js-yaml';
+import type { Platform } from '../core/platforms.js';
+import { resolvePlatformKey } from '../core/platforms.js';
 
 export interface FrontmatterSplitResult<T = any> {
   frontmatter: T | null;
@@ -110,6 +112,34 @@ export function deepEqualYaml(a: any, b: any): boolean {
   return JSON.stringify(normalizeYamlNode(a)) === JSON.stringify(normalizeYamlNode(b));
 }
 
+/**
+ * Deep merge two YAML-compatible data structures.
+ * Arrays are replaced entirely, objects are merged recursively.
+ */
+export function deepMerge(base: any, override: any): any {
+  if (Array.isArray(base) && Array.isArray(override)) {
+    return override.slice();
+  }
+
+  if (isPlainObject(base) && isPlainObject(override)) {
+    const result: Record<string, any> = { ...base };
+    for (const [key, value] of Object.entries(override)) {
+      if (key in result) {
+        result[key] = deepMerge(result[key], value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  if (override !== undefined) {
+    return override;
+  }
+
+  return base;
+}
+
 export function isPlainObject(value: any): value is Record<string, any> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -213,3 +243,32 @@ export function subtractKeys(target: any, keys: any): any {
   return result;
 }
 
+export function extractInlinePlatformOverrides(
+  frontmatter: Record<string, any> | null | undefined,
+  cwd?: string
+): {
+  common: Record<string, any>;
+  overridesByPlatform: Map<Platform, Record<string, any>>;
+} {
+  const overridesByPlatform = new Map<Platform, Record<string, any>>();
+  if (!isPlainObject(frontmatter)) {
+    return { common: {}, overridesByPlatform };
+  }
+
+  // Collect shared/common keys (everything except the reserved openpackage block)
+  const { openpackage, ...rest } = frontmatter;
+  // Use cloneYaml(rest) to ensure deep copy, simpler than iterating.
+  const common: Record<string, any> = cloneYaml(rest);
+
+  // Collect platform overrides from the reserved openpackage block
+  if (isPlainObject(openpackage)) {
+    for (const [key, value] of Object.entries(openpackage)) {
+      const platform = resolvePlatformKey(key, cwd);
+      if (platform && isPlainObject(value)) {
+        overridesByPlatform.set(platform, cloneYaml(value));
+      }
+    }
+  }
+
+  return { common, overridesByPlatform };
+}

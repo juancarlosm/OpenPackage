@@ -31,7 +31,7 @@ import { mapUniversalToPlatform } from './platform-mapper.js';
 import { safePrompts } from './prompts.js';
 import type { InstallOptions } from '../types/index.js';
 import type { PackageFile } from '../types/index.js';
-import { mergePlatformYamlOverride, loadRegistryYamlOverrides } from './platform-yaml-merge.js';
+import { mergeInlinePlatformOverride } from './platform-yaml-merge.js';
 import { parseUniversalPath } from './platform-file.js';
 import { getPlatformDefinition } from '../core/platforms.js';
 
@@ -627,7 +627,10 @@ function groupPlannedFiles(plannedFiles: PlannedFile[], cwd?: string): Map<strin
 // Planning Functions
 // ============================================================================
 
-function buildPlannedTargetMap(plannedFiles: PlannedFile[], yamlOverrides: PackageFile[]): Map<string, PlannedTargetDetail> {
+function buildPlannedTargetMap(
+  plannedFiles: PlannedFile[],
+  cwd?: string
+): Map<string, PlannedTargetDetail> {
   const map = new Map<string, PlannedTargetDetail>();
 
   type PlannedWithParsed = { planned: PlannedFile; parsed: ReturnType<typeof parseUniversalPath> };
@@ -648,15 +651,13 @@ function buildPlannedTargetMap(plannedFiles: PlannedFile[], yamlOverrides: Packa
       for (const target of planned.targets) {
         const normalizedRel = normalizePathForProcessing(target.relPath);
 
-        // Compute per-target content (apply platform YAML overrides for universal files)
+        // Compute per-target content (apply inline platform overrides for universal files)
         let content = planned.content;
-        if (parsed && target.platform && target.platform !== 'other') {
-          content = mergePlatformYamlOverride(
+        if (parsed && !parsed.platformSuffix && target.platform && target.platform !== 'other') {
+          content = mergeInlinePlatformOverride(
             planned.content,
             target.platform as Platform,
-            parsed.universalSubdir,
-            parsed.relPath,
-            yamlOverrides
+            cwd
           );
         }
 
@@ -950,10 +951,7 @@ export async function installPackageByIndex(
     logger.warn(warning);
   }
 
-  // Load platform YAML overrides once per install
-  const yamlOverrides = await loadRegistryYamlOverrides(packageName, version, cwd);
-
-  const plannedTargetMap = buildPlannedTargetMap(plannedFiles, yamlOverrides);
+  const plannedTargetMap = buildPlannedTargetMap(plannedFiles, cwd);
   const { planned, deletions } = computeDiff(plannedTargetMap, previousOwnedPaths);
 
   const operationResult = await applyFileOperations(cwd, planned, deletions, options);
@@ -1392,7 +1390,7 @@ export async function applyPlannedSyncForPackageFiles(
     logger.warn(warning);
   }
 
-  const plannedTargetMap = buildPlannedTargetMap(plannedFiles, packageFiles);
+  const plannedTargetMap = buildPlannedTargetMap(plannedFiles, cwd);
   const { planned, deletions } = computeDiff(plannedTargetMap, previousOwnedPaths);
 
   const operationResult = await applyFileOperations(cwd, planned, deletions, options);

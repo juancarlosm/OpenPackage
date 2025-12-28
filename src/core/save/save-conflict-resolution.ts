@@ -3,7 +3,7 @@ import type { PackageFile } from '../../types/index.js';
 import type { PackageContext } from '../package-context.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { readPackageIndex, isDirKey } from '../../utils/package-index-yml.js';
-import { ensureDir, exists, isDirectory, readTextFile, writeTextFile, remove } from '../../utils/fs.js';
+import { ensureDir, exists, isDirectory, readTextFile, writeTextFile } from '../../utils/fs.js';
 import {
   normalizeRegistryPath,
 } from '../../utils/registry-entry-filter.js';
@@ -18,7 +18,6 @@ import {
 import {
   buildFrontmatterMergePlans,
   applyFrontmatterMergePlans,
-  getOverrideRelativePath,
 } from './save-yml-resolution.js';
 import { loadLocalCandidates, discoverWorkspaceCandidates } from './save-candidate-loader.js';
 import {
@@ -278,19 +277,10 @@ export async function resolvePackageFilesWithConflicts(
         logger.debug(`Wrote platform-specific file: ${platformRegistryPath}`);
 
         if (pathsWithFrontmatterPlans.has(group.registryPath)) {
-          const overrideRelativePath = getOverrideRelativePath(group.registryPath, platform);
-          if (overrideRelativePath) {
-          const overrideFullPath = join(packageRootDir, overrideRelativePath);
-            if (await exists(overrideFullPath)) {
-              await remove(overrideFullPath);
-              logger.debug(`Removed redundant platform override: ${overrideRelativePath}`);
-            }
-          }
-
           const plan = frontmatterPlanMap.get(group.registryPath);
           if (plan) {
             plan.workspaceEntries = plan.workspaceEntries.filter(entry => entry.platform !== platform);
-            plan.platformOverrides.delete(platform);
+            plan.platformDiffs.delete(platform);
             if (plan.workspaceEntries.length === 0) {
               frontmatterPlanMap.delete(group.registryPath);
               pathsWithFrontmatterPlans.delete(group.registryPath);

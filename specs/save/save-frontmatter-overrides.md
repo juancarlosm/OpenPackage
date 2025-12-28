@@ -1,8 +1,8 @@
-### Save Pipeline – Frontmatter and YAML Overrides
+### Save Pipeline – Frontmatter and Inline Platform Overrides
 
 #### 1. Overview
 
-For markdown files, the pipeline manages **frontmatter** and platform‑specific overrides to keep shared metadata centralized while allowing platform-specific behavior.
+For markdown files, the pipeline manages **frontmatter** and platform‑specific overrides to keep shared metadata centralized while allowing platform-specific behavior. Platform overrides now live **inline** inside the universal markdown frontmatter under `openpackage.<platform>` (ids/aliases); no separate `.yml` override files are written.
 
 ---
 
@@ -26,25 +26,22 @@ For each platform:
 
 - The per‑platform frontmatter is compared against the universal frontmatter.
 - Only the **difference** per platform is treated as that platform's override, or omitted if empty.
-- Platform overrides are written into **separate YAML files** in a dedicated overrides location.
+- Platform overrides are embedded **inline** under `openpackage.<platform>` (id/alias) in the universal frontmatter.
+- During apply/install, the target platform’s block is deep‑merged onto the common frontmatter to produce the final frontmatter for that platform. Platform blocks are not emitted in the installed files.
 
 ---
 
 #### 5. Conflicts with Existing Overrides
 
-When a platform override file already exists for a path:
-
-- The pipeline compares existing and new frontmatter, taking modification times into account.
-- Typically:
-  - If the newer change comes from the workspace, it is preferred by default.
-  - When there is a conflicting but not clearly newer override, the user may be prompted to choose between workspace and existing override content where appropriate.
+All overrides are computed from workspace candidates (overwrite-derived). The universal frontmatter is rewritten to contain the shared keys plus per-platform blocks; no external override files are consulted or prompted for.
 
 ---
 
 #### 6. Resulting Layout
 
-- One universal markdown file with shared frontmatter.
-- Zero or more per‑platform YAML override files capturing only the per‑platform differences.
+- One universal markdown file with:
+  - Shared/common frontmatter keys
+  - Per‑platform blocks nested under `openpackage.<platform>` containing only the per‑platform differences
 
 This scheme keeps:
 
@@ -67,7 +64,6 @@ After all conflicts and frontmatter merges are resolved, the pipeline reads the 
 
 - Paths allowed by the regular registry path rules.
 - Root files (the unified root agents file and related root docs).
-- YAML override files that represent platform‑specific metadata.
 - Root‑level files adjacent to `package.yml` that are intended as part of the package.
 
 ---

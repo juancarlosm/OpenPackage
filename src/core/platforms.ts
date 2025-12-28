@@ -11,13 +11,11 @@ import { getPathLeaf } from "../utils/path-normalization.js"
 import {
   DIR_PATTERNS,
   FILE_PATTERNS,
-  type UniversalSubdir,
 } from "../constants/index.js"
 import { mapPlatformFileToUniversal } from "../utils/platform-mapper.js"
 import { parseUniversalPath } from "../utils/platform-file.js"
 import { readJsoncFileSync, readJsoncOrJson } from "../utils/jsonc.js"
 import * as os from "os"
-import { deepMerge } from "../utils/platform-yaml-merge.js"
 
 export type Platform = string
 
@@ -455,6 +453,26 @@ export function resolvePlatformName(
   }
 
   return state.aliasLookup[normalized]
+}
+
+/**
+ * Resolve a frontmatter/platform key (id or alias, case-insensitive) to a canonical platform id.
+ * Returns null when the key is not a known platform or alias.
+ */
+export function resolvePlatformKey(
+  key: string,
+  cwd?: string
+): Platform | null {
+  if (!key) return null
+
+  const normalized = key.toLowerCase()
+  const state = getPlatformsState(cwd)
+
+  if (normalized in state.defs) {
+    return normalized as Platform
+  }
+
+  return state.aliasLookup[normalized] ?? null
 }
 
 /**

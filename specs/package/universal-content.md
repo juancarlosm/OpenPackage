@@ -22,7 +22,6 @@ Universal subdirs (standard: `agents/`, `rules/`, `commands/`, `skills/`; plus a
     <universal-subdir>/        # e.g., agents/, rules/, commands/, skills/, or custom (from platforms.jsonc)
       <name>.md                # universal markdown
       <name>.<platform>.md     # platform-suffixed markdown (optional)
-      <name>.<platform>.yml    # YAML override for frontmatter (optional)
     ...                         # other standard/custom subdirs
 ```
 
@@ -36,10 +35,6 @@ Universal subdirs (standard: `agents/`, `rules/`, `commands/`, `skills/`; plus a
   - Paths like `.openpackage/agents/foo.<platform>.md`
   - Represents platform-specific variants of a universal file
   
-- **YAML override files**:
-  - Paths like `.openpackage/agents/foo.<platform>.yml`
-  - Contains only the **per-platform difference** in frontmatter
-
 ---
 
 #### Root-Level Content (Outside `.openpackage/`)
@@ -119,19 +114,14 @@ In the canonical structure:
 - Each universal markdown file (`.openpackage/<subdir>/<name>.md`) is the **single source of truth** for:
   - Markdown body
   - Shared frontmatter keys/common metadata
+  - Platform overrides embedded inline under `openpackage.<platform>` (ids/aliases, only diffs)
 
-- Platform overrides live alongside their universal file:
-
-```text
-.openpackage/agents/foo.md              # universal body + shared frontmatter
-.openpackage/agents/foo.claude.yml      # CLAUDE-specific frontmatter diff
-.openpackage/agents/foo.claude.md       # optional CLAUDE-specific markdown body
-```
+- Platform-specific content files (`<name>.<platform>.md`) remain optional body overrides.
 
 The save pipeline:
 
 1. Normalizes workspace markdown and computes:
    - Universal frontmatter to keep in `foo.md`
-   - Per-platform differences to write as `foo.<platform>.yml`
-2. Writes override files into the `.openpackage/<subdir>/` tree
+   - Per-platform differences to store as inline blocks under `openpackage.<platform>` inside `foo.md`
+2. Writes only the universal file (plus any platform-specific markdown files)
 
