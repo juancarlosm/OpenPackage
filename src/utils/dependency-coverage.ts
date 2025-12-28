@@ -26,7 +26,7 @@ export async function getDependencyCoverage(cwd: string): Promise<DependencyCove
   try {
     config = await parsePackageYml(packageYmlPath);
   } catch (error) {
-    logger.warn(`Failed to parse main package.yml while computing dependency coverage: ${error}`);
+    logger.warn(`Failed to parse main openpackage.yml while computing dependency coverage: ${error}`);
     return { direct, transitive };
   }
 

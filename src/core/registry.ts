@@ -75,9 +75,9 @@ export class RegistryManager {
               
               entries.push({
                 name: metadata.name,
-                version: version, // Use version from directory name, not package.yml
+                version: version, // Use version from directory name, not openpackage.yml
                 description: metadata.description,
-                author: undefined, // Not available in package.yml
+                author: undefined, // Not available in openpackage.yml
                 lastUpdated: new Date().toISOString() // We don't track this anymore
               });
             }
@@ -103,9 +103,9 @@ export class RegistryManager {
             
             entries.push({
               name: metadata.name,
-              version: latestVersion, // Use version from directory name, not package.yml
+              version: latestVersion, // Use version from directory name, not openpackage.yml
               description: metadata.description,
-              author: undefined, // Not available in package.yml
+              author: undefined, // Not available in openpackage.yml
               lastUpdated: new Date().toISOString() // We don't track this anymore
             });
           }
@@ -295,12 +295,12 @@ export class RegistryManager {
 
           // Check metadata consistency
           if (metadata.name !== pkg.name) {
-            issues.push(`Name mismatch in package '${pkg.name}': package.yml says '${metadata.name}'`);
+            issues.push(`Name mismatch in package '${pkg.name}': openpackage.yml says '${metadata.name}'`);
           }
 
           if (metadata.version && pkg.version && semver.valid(metadata.version) && semver.valid(pkg.version)) {
             if (semver.neq(metadata.version, pkg.version)) {
-              issues.push(`Version mismatch in package '${pkg.name}': registry says '${pkg.version}', package.yml says '${metadata.version}'`);
+              issues.push(`Version mismatch in package '${pkg.name}': registry says '${pkg.version}', openpackage.yml says '${metadata.version}'`);
             }
           }
 

@@ -30,9 +30,7 @@ export function parseUniversalPath(
   const universalSubdirs = getAllUniversalSubdirs(options.cwd);
   const knownPlatforms = getAllPlatforms({ includeDisabled: true }) as readonly Platform[];
   const normalized = normalizePathForProcessing(path);
-  const withoutPrefix = normalized.startsWith(`${DIR_PATTERNS.OPENPACKAGE}/`)
-    ? normalized.slice(DIR_PATTERNS.OPENPACKAGE.length + 1)
-    : normalized;
+  const withoutPrefix = normalized; // Strict v2: do not strip legacy .openpackage/ prefix
 
   for (const subdir of universalSubdirs) {
     const parsed = parsePathWithPrefix(withoutPrefix, subdir);

@@ -11,14 +11,14 @@ import { parsePackageYml } from './package-yml.js';
  */
 
 /**
- * Get the path to the local package.yml file
+ * Get the path to the workspace manifest (openpackage.yml)
  */
 export function getLocalPackageYmlPath(cwd: string): string {
-  return join(cwd, DIR_PATTERNS.OPENPACKAGE, FILE_PATTERNS.PACKAGE_YML);
+  return join(cwd, DIR_PATTERNS.OPENPACKAGE, FILE_PATTERNS.OPENPACKAGE_YML);
 }
 
 /**
- * Check if a package name matches the root package in .openpackage/package.yml
+ * Check if a package name matches the root package in .openpackage/openpackage.yml
  */
 export async function isRootPackage(cwd: string, packageName: string): Promise<boolean> {
   const rootPackageYmlPath = getLocalPackageYmlPath(cwd);
@@ -62,11 +62,11 @@ export function getLocalPackageDir(cwd: string, packageName: string): string {
 }
 
 /**
- * Get the content directory (.openpackage/) for a nested package.
- * This is where package.yml, the package index file, and universal content live.
+ * Get the cached package root directory for a specific package.
+ * Cached copies mirror the package payload at their root.
  */
 export function getLocalPackageContentDir(cwd: string, packageName: string): string {
-  return join(getLocalPackageDir(cwd, packageName), DIR_PATTERNS.OPENPACKAGE);
+  return getLocalPackageDir(cwd, packageName);
 }
 
 /**

@@ -3,7 +3,7 @@
 This document specifies how `install` chooses **which concrete version** of a package to install, given:
 
 - A **package name**.
-- An **effective version constraint** (from `package.yml` and/or CLI).
+- An **effective version constraint** (from `openpackage.yml` and/or CLI).
 - Access to **local registry versions** and optionally **remote registry metadata**.
 
 The goal is to implement **“latest in range from local+remote”** deterministically, with clear WIP vs stable semantics.
@@ -16,10 +16,10 @@ The goal is to implement **“latest in range from local+remote”** determinist
 - **Constraint**:
   - A string understood by `version-ranges` (exact, caret, tilde, wildcard, comparison).
   - Examples: `1.2.3`, `^1.2.0`, `~2.0.1`, `>=3.0.0 <4.0.0`, `*`, `latest`.
-- When a dependency entry in `package.yml` omits `version`, the effective constraint is treated as `*` (wildcard).
+- When a dependency entry in `openpackage.yml` omits `version`, the effective constraint is treated as `*` (wildcard).
 - **Local versions**:
   - Semver versions discoverable via `listPackageVersions(name)` from the **local registry**.
-  - May include a `0.0.0` entry when the package has no `version` in `package.yml`.
+  - May include a `0.0.0` entry when the package has no `version` in `openpackage.yml`.
   - Includes both **stable** and **WIP/pre-release** semver versions, e.g. `1.2.3`, `1.2.3-000fz8.a3k`.
 - **Remote versions**:
   - Semver versions discoverable via remote metadata APIs (e.g. via `fetchRemotePackageMetadata` / registry metadata).
@@ -33,12 +33,12 @@ The goal is to implement **“latest in range from local+remote”** determinist
 - **Base rule**:
   - The **effective `available` set** depends on the resolution mode and scenario, and this rule is applied **uniformly** to:
     - The **root package** being installed.
-    - **All recursive dependencies** discovered from `package.yml` files.
+    - **All recursive dependencies** discovered from `openpackage.yml` files.
     - Any **pre-flight checks or validations** that need to answer “what version would be chosen?” for a given name + constraint.
     - **Local-only / explicit `--local`**:
       - **`available = local`**.
       - Remote metadata is **never** consulted; if no satisfying local version exists, resolution fails (see error behavior).
-    - **Fresh dependency installs in default mode** (e.g. `opkg install <name>` or `opkg install <name>@<spec>` where `<name>` is **not yet declared** in `package.yml`):
+    - **Fresh dependency installs in default mode** (e.g. `opkg install <name>` or `opkg install <name>@<spec>` where `<name>` is **not yet declared** in `openpackage.yml`):
       - Version selection is **local-first with remote fallback**, regardless of whether the effective constraint is a wildcard or an explicit range:
         - Step 1 – **Local-only attempt**:
           - Start with **`available_local = local`**.
@@ -53,7 +53,7 @@ The goal is to implement **“latest in range from local+remote”** determinist
               - Resolution fails with a clear error that:
                 - Explains that no satisfying local version exists, and
                 - Mentions that remote lookup also failed (or was disabled).
-    - **Existing dependencies in default mode** (e.g. entries already in `package.yml`, or dependencies declared in nested `package.yml` files during recursive resolution):
+    - **Existing dependencies in default mode** (e.g. entries already in `openpackage.yml`, or dependencies declared in nested `openpackage.yml` files during recursive resolution):
       - Resolution also follows a **local-first with remote fallback** policy:
         - Step 1 – **Local-only attempt**:
           - Use **only local registry versions** that match the declared range to build `available_local`.
@@ -89,7 +89,7 @@ The goal is to implement **“latest in range from local+remote”** determinist
 - **Invalid constraints**:
   - If the constraint string cannot be parsed:
     - The install operation **fails early** with a clear error.
-    - The user is instructed to fix the version in `package.yml` for canonical cases, or in the CLI for fresh installs.
+    - The user is instructed to fix the version in `openpackage.yml` for canonical cases, or in the CLI for fresh installs.
 
 ---
 
@@ -124,7 +124,7 @@ If no version satisfies the constraint:
     - The requested range.
     - The set of available stable and WIP versions.
   - Suggestions for:
-    - Editing `package.yml` to broaden the range.
+    - Editing `openpackage.yml` to broaden the range.
     - Using `pack` / `save` to create a compatible version.
 
 ---
@@ -184,7 +184,7 @@ If no version satisfies the constraint:
 ### 6.2 Wildcard / latest (`*`, `latest`)
 
 - **Fresh dependency default (wildcard)**:
-  - For `opkg install <name>` where `<name>` is not yet in `package.yml` and the effective constraint is wildcard/latest:
+  - For `opkg install <name>` where `<name>` is not yet in `openpackage.yml` and the effective constraint is wildcard/latest:
     - Resolution follows the **local-first with remote fallback** policy (see §2 and §7):
       - First, attempt selection using **only local versions** as `available`.
       - If no local versions exist, or none satisfy the wildcard constraint:
@@ -232,12 +232,12 @@ If no version satisfies the constraint:
 ## 7. Local vs remote precedence
 
 - **Default mode**:
-  - For **all dependency resolutions in default mode** (root package and recursive dependencies, whether or not they are already declared in some `package.yml`):
+  - For **all dependency resolutions in default mode** (root package and recursive dependencies, whether or not they are already declared in some `openpackage.yml`):
     - The resolver behaves as **local-first with automatic fallback to remote** as described in §2:
       - It first attempts to satisfy the effective constraint using **local versions only**.
       - If no satisfying local version exists, it **includes remote versions** (when available) and retries selection over the combined set.
       - Only when **neither local nor remote** can satisfy the constraint does it fail with a “no matching versions found” style error.
-  - For **fresh dependencies** (`opkg install <name>` or `opkg install <name>@<spec>` where `<name>` is not yet in `package.yml`, and `--local` is **not** set):
+  - For **fresh dependencies** (`opkg install <name>` or `opkg install <name>@<spec>` where `<name>` is not yet in `openpackage.yml`, and `--local` is **not** set):
     - This is just a special case of the general rule above, where the dependency is being introduced for the first time into the workspace.
 
 - **`--remote` mode**:
@@ -252,13 +252,13 @@ If no version satisfies the constraint:
 These examples assume remote is reachable.
 
 - **Example 1 – Simple caret range**:
-  - `package.yml`: `foo: ^1.2.0`
+  - `openpackage.yml`: `foo: ^1.2.0`
   - Local: `1.2.3`, `1.3.0`
   - Remote: `1.3.1`
   - Selected: **`1.3.1`**.
 
 - **Example 2 – WIP and stable (default behavior)**:
-  - `package.yml`: `foo: ^1.2.0`
+  - `openpackage.yml`: `foo: ^1.2.0`
   - Local: `1.2.3-000fz8.a3k`, `1.2.3`, `1.3.0-000fz9.a3k`
   - Remote: `1.3.0`
   - Satisfying: `1.2.3`, `1.3.0-000fz9.a3k`, `1.3.0`
@@ -266,7 +266,7 @@ These examples assume remote is reachable.
   - With `--stable`: **`1.3.0`** (same result, stable preferred).
 
 - **Example 2b – WIP and stable (WIP is newer)**:
-  - `package.yml`: `foo: ^1.2.0`
+  - `openpackage.yml`: `foo: ^1.2.0`
   - Local: `1.2.3`, `1.3.0-000fz9.a3k`
   - Remote: `1.3.0`
   - Satisfying: `1.2.3`, `1.3.0-000fz9.a3k`, `1.3.0`
@@ -274,7 +274,7 @@ These examples assume remote is reachable.
   - With `--stable`: **`1.3.0`** (stable preferred over WIP).
 
 - **Example 3 – No stable exists**:
-  - `package.yml`: `foo: ^1.0.0-0` (or explicit WIP version).
+  - `openpackage.yml`: `foo: ^1.0.0-0` (or explicit WIP version).
   - Local: none.
   - Remote: `1.0.0-000fz8.a3k`, `1.0.1-000fz9.a3k`
   - Selected: **`1.0.1-000fz9.a3k`**.
@@ -285,7 +285,7 @@ These examples assume remote is reachable.
   - Remote: `0.1.0-000fz8.a3k`
   - Selected: **`0.1.0-000fz8.a3k`**, but:
     - The CLI should make it clear the installed version is a **pre-release/WIP**.
-    - The stored range in `package.yml` may be **exact** or chosen policy-driven (e.g. exact WIP string).
+    - The stored range in `openpackage.yml` may be **exact** or chosen policy-driven (e.g. exact WIP string).
 
 ---
 
@@ -298,7 +298,7 @@ Version resolution chooses **which version string** to install; this section sum
     - Path: `~/.openpackage/registry/<pkg>/<wipVersion>/...`.
     - The loader must:
       - Load package files directly from that directory.
-      - Read the `package.yml` from that directory for metadata.
+      - Read the `openpackage.yml` from that directory for metadata.
   - The resolved version string (`S-<t>.<w>`) still participates in semver ordering and dependency resolution as specified above.
 
 - **Remote WIPs**:

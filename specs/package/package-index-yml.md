@@ -1,15 +1,15 @@
-### Package Index File (`package.index.yml`)
+### Package Index File (`openpackage.index.yml`)
 
-The `package.index.yml` file tracks the mapping between package files and their **actually installed** workspace locations.
+The `openpackage.index.yml` file tracks the mapping between package files and their **actually installed** workspace locations.
 
 ---
 
 #### Location
 
-- **Root package**: `cwd/.openpackage/package.index.yml`
-- **Nested package**: `cwd/.openpackage/packages/<name>/.openpackage/package.index.yml`
+- **Root package (workspace-local metadata)**: `cwd/.openpackage/openpackage.index.yml`
+- **Nested package (cached package root)**: `cwd/.openpackage/packages/<name>/openpackage.index.yml`
 
-> **Note**: `package.index.yml` is **never** included in the registry payload. It's workspace-local metadata.
+> **Note**: `openpackage.index.yml` is **never** included in the registry payload. It's workspace-local metadata.
 
 ---
 
@@ -19,9 +19,8 @@ The following files are **never** included in the index, even though they may ex
 
 | File | Reason |
 |------|--------|
-| `package.yml` | Package manifest; not synced to workspace |
-| `.openpackage/package.yml` | Same as above (path variant) |
-| `package.index.yml` | Index file itself; workspace-local metadata |
+| `openpackage.yml` | Package manifest; not synced as a regular content file |
+| `openpackage.index.yml` | Index file itself; workspace-local metadata |
 
 The index only contains entries for content that is **actually synced** to workspace locations.
 
@@ -51,8 +50,8 @@ Registry keys are **relative to the package root**:
 
 | Content Type | Key Format | Example |
 |--------------|------------|---------|
-| Universal content | `.openpackage/<subdir>/<file>` | `.openpackage/commands/test.md` |
-| Root-level content | `<path>` | `<dir>/helper.md` |
+| Universal content | `<subdir>/<file>` | `commands/test.md` |
+| Root-level content | `<path>` | `<dir>/helper.md` (not installed by default) |
 | Root files | `<filename>` | `AGENTS.md` |
 
 ---
@@ -64,7 +63,7 @@ Values are **relative to the workspace root (`cwd`)** and represent **paths that
 | Content Type | Value Format | Example |
 |--------------|--------------|---------|
 | Universal content | Platform-specific paths | `.cursor/commands/test.md`, `.opencode/commands/test.md` |
-| Root-level content | Same as key | `ai/helper.md` |
+| Root-level content | Same as key | `ai/helper.md` (when explicitly installed) |
 
 > **Important**: The index only records paths where files **actually exist**. If a file is only installed to one platform (e.g., `.cursor/`), only that path appears in the index—not hypothetical paths for other platforms.
 

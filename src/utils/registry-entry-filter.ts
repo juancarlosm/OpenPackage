@@ -11,8 +11,6 @@ import { getPlatformRootFiles, getAllUniversalSubdirs, isPlatformId } from '../c
 import { isManifestPath } from './manifest-paths.js';
 
 const ROOT_REGISTRY_FILE_NAMES = getPlatformRootFiles();
-const OPENPACKAGE_PREFIX = `${DIR_PATTERNS.OPENPACKAGE}/`;
-
 export function normalizeRegistryPath(registryPath: string): string {
   return normalizePathForProcessing(registryPath);
 }
@@ -27,7 +25,7 @@ export function isRootRegistryPath(registryPath: string): boolean {
 export function isSkippableRegistryPath(registryPath: string): boolean {
   const normalized = normalizeRegistryPath(registryPath);
   
-  // Handle package.yml at any level (.openpackage/package.yml, package.yml, etc.)
+  // Handle openpackage.yml at any level
   if (isManifestPath(normalized)) {
     return true;
   }
@@ -59,15 +57,15 @@ export function isSkippableRegistryPath(registryPath: string): boolean {
 export function isAllowedRegistryPath(registryPath: string): boolean {
   const normalized = normalizeRegistryPath(registryPath);
 
-  if (isRootRegistryPath(normalized)) {
-    return false;
-  }
+  if (isRootRegistryPath(normalized)) return false;
+  if (isSkippableRegistryPath(normalized)) return false;
 
-  if (isSkippableRegistryPath(normalized)) {
-    return false;
-  }
+  // Reject copy-to-root entries here; they are handled explicitly elsewhere
+  if (normalized.startsWith('root/')) return false;
 
-  return true;
+  // Strict v2: only accept paths whose first component is a universal subdir
+  const universalInfo = extractUniversalSubdirInfo(normalized);
+  return Boolean(universalInfo);
 }
 
 export function extractUniversalSubdirInfo(
@@ -75,19 +73,20 @@ export function extractUniversalSubdirInfo(
   cwd?: string
 ): { universalSubdir: string; relPath: string } | null {
   const normalized = normalizeRegistryPath(registryPath);
-  if (!normalized.startsWith(OPENPACKAGE_PREFIX)) {
+
+  // Strict v2: do not accept legacy .openpackage/ prefix
+  if (normalized.startsWith(`${DIR_PATTERNS.OPENPACKAGE}/`)) {
     return null;
   }
 
-  const afterPrefix = normalized.slice(OPENPACKAGE_PREFIX.length);
-  const firstComponent = getFirstPathComponent(afterPrefix);
+  const firstComponent = getFirstPathComponent(normalized);
 
   const universalSubdirs = getAllUniversalSubdirs(cwd);
   if (!firstComponent || !universalSubdirs.has(firstComponent)) {
     return null;
   }
 
-  const relPath = getPathAfterFirstComponent(afterPrefix) ?? '';
+  const relPath = getPathAfterFirstComponent(normalized) ?? '';
   return {
     universalSubdir: firstComponent,
     relPath

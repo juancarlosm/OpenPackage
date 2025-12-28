@@ -119,10 +119,10 @@ async function scanLocalPackageMetadata(cwd: string): Promise<Map<string, Packag
   }
   
   try {
-    // Use the generic recursive scanner to find all pkg.yml files
+    // Use the generic recursive scanner to find all openpackage.yml files
     const packageDirs = await findDirectoriesContainingFile(
       packagesDir,
-      FILE_PATTERNS.PACKAGE_YML,
+      FILE_PATTERNS.OPENPACKAGE_YML,
       async (filePath) => {
         try {
           return await parsePackageYml(filePath);
@@ -254,7 +254,7 @@ async function analyzePackageStatus(
   // If local metadata is missing, likely .openpackage/packages/<name>/pkg.yml is missing or misnamed
   if (!localMetadata) {
     status.status = 'files-missing';
-    status.issues = [`'${FILE_PATTERNS.PACKAGE_YML}' is missing or misnamed`];
+    status.issues = [`'${FILE_PATTERNS.OPENPACKAGE_YML}' is missing or misnamed`];
     // Avoid confusing 0.0.0 display when metadata is missing
     status.installedVersion = requiredVersion;
     return status;

@@ -59,7 +59,7 @@ export async function determineCanonicalInstallPlan(args: CanonicalPlanArgs): Pr
         canonicalTarget: existing.target,
         dependencyInclude: existing.include,
         persistDecision: { type: 'none' },
-        compatibilityMessage: `Using version range from package.yml (${existing.range}); CLI spec '${cliConstraint.displayRange}' is compatible.`
+        compatibilityMessage: `Using version range from openpackage.yml (${existing.range}); CLI spec '${cliConstraint.displayRange}' is compatible.`
       };
     }
 
@@ -152,7 +152,7 @@ function parseConstraintOrThrow(source: 'cli' | 'package', raw: string, packageN
     }
 
     throw new Error(
-      `Dependency '${packageName}' in .openpackage/package.yml has invalid version '${raw}'. ${message}. Edit the file and try again.`
+      `Dependency '${packageName}' in .openpackage/openpackage.yml has invalid version '${raw}'. ${message}. Edit the file and try again.`
     );
   }
 }
@@ -167,7 +167,7 @@ function isRangeSubset(candidate: string, canonical: string): boolean {
 
 function buildCanonicalConflictError(packageName: string, cliSpec: string, canonicalRange: string): Error {
   return new Error(
-    `Requested '${packageName}@${cliSpec}', but .openpackage/package.yml declares '${packageName}' with range '${canonicalRange}'. Edit package.yml to change the dependency line, then re-run opkg install.`
+    `Requested '${packageName}@${cliSpec}', but .openpackage/openpackage.yml declares '${packageName}' with range '${canonicalRange}'. Edit openpackage.yml to change the dependency line, then re-run opkg install.`
   );
 }
 

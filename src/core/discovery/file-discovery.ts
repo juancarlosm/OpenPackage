@@ -34,7 +34,7 @@ export async function obtainSourceDirAndRegistryPath(
   if (context.platform) {
     const mapping = mapPlatformFileToUniversal(file.fullPath);
     const registryPath = mapping
-      ? join(DIR_PATTERNS.OPENPACKAGE, mapping.subdir, mapping.relPath)
+      ? join(mapping.subdir, mapping.relPath)
       : fallbackPath;
     const sourceDir = context.sourceDirLabel ?? getPlatformDefinition(context.platform).rootDir;
     return { sourceDir, registryPath };

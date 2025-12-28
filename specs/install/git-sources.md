@@ -19,9 +19,9 @@ This document specifies how `install` supports installing packages from **git re
 
 ---
 
-## 2. package.yml schema
+## 2. openpackage.yml schema
 
-Dependencies in `.openpackage/package.yml` support git sources via:
+Dependencies in `openpackage.yml` support git sources via:
 
 ```yaml
 packages:
@@ -43,8 +43,8 @@ Rules:
 - If `ref` is provided:
   - For branch/tag: clone the specified ref.
   - For commit SHA: clone and checkout that SHA (best-effort shallow fetch).
-- The cloned repository MUST contain `.openpackage/package.yml` at its root.
-- The installed package version is read from the cloned repo’s `.openpackage/package.yml`.
+- The cloned repository MUST contain `openpackage.yml` at its root.
+- The installed package version is read from the cloned repo’s `openpackage.yml`.
 - The rest of the install flow matches path installs:
   - Dependencies are resolved recursively.
   - Content is installed to the workspace platforms.

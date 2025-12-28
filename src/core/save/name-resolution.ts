@@ -21,7 +21,7 @@ export async function resolveWorkspaceNames(
   const { name: inputName, version } = parsePackageInput(packageInput);
   if (version) {
     throw new ValidationError(
-      `${MODE_LABELS[mode].label} command does not accept explicit versions. Edit package.yml to change the stable line.`
+      `${MODE_LABELS[mode].label} command does not accept explicit versions. Edit openpackage.yml to change the stable line.`
     );
   }
 

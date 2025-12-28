@@ -8,7 +8,7 @@ import { ERROR_MESSAGES } from './constants.js';
 
 export interface WipVersionComputationResult {
   /**
-   * The normalized stable base declared in package.yml (e.g. "1.2.3").
+   * The normalized stable base declared in openpackage.yml (e.g. "1.2.3").
    */
   stable: string;
   /**
@@ -36,12 +36,12 @@ export interface WipVersionComputationResult {
    */
   resetMessage?: string;
   /**
-   * When true, callers may choose to auto-bump package.yml.version from
+   * When true, callers may choose to auto-bump openpackage.yml.version from
    * `stable` to `nextStable` after a successful save.
    */
   shouldBumpPackageYml: boolean;
   /**
-   * The next stable version that package.yml.version should be bumped to
+   * The next stable version that openpackage.yml.version should be bumped to
    * when `shouldBumpPackageYml` is true.
    */
   nextStable?: string;
@@ -66,13 +66,13 @@ export function computeWipVersion(
   const lastBase = lastWorkspaceVersion ? extractBaseVersion(lastWorkspaceVersion) : undefined;
   const reset = Boolean(lastWorkspaceVersion && lastBase !== normalizedStable);
   const resetMessage = reset
-    ? `package.yml version ${normalizedStable} differs from last saved version ${lastWorkspaceVersion}. ` +
+    ? `openpackage.yml version ${normalizedStable} differs from last saved version ${lastWorkspaceVersion}. ` +
       `Resetting WIP stream for ${normalizedStable}.`
     : undefined;
 
   // Determine whether the last workspace version represents a packed/installed
   // stable. Only when it is a non-prerelease semver whose base matches
-  // package.yml.version do we start a new WIP stream from patch(stable).
+  // openpackage.yml.version do we start a new WIP stream from patch(stable).
   let effectiveStable = normalizedStable;
   let shouldBumpPackageYml = false;
   let nextStable: string | undefined;
@@ -82,7 +82,7 @@ export function computeWipVersion(
     const isStableLast = Boolean(parsedLast && parsedLast.prerelease.length === 0);
 
     if (isStableLast) {
-      // lastWorkspaceVersion is a stable S on the same base line as package.yml.
+      // lastWorkspaceVersion is a stable S on the same base line as openpackage.yml.
       // Begin the next development cycle from patch(S).
       nextStable = bumpStableVersion(normalizedStable, 'patch');
       effectiveStable = nextStable;
@@ -112,7 +112,7 @@ export function computePackTargetVersion(
   const lastBase = lastWorkspaceVersion ? extractBaseVersion(lastWorkspaceVersion) : undefined;
   const reset = Boolean(lastWorkspaceVersion && lastBase !== normalizedStable);
   const resetMessage = reset
-    ? `package.yml version ${normalizedStable} differs from last packed version ${lastWorkspaceVersion}. ` +
+    ? `openpackage.yml version ${normalizedStable} differs from last packed version ${lastWorkspaceVersion}. ` +
       `Promoting ${normalizedStable} as the next stable release.`
     : undefined;
 

@@ -14,7 +14,7 @@ For each save/pack run, the pipeline considers up to four sets of candidates:
 
 - Files already present in the **package directory** under `.openpackage/packages/<name>/`.
 - Excludes:
-  - Internal `package.index.yml` metadata.
+  - Internal `openpackage.index.yml` metadata.
   - Certain root marker files (e.g. the unified root agents file) that are handled specially.
 - Only includes paths that are allowed by the registry path rules (e.g. skip internal or unsupported paths).
 
@@ -54,7 +54,7 @@ Each candidate includes:
 
 #### 4. First Save vs Subsequent Saves
 
-The behavior changes depending on whether the package already has an index (`package.index.yml`) with file mapping information.
+The behavior changes depending on whether the package already has an index (`openpackage.index.yml`) with file mapping information.
 
 ##### First save (no index present, or empty file mapping)
 
@@ -67,7 +67,7 @@ The behavior changes depending on whether the package already has an index (`pac
 
 ##### Subsequent saves (index present with file mappings)
 
-- The pipeline uses `package.index.yml` as a **filter** for which workspace paths are relevant:
+- The pipeline uses `openpackage.index.yml` as a **filter** for which workspace paths are relevant:
   - It builds a set of allowed registry paths and directories based on the index's `files` keys.
   - Workspace candidates whose registry paths are outside this allowed set are ignored, except for root files that are deliberately allowed.
 - It merges local and workspace candidates:

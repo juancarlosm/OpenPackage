@@ -11,8 +11,7 @@ import { logger } from '../../utils/logger.js';
 
 /**
  * Apply package rename changes directly to workspace files prior to save.
- * Updates package.yml, markdown frontmatter, index.yml entries, root markers,
- * package directory, and root package.yml dependencies.
+ * Updates openpackage.yml, root markers, package directory, and root openpackage.yml dependencies.
  */
 export async function applyWorkspacePackageRename(
   cwd: string,
@@ -24,7 +23,7 @@ export async function applyWorkspacePackageRename(
 
   logger.debug(`Renaming workspace package files`, { from: currentName, to: newName, cwd });
 
-  // Update package.yml with the new name before further processing
+  // Update openpackage.yml with the new name before further processing
   const updatedConfig = { ...packageContext.config, name: newName };
   await writePackageYml(packageContext.packageYmlPath, updatedConfig);
 
@@ -48,7 +47,7 @@ export async function applyWorkspacePackageRename(
     }
   }
 
-  // Update root package.yml dependencies (project package.yml)
+  // Update root openpackage.yml dependencies (project openpackage.yml)
   await updateRootPackageYmlDependencies(cwd, currentName, newName);
 
   // For sub-packages, move the directory to the new normalized name
@@ -72,7 +71,7 @@ export async function applyWorkspacePackageRename(
 }
 
 /**
- * Update dependencies on the old package name to the new name in root package.yml
+ * Update dependencies on the old package name to the new name in root openpackage.yml
  */
 async function updateRootPackageYmlDependencies(
   cwd: string,
@@ -82,7 +81,7 @@ async function updateRootPackageYmlDependencies(
   const rootPackageYmlPath = getLocalPackageYmlPath(cwd);
 
   if (!(await exists(rootPackageYmlPath))) {
-    return; // No root package.yml to update
+    return; // No root openpackage.yml to update
   }
 
   try {
@@ -111,10 +110,10 @@ async function updateRootPackageYmlDependencies(
 
     if (updated) {
       await writePackageYml(rootPackageYmlPath, config);
-      logger.debug(`Updated root package.yml dependencies from ${oldName} to ${newName}`);
+      logger.debug(`Updated root openpackage.yml dependencies from ${oldName} to ${newName}`);
     }
   } catch (error) {
-    logger.warn(`Failed to update root package.yml dependencies: ${error}`);
+    logger.warn(`Failed to update root openpackage.yml dependencies: ${error}`);
   }
 }
 

@@ -189,7 +189,7 @@ export interface BuildIndexOptions {
    */
   preserveExactPaths?: boolean;
   /**
-   * Force the version written to the package index file (defaults to previous/index/package.yml resolution).
+   * Force the version written to the package index file (defaults to previous/index/openpackage.yml resolution).
    */
   versionOverride?: string;
 }
@@ -333,7 +333,7 @@ export async function buildMappingAndWriteIndex(
   const packageLocation = packageContext.location;
 
   try {
-    // Filter to index-eligible files only (excludes package.yml, package index file, etc.)
+    // Filter to index-eligible files only (excludes openpackage.yml, package index file, etc.)
     // These are manifest/metadata files that are NOT synced to workspace locations
     const indexEligibleFiles = packageFiles.filter(f => {
       const normalized = normalizeRegistryPath(f.path);
@@ -344,7 +344,7 @@ export async function buildMappingAndWriteIndex(
     const previousIndex = await readPackageIndex(cwd, packageName, packageLocation);
     const otherIndexes = await loadOtherPackageIndexes(cwd, packageName);
 
-    // Resolve version (prefer previous index; otherwise read from package.yml)
+    // Resolve version (prefer previous index; otherwise read from openpackage.yml)
     let version: string | undefined = options.versionOverride || previousIndex?.workspace?.version || undefined;
     if (!version) {
       const packageYmlPath = packageContext.packageYmlPath;
@@ -353,7 +353,7 @@ export async function buildMappingAndWriteIndex(
           const packageYml = await parsePackageYml(packageYmlPath);
           version = packageYml.version;
         } catch (error) {
-          logger.warn(`Failed to read package.yml for version: ${error}`);
+          logger.warn(`Failed to read openpackage.yml for version: ${error}`);
           return;
         }
       }
@@ -411,9 +411,9 @@ export async function buildMappingAndWriteIndex(
       files: mergedFiles
     };
     await writePackageIndex(indexRecord);
-    logger.debug(`Updated ${FILE_PATTERNS.PACKAGE_INDEX_YML} for ${packageName}@${version}`);
+    logger.debug(`Updated ${FILE_PATTERNS.OPENPACKAGE_INDEX_YML} for ${packageName}@${version}`);
   } catch (error) {
-    logger.warn(`Failed to update ${FILE_PATTERNS.PACKAGE_INDEX_YML} for ${packageName}: ${error}`);
+    logger.warn(`Failed to update ${FILE_PATTERNS.OPENPACKAGE_INDEX_YML} for ${packageName}: ${error}`);
   }
 }
 

@@ -91,7 +91,7 @@ export class PackageManager {
     }
     
     try {
-      // Load package.yml for metadata (always under .openpackage/)
+      // Load openpackage.yml for metadata
       const packageYmlPath = join(packagePath, PACKAGE_PATHS.MANIFEST_RELATIVE);
       if (!(await exists(packageYmlPath))) {
         throw new PackageNotFoundError(packageName);

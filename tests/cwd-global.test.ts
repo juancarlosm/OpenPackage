@@ -107,7 +107,7 @@ console.log('All --cwd tests passed!');
     await fs.mkdir(path.join(pkgRoot, '.openpackage'), { recursive: true });
 
     await fs.writeFile(
-      path.join(pkgRoot, '.openpackage', 'package.yml'),
+      path.join(pkgRoot, 'openpackage.yml'),
       [
         `name: ${pkgName}`,
         `version: ${version}`,
@@ -168,7 +168,7 @@ console.log('All --cwd tests passed!');
     await fs.mkdir(path.join(pkgRoot, '.openpackage'), { recursive: true });
 
     await fs.writeFile(
-      path.join(pkgRoot, '.openpackage', 'package.yml'),
+      path.join(pkgRoot, 'openpackage.yml'),
       [
         `name: ${pkgName}`,
         `version: 1.0.0`,

@@ -21,19 +21,19 @@ export async function readOrCreateBasePackageYml(
   });
 
   if (ensured.isNew) {
-    logger.debug('No package.yml found for save, creating', { dir: ensured.packageDir });
+    logger.debug('No openpackage.yml found for save, creating', { dir: ensured.packageDir });
     console.log(`${LOG_PREFIXES.CREATED} ${ensured.packageDir}`);
     console.log(`${LOG_PREFIXES.NAME} ${ensured.packageConfig.name}`);
     console.log(`${LOG_PREFIXES.VERSION} ${ensured.packageConfig.version ?? UNVERSIONED}`);
   } else {
-    logger.debug('Found existing package.yml for save', { path: ensured.packageYmlPath });
+    logger.debug('Found existing openpackage.yml for save', { path: ensured.packageYmlPath });
     console.log(
       `✓ Found existing package ${ensured.packageConfig.name}${ensured.packageConfig.version ? `@${ensured.packageConfig.version}` : ''}`
     );
   }
 
-  // ensured.packageDir is the content directory (.openpackage/), so package root is parent
-  const packageRootDir = dirname(ensured.packageDir);
+  // Cached packages mirror the payload at their root
+  const packageRootDir = ensured.packageDir;
   
   return {
     name: ensured.normalizedName,

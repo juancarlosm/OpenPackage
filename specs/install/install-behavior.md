@@ -3,33 +3,33 @@
 This document defines the **user-facing behavior** of the `install` command, assuming:
 
 - Versioning semantics from `save` / `pack` specs are already in place.
-- `package.yml` is the **canonical declaration of direct dependencies** (see `package-yml-canonical.md`).
+- `openpackage.yml` is the **canonical declaration of direct dependencies** (see `package-yml-canonical.md`).
 - Version selection obeys **“latest in range”**, with **local-first defaults for fresh installs without an explicit version** and **automatic fallback to remote when local cannot satisfy** (see `version-resolution.md`).
 
 ---
 
 ## 0. Workspace Context
 The `install` command operates on the **workspace root** determined by the effective current working directory (`cwd` from shell or overridden by global `--cwd <dir>` flag; see [../../cli-options.md]). This affects:
-- Detection of `.openpackage/package.yml` (must exist at effective cwd for root package ops).
+- Detection of `openpackage.yml` (must exist at effective cwd for root package ops).
 - Target location for file installations (universal content to `.openpackage/<subdir>/`, root files to cwd root).
-- Dependency resolution from workspace `package.yml`.
+- Dependency resolution from workspace `openpackage.yml`.
 
 If no package detected at effective cwd, errors with "No package project found" (unless dry-run or flags allow).
 
 ## 1. Command shapes
 
 - **`opkg install`**
-  - **Meaning**: Materialize *all* dependencies declared in `.openpackage/package.yml` into the workspace, at the **latest versions that satisfy their declared ranges**, using the **default local-first with remote-fallback policy** over local and remote registries (see §2 and `version-resolution.md`).
+  - **Meaning**: Materialize *all* dependencies declared in `openpackage.yml` into the workspace, at the **latest versions that satisfy their declared ranges**, using the **default local-first with remote-fallback policy** over local and remote registries (see §2 and `version-resolution.md`).
 
 - **`opkg install <name>`**
   - **Meaning**:
-    - If `<name>` is **already declared** in `package.yml`: ensure it is installed at the **latest version that satisfies the `package.yml` range**, using the same **local-first with remote-fallback** resolver behavior.
-    - If `<name>` is **not declared**: perform a **fresh install**, resolve the target version using the **local-first with remote-fallback** policy (see §3 and `version-resolution.md`), then add a new entry to `package.yml` (see §3).
+    - If `<name>` is **already declared** in `openpackage.yml`: ensure it is installed at the **latest version that satisfies the `openpackage.yml` range**, using the same **local-first with remote-fallback** resolver behavior.
+    - If `<name>` is **not declared**: perform a **fresh install**, resolve the target version using the **local-first with remote-fallback** policy (see §3 and `version-resolution.md`), then add a new entry to `openpackage.yml` (see §3).
 
 - **`opkg install <name>@<spec>`**
   - **Meaning**:
-    - If `<name>` is **already declared** in `package.yml`: `<spec>` is treated as a **constraint hint** that must be **compatible** with the canonical `package.yml` range (see `package-yml-canonical.md` for rules); resolution still uses the same **local-first with remote-fallback** semantics unless `--local` or `--remote` are set.
-    - If `<name>` is **not declared**: `<spec>` is treated as the **initial version range** to store in `package.yml`, and resolution uses the **local-first with remote-fallback** policy under that range (or strictly local / remote when the corresponding flags are set).
+    - If `<name>` is **already declared** in `openpackage.yml`: `<spec>` is treated as a **constraint hint** that must be **compatible** with the canonical `openpackage.yml` range (see `package-yml-canonical.md` for rules); resolution still uses the same **local-first with remote-fallback** semantics unless `--local` or `--remote` are set.
+    - If `<name>` is **not declared**: `<spec>` is treated as the **initial version range** to store in `openpackage.yml`, and resolution uses the **local-first with remote-fallback** policy under that range (or strictly local / remote when the corresponding flags are set).
 
 - **`opkg install <name>/<registry-path>`** and **`opkg install <name>@<spec>/<registry-path>`**
   - **Meaning**: Install only the specified registry-relative path(s) for `<name>` (e.g. `.openpackage/universal/prompts/foo.md`, `workspace/agents.md`). The path must be an **exact registry path** (no globs) and applies only to the **root dependency** being installed.
@@ -37,11 +37,11 @@ If no package detected at effective cwd, errors with "No package project found" 
 - **`opkg install git:<url>[#ref]`**
   - **Meaning**: Install a package directly from a git repository by cloning it and installing from the checked-out working tree.
   - Requirements:
-    - The repository root MUST contain `.openpackage/package.yml`.
+    - The repository root MUST contain `openpackage.yml`.
     - `git` must be available on PATH.
   - Notes:
-    - The installed package version is taken from the repo’s `.openpackage/package.yml`.
-    - `install` persists this dependency to `.openpackage/package.yml` using `git` + optional `ref` (not a registry `version` range).
+    - The installed package version is taken from the repo’s `openpackage.yml`.
+    - `install` persists this dependency to `openpackage.yml` using `git` + optional `ref` (not a registry `version` range).
 
 - **`opkg install github:<owner>/<repo>[#ref]`**
   - **Meaning**: Shorthand for GitHub git installs. Equivalent to:
@@ -54,12 +54,12 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
 ## 2. High-level goals
 
 - **G1 – Single mental model**:
-  - **“`package.yml` declares intent, `install` materializes the newest versions that satisfy that intent.”**
+  - **“`openpackage.yml` declares intent, `install` materializes the newest versions that satisfy that intent.”**
 
 - **G2 – Latest in range with local-first defaults**:
   - Whenever a version needs to be chosen for install, the system:
-    - For **fresh dependencies** (e.g. `opkg install <name>` or `opkg install <name>@<spec>` where `<name>` is not yet in `package.yml`), first tries to satisfy the effective range from the **local registry only**, then falls back to include **remote versions** when local cannot satisfy.
-    - For **existing dependencies** (already declared in `package.yml`, with or without CLI hints), follow the **same local-first with remote fallback policy** described in `version-resolution.md`, choosing the highest satisfying semver version (including pre-releases where allowed by policy).
+    - For **fresh dependencies** (e.g. `opkg install <name>` or `opkg install <name>@<spec>` where `<name>` is not yet in `openpackage.yml`), first tries to satisfy the effective range from the **local registry only**, then falls back to include **remote versions** when local cannot satisfy.
+    - For **existing dependencies** (already declared in `openpackage.yml`, with or without CLI hints), follow the **same local-first with remote fallback policy** described in `version-resolution.md`, choosing the highest satisfying semver version (including pre-releases where allowed by policy).
   - This same resolver policy (or its `--local` / `--remote` variants) is used **uniformly** for:
     - The root install target.
     - All **transitive dependencies** discovered during resolution.
@@ -75,7 +75,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
 
 ## 3. Fresh vs existing dependencies
 
-### 3.1 Fresh dependency (`<name>` not in package.yml)
+### 3.1 Fresh dependency (`<name>` not in openpackage.yml)
 
 - **Inputs**:
   - CLI: `opkg install <name>` or `opkg install <name>@<spec>`.
@@ -92,7 +92,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
         - Only fail if **neither local nor remote** provide a satisfying version, or remote metadata is unavailable.
       - In **`--local` mode**, this remote fallback is **disabled** and the command fails with a clear “not available locally” style error that may suggest re-running without `--local` or using `save` / `pack`.
     - **Install `<name>@<selectedVersion>`**.
-    - **Add to `package.yml`**:
+    - **Add to `openpackage.yml`**:
       - Default range is **caret based on the stable base** of the selected version (e.g. `^1.0.1` for `1.0.1-000fz8.a3k`), unless later overridden by a global policy.
       - When the selected version is **unversioned** (manifest omits `version`, represented internally as `0.0.0`), persist the entry **without a `version` field** in `packages` / `dev-packages` (do **not** write `0.0.0`).
 
@@ -105,17 +105,17 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
         - In **default mode** (no `--local`), include **remote versions** and retry selection over the combined set, allowing a remote version to be selected when it is the only match.
         - In **`--local` mode**, do **not** fall back to remote; fail with a clear error indicating no local version satisfies `<spec>`.
     - **Install the selected version**.
-    - **Persist `<spec>` in `package.yml`** (do not auto-normalize beyond what the version-range parser requires).
+    - **Persist `<spec>` in `openpackage.yml`** (do not auto-normalize beyond what the version-range parser requires).
 
-### 3.2 Existing dependency (`<name>` already in package.yml)
+### 3.2 Existing dependency (`<name>` already in openpackage.yml)
 
 - **Inputs**:
-  - Canonical range from `package.yml` (see `package-yml-canonical.md`).
+  - Canonical range from `openpackage.yml` (see `package-yml-canonical.md`).
   - Optional CLI `<spec>` from `install <name>@<spec>`.
 
 - **Behavior**:
   - `opkg install <name>`:
-    - Use the **canonical range from `package.yml`**.
+    - Use the **canonical range from `openpackage.yml`**.
     - Resolve versions using the same **local-first with remote-fallback** policy (per `version-resolution.md`):
       - First attempt to satisfy the canonical range using **only local registry versions**.
       - Only when no satisfying local version exists, and remote is enabled and reachable, **include remote versions** and retry selection over the combined set.
@@ -123,7 +123,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
   - `opkg install <name>@<spec>`:
     - Treat `<spec>` as a **sanity check** against the canonical range:
       - If compatible (according to rules in `package-yml-canonical.md`), proceed as above.
-      - If incompatible, **fail with a clear error** instructing the user to edit `package.yml` instead of using CLI-only overrides.
+      - If incompatible, **fail with a clear error** instructing the user to edit `openpackage.yml` instead of using CLI-only overrides.
 
 ### 3.4 Registry-path / single-file installs
 
@@ -134,10 +134,10 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
 - **Behavior – fresh dependency**:
   - Resolve the version using the same policies as §3.1 (respecting `<spec>` if provided).
   - Install only the specified registry path(s), including root files only when they are explicitly listed.
-  - Persist a new `files: [<registry-path>, ...]` list for the dependency in `package.yml` alongside the chosen range.
-  - If the requested path does not exist in the selected version, the install **warns and skips the package** (no files written, counts as `skipped`).
+  - Persist a new `files: [<registry-path>, ...]` list for the dependency in `openpackage.yml` alongside the chosen range.
+- If the requested path does not exist in the selected version, the install **warns and skips the package** (no files written, counts as `skipped`).
 
-- **Behavior – existing dependency with `files` already in `package.yml`**:
+- **Behavior – existing dependency with `files` already in `openpackage.yml`**:
   - `opkg install <name>` (no new path):
     - Re-installs the stored subset.
     - In an interactive TTY and non-`--dry-run`, prompt: **switch to full install?** If accepted, clears the `files` list and performs a full install; otherwise keeps the subset.
@@ -146,10 +146,10 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
     - Adds the new path to the stored `files` list (deduped), then installs that combined subset.
 
 - **Behavior – existing dependency without `files` (full install)**:
-  - Path-based install attempts are **rejected** with a clear error. To install a subset, uninstall first (or remove the dependency) and re-install with a path, or edit `package.yml` manually to add `files`.
+  - Path-based install attempts are **rejected** with a clear error. To install a subset, uninstall first (or remove the dependency) and re-install with a path, or edit `openpackage.yml` manually to add `files`.
 
 - **Switching back to full**:
-  - Accept the prompt described above, or delete the `files` field for the dependency in `package.yml` (or uninstall/reinstall without a path).
+  - Accept the prompt described above, or delete the `files` field for the dependency in `openpackage.yml` (or uninstall/reinstall without a path).
 
 ---
 
@@ -170,7 +170,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
 ## 4. `opkg install` (no args) – “refresh workspace to intent”
 
 - **Inputs**:
-  - `.openpackage/package.yml`:
+  - `openpackage.yml`:
     - `packages[]` and `dev-packages[]`, each with `name` and exactly one source:
       - `version` (registry range or exact)
       - `path` (directory or tarball)
@@ -186,7 +186,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
     - If that version is **already installed**, **do nothing** (idempotent).
     - If a **newer satisfying version exists**, **upgrade** the installed version to that one.
   - This makes `opkg install` act as:
-    - **“Hydrate my workspace to match `package.yml`”** on first run.
+    - **“Hydrate my workspace to match `openpackage.yml`”** on first run.
     - **“Upgrade within my declared ranges”** on subsequent runs.
 
 ---
@@ -249,7 +249,7 @@ This section ties WIP version selection to **how content is loaded** when the se
   - When the version resolution layer selects a **WIP version** that exists locally:
     - The package loader (e.g. `packageManager.loadPackage`) MUST:
       - Load files directly from the WIP registry directory (`~/.openpackage/registry/<pkg>/<wipVersion>/...`).
-      - Read the `package.yml` from that directory for metadata.
+      - Read the `openpackage.yml` from that directory for metadata.
       - Treat this data exactly as it would for a stable registry copy for the purposes of installation and dependency resolution.
   - If the WIP registry directory is missing or malformed for a selected WIP version:
     - Install MUST **fail clearly**, indicating the broken WIP copy and suggesting:
@@ -266,14 +266,14 @@ This section ties WIP version selection to **how content is loaded** when the se
 
 - **Non-goal**: Emulate every nuance of npm’s `install` / `update` / `dedupe` behavior.
   - Instead, aim for a **small, orthogonal core**:
-    - `package.yml` declares intent.
+    - `openpackage.yml` declares intent.
     - `save`/`pack` manage versions & WIPs.
     - `install` materializes **latest-in-range** from local+remote.
 
 - **Compatibility goal**:
   - A user coming from npm should be able to reason as:
-    - “`package.yml` is like `package.json` dependencies.”
+    - “`openpackage.yml` is like `package.json` dependencies.”
     - “`opkg install` is like `npm install`: it installs & upgrades within ranges.”
-    - “To change which major I target, I edit the version in `package.yml`, not the CLI.”
+    - “To change which major I target, I edit the version in `openpackage.yml`, not the CLI.”
 
 

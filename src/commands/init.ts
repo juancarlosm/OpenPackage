@@ -32,11 +32,11 @@ async function initRootPackage(force?: boolean): Promise<CommandResult<PackageCo
   
   if (existingContext && existingContext.location === 'root') {
     if (!force) {
-      logger.info('Found existing root package.yml');
+      logger.info('Found existing root openpackage.yml');
       displayPackageConfig(existingContext.config, relative(cwd, packageYmlPath), true);
       return { success: true, data: existingContext };
     }
-    logger.info('Found existing package.yml, forcing overwrite...');
+    logger.info('Found existing openpackage.yml, forcing overwrite...');
   }
 
   try {
@@ -68,7 +68,7 @@ async function initNestedPackage(packageName: string, force?: boolean): Promise<
   validatePackageName(packageName);
   const normalizedName = normalizePackageName(packageName);
 
-  // Ensure root package.yml exists
+  // Ensure root openpackage.yml exists
   await createWorkspacePackageYml(cwd, false);
 
   // Check if package already exists
@@ -102,11 +102,6 @@ async function initNestedPackage(packageName: string, force?: boolean): Promise<
       partial: true
     };
     
-    // Ensure include pattern is set
-    if (!packageConfig.include || packageConfig.include.length === 0) {
-      packageConfig.include = ['**'];
-    }
-    
     await writePackageYml(packageYmlPath, packageConfig);
     
     const context = createPackageContext(cwd, packageConfig, 'nested');
@@ -131,11 +126,11 @@ export function setupInitCommand(program: Command): void {
   program
     .command('init')
     .argument('[package-name]', 'package name for initialization in .openpackage/packages/ (optional)')
-    .description('Initialize a new package.yml file. \n' +
+    .description('Initialize a new openpackage.yml file. \n' +
       'Usage patterns:\n' +
-      '  opkg init                    # Initialize .openpackage/package.yml in current directory\n' +
-      '  opkg init <package-name>     # Initialize .openpackage/packages/<package-name>/package.yml')
-    .option('-f, --force', 'overwrite existing package.yml')
+      '  opkg init                    # Initialize .openpackage/openpackage.yml in current directory\n' +
+      '  opkg init <package-name>     # Initialize .openpackage/packages/<package-name>/openpackage.yml')
+    .option('-f, --force', 'overwrite existing openpackage.yml')
     .action(withErrorHandling(async (packageName?: string, options?: { force?: boolean }) => {
       const result = packageName
         ? await initNestedPackage(packageName, options?.force)

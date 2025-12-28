@@ -15,6 +15,8 @@ import { discoverAndCategorizeFiles } from '../../utils/install-file-discovery.j
 import { installRootFilesFromMap } from '../../utils/root-file-installer.js';
 import { installPackageByIndex, type IndexInstallResult } from '../../utils/index-based-installer.js';
 import { promptVersionSelection } from '../../utils/prompts.js';
+import { ensureDir, exists, writeTextFile } from '../../utils/fs.js';
+import { dirname, join } from 'path';
 
 export interface DependencyResolutionResult {
   resolvedPackages: ResolvedPackage[];
@@ -258,6 +260,20 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
       installResult.installed.forEach(file => rootFileResults.installed.add(file));
       installResult.updated.forEach(file => rootFileResults.updated.add(file));
       installResult.skipped.forEach(file => rootFileResults.skipped.add(file));
+
+      // Copy root/** files directly to workspace root (strip prefix)
+      for (const file of categorized.rootCopyFiles) {
+        const targetPath = join(cwd, file.path);
+        const parent = dirname(targetPath);
+        await ensureDir(parent);
+        const existed = await exists(targetPath);
+        await writeTextFile(targetPath, file.content, (file.encoding as BufferEncoding) ?? 'utf8');
+        if (existed) {
+          rootFileResults.updated.add(file.path);
+        } else {
+          rootFileResults.installed.add(file.path);
+        }
+      }
     } catch (error) {
       if (error instanceof UserCancellationError) {
         throw error; // Re-throw to allow clean exit

@@ -62,7 +62,7 @@ export async function findFilesByExtension(
 /**
  * Recursively find directories containing a specific file
  * @param rootDir - Root directory to start searching from
- * @param targetFileName - Name of the file to search for (e.g., 'package.yml')
+ * @param targetFileName - Name of the file to search for (e.g., 'openpackage.yml')
  * @param parseCallback - Optional callback to parse and validate the file content
  * @returns Array of directory paths where the file was found
  */

@@ -5,7 +5,7 @@ import { gatherRootVersionConstraints } from '../core/openpackage.js';
 import { arePackageNamesEquivalent } from './package-name.js';
 
 /**
- * Extract packages from package.yml configuration
+ * Extract packages from openpackage.yml configuration
  */
 export function extractPackagesFromConfig(config: PackageYml): Array<{ name: string; version?: string; path?: string; git?: string; ref?: string; isDev: boolean }> {
   const packages: Array<{ name: string; version?: string; path?: string; git?: string; ref?: string; isDev: boolean }> = [];

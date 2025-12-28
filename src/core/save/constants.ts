@@ -11,13 +11,13 @@ export const ERROR_MESSAGES = {
   INVALID_VERSION_FORMAT: 'Invalid version format: %s',
   INVALID_BUMP_TYPE: 'Invalid bump type: %s. Must be \'patch\', \'minor\', or \'major\'.',
   INVALID_VERSION_TYPE: 'Invalid version type: %s. Only \'%s\' is supported.',
-  PARSE_PACKAGE_YML_FAILED: 'Failed to parse existing package.yml at %s: %s',
+  PARSE_PACKAGE_YML_FAILED: 'Failed to parse existing openpackage.yml at %s: %s',
   PACKAGE_DIR_NOT_FOUND: 'Package directory not found at %s'
 } as const;
 
 export const LOG_PREFIXES = {
-  CREATED: '✓ Created package.yml in',
-  FOUND: '✓ Found existing package.yml',
+  CREATED: '✓ Created openpackage.yml in',
+  FOUND: '✓ Found existing openpackage.yml',
   NAME: '✓ Name:',
   VERSION: '✓ Version:',
   FILES: '✓ Found',

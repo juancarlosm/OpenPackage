@@ -375,12 +375,12 @@ function buildPackageMetadata(
         return parsed;
       }
 
-      logger.debug('Parsed package.yml missing required fields, falling back to inferred metadata', {
+      logger.debug('Parsed openpackage.yml missing required fields, falling back to inferred metadata', {
         fallbackName,
         fallbackVersion
       });
     } catch (error) {
-      logger.debug('Failed to parse package.yml from extracted tarball', {
+      logger.debug('Failed to parse openpackage.yml from extracted tarball', {
         fallbackName,
         fallbackVersion,
         error

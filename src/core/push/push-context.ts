@@ -114,7 +114,7 @@ async function resolveImplicitPush(
 	}
 
 	throw new PushError(
-		`No versions found for package '${packageName}'. Create a package with "opkg pack <package>" or ensure package.yml exists.`,
+		`No versions found for package '${packageName}'. Create a package with "opkg pack <package>" or ensure openpackage.yml exists.`,
 		'NO_VERSIONS'
 	);
 }

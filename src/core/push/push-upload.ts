@@ -36,7 +36,7 @@ export function preparePackageForUpload(pkg: Package, uploadName: string): Packa
   });
 
   if (!manifestUpdated) {
-    throw new Error('package.yml not found in package files');
+    throw new Error('openpackage.yml not found in package files');
   }
 
   return {
@@ -74,7 +74,7 @@ export function buildPartialTarballPackage(
     normalizePathForProcessing(file.path) === manifestPath
   );
   if (!manifest) {
-    throw new Error('package.yml not found in local registry');
+    throw new Error('openpackage.yml not found in local registry');
   }
 
   const requestedSet = new Set(

@@ -26,7 +26,7 @@ async function runApplyAndSaveApplyTests(): Promise<void> {
     // Minimal package setup
     await mkdir(join(tempDir, '.openpackage', 'commands'), { recursive: true });
     await writeFile(
-      join(tempDir, '.openpackage', 'package.yml'),
+      join(tempDir, 'openpackage.yml'),
       ['name: apply-save-test', 'version: "1.0.0"', ''].join('\n'),
       'utf8'
     );

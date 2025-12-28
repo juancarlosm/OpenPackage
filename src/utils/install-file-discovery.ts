@@ -7,6 +7,7 @@ import { buildNormalizedIncludeSet, isManifestPath, normalizePackagePath } from 
 export interface CategorizedInstallFiles {
   pathBasedFiles: PackageFile[];
   rootFiles: Map<string, string>;
+  rootCopyFiles: PackageFile[];
 }
 
 export async function discoverAndCategorizeFiles(
@@ -33,20 +34,31 @@ export async function discoverAndCategorizeFiles(
   // Single pass classification
   const pathBasedFiles: PackageFile[] = [];
   const rootFiles = new Map<string, string>();
+  const rootCopyFiles: PackageFile[] = [];
   for (const file of pkg.files) {
     const p = file.path;
+    const normalized = normalizePackagePath(p);
     // Never install registry package metadata files
-    if (isManifestPath(p) || normalizePackagePath(p) === PACKAGE_PATHS.INDEX_RELATIVE) continue;
+    if (isManifestPath(p) || normalized === PACKAGE_PATHS.INDEX_RELATIVE) continue;
     if (!shouldInclude(p)) continue;
+
+    // root/** copy-to-root handling
+    if (normalized.startsWith('root/')) {
+      const stripped = normalized.slice('root/'.length);
+      if (stripped.length > 0) {
+        rootCopyFiles.push({ ...file, path: stripped });
+      }
+      continue;
+    }
 
     pathBasedFiles.push(file);
 
-    if (p === FILE_PATTERNS.AGENTS_MD || platformRootNames.has(p)) {
-      rootFiles.set(p, file.content);
+    if (normalized === FILE_PATTERNS.AGENTS_MD || platformRootNames.has(normalized)) {
+      rootFiles.set(normalized, file.content);
     }
   }
 
-  return { pathBasedFiles, rootFiles };
+  return { pathBasedFiles, rootFiles, rootCopyFiles };
 }
 
 

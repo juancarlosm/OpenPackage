@@ -41,7 +41,7 @@ export async function runBulkInstallPipeline(
   const packageYmlPath = getLocalPackageYmlPath(cwd);
   const cwdConfig: PackageYml = await withOperationErrorHandling(
     () => parsePackageYml(packageYmlPath),
-    'parse package.yml',
+    'parse openpackage.yml',
     packageYmlPath
   );
 
@@ -60,23 +60,23 @@ export async function runBulkInstallPipeline(
 
   if (packagesToInstall.length === 0) {
     if (skippedRootPackages.length > 0) {
-      console.log('✓ All packages in package.yml were skipped (matched root package)');
+      console.log('✓ All packages in openpackage.yml were skipped (matched root package)');
       console.log('\nTips:');
       console.log('• Root packages cannot be installed as dependencies');
       console.log('• Use "opkg install <package-name>" to install external packages');
       console.log('• Use "opkg save" to create a WIP copy of your root package in the registry');
     } else {
-      console.log('⚠️ No packages found in package.yml');
+      console.log('⚠️ No packages found in openpackage.yml');
       console.log('\nTips:');
-      console.log('• Add packages to the "packages" array in package.yml');
-      console.log('• Add development packages to the "dev-packages" array in package.yml');
+      console.log('• Add packages to the "packages" array in openpackage.yml');
+      console.log('• Add development packages to the "dev-packages" array in openpackage.yml');
       console.log('• Use "opkg install <package-name>" to install a specific package');
     }
 
     return { success: true, data: { installed: 0, skipped: skippedRootPackages.length } };
   }
 
-  console.log(`✓ Installing ${packagesToInstall.length} packages from package.yml:`);
+  console.log(`✓ Installing ${packagesToInstall.length} packages from openpackage.yml:`);
   packagesToInstall.forEach(pkg => {
     const prefix = pkg.isDev ? '[dev] ' : '';
     const label = pkg.version ? `${pkg.name}@${pkg.version}` : pkg.name;

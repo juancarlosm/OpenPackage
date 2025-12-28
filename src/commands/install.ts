@@ -93,7 +93,7 @@ export function setupInstallCommand(program: Command): void {
     .description(
       'Install packages from the local (and optional remote) registry into this workspace. Works with WIP copies from `opkg save` and stable releases from `opkg pack`.'
     )
-    .argument('[package-name]', 'name of the package to install (optional - installs all from package.yml if not specified). Supports package@version syntax.')
+    .argument('[package-name]', 'name of the package to install (optional - installs all from openpackage.yml if not specified). Supports package@version syntax.')
     .option('--dry-run', 'preview changes without applying them')
     .option('--force', 'overwrite existing files')
     .option('--conflicts <strategy>', 'conflict handling strategy: keep-both, overwrite, skip, or ask')

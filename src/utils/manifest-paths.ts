@@ -16,7 +16,7 @@ export function normalizePackagePath(path: string): string {
 export function isManifestPath(path: string): boolean {
   const normalized = normalizePackagePath(path);
   return (
-    normalized === FILE_PATTERNS.PACKAGE_YML ||
+    normalized === FILE_PATTERNS.OPENPACKAGE_YML ||
     normalized === PACKAGE_PATHS.MANIFEST_RELATIVE
   );
 }

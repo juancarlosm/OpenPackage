@@ -108,7 +108,7 @@ export async function runSavePipeline(
 
   if (isUnversioned) {
     if (mode === 'stable') {
-      throw new Error('package.yml must contain a semver version to pack a release.');
+      throw new Error('openpackage.yml must contain a semver version to pack a release.');
     }
     targetVersion = UNVERSIONED;
   } else if (mode === 'wip') {
@@ -137,9 +137,9 @@ export async function runSavePipeline(
       const bumpedConfig = { ...packageContext.config, version: nextStable };
       await writePackageYml(packageContext.packageYmlPath, bumpedConfig);
       packageContext = { ...packageContext, config: bumpedConfig, version: nextStable };
-      console.log(`✓ Updated package.yml.version to ${nextStable} for the next cycle`);
+      console.log(`✓ Updated openpackage.yml.version to ${nextStable} for the next cycle`);
     } catch (error) {
-      logger.warn(`Failed to auto-bump package.yml before save: ${String(error)}`);
+      logger.warn(`Failed to auto-bump openpackage.yml before save: ${String(error)}`);
     }
   }
 
@@ -213,7 +213,7 @@ export async function runSavePipeline(
         true
       );
     } else {
-      logger.debug(`Skipping addition of ${effectiveConfig.name} to package.yml; already covered transitively.`);
+      logger.debug(`Skipping addition of ${effectiveConfig.name} to openpackage.yml; already covered transitively.`);
     }
   }
 

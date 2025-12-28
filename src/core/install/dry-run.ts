@@ -50,11 +50,11 @@ export async function handleDryRunMode(
     }
   }
 
-  // Show package.yml update
+  // Show openpackage.yml update
   if (packageYmlExists) {
-    console.log(`\n✓ Would add to .openpackage/package.yml: ${packageName}@${resolvedPackages.find(f => f.isRoot)?.version}`);
+    console.log(`\n✓ Would add to .openpackage/openpackage.yml: ${packageName}@${resolvedPackages.find(f => f.isRoot)?.version}`);
   } else {
-    console.log('\nNo .openpackage/package.yml found - skipping dependency addition');
+    console.log('\nNo .openpackage/openpackage.yml found - skipping dependency addition');
   }
 
   return {

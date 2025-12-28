@@ -12,14 +12,14 @@ async function runRootSaveIndexTest(): Promise<void> {
 
   try {
     // Create a minimal root package with a universal commands file
-    await mkdir(join(tempDir, '.openpackage', 'commands'), { recursive: true });
+    await mkdir(join(tempDir, 'commands'), { recursive: true });
     await writeFile(
-      join(tempDir, '.openpackage', 'package.yml'),
+      join(tempDir, 'openpackage.yml'),
       ['name: root-save-index-test', 'version: "1.0.0"', ''].join('\n'),
       'utf8'
     );
     await writeFile(
-      join(tempDir, '.openpackage', 'commands', 'example.md'),
+      join(tempDir, 'commands', 'example.md'),
       '# Example command',
       'utf8'
     );
@@ -46,11 +46,8 @@ async function runRootSaveIndexTest(): Promise<void> {
       'package.index.yml.files should not be empty after first save with universal content'
     );
 
-    const key = '.openpackage/commands/example.md';
-    assert.ok(
-      Array.isArray(files[key]) && files[key].length > 0,
-      'package.index.yml should record mapping for .openpackage/commands/example.md after first save'
-    );
+    const key = 'commands/example.md';
+    assert.ok(Array.isArray(files[key]) && files[key].length > 0);
 
     // Run a second save to ensure existing mappings are preserved / updated, not cleared
     const secondResult = await runSavePipeline(undefined, {
@@ -68,10 +65,7 @@ async function runRootSaveIndexTest(): Promise<void> {
       0,
       'package.index.yml.files should not be emptied after second save with universal content'
     );
-    assert.ok(
-      Array.isArray(files[key]) && files[key].length > 0,
-      'package.index.yml should still record mapping for .openpackage/commands/example.md after second save'
-    );
+    assert.ok(Array.isArray(files[key]) && files[key].length > 0);
 
     console.log('package-index-root-save tests passed');
   } finally {

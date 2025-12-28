@@ -46,7 +46,7 @@ async function runPartialMergeTest(): Promise<void> {
     {
       metadata: { name: 'partial-merge', version: '1.0.0', partial: true } as any,
       files: [
-        { path: '.openpackage/package.yml', content: manifest },
+        { path: 'openpackage.yml', content: manifest },
         { path: 'docs/keep.md', content: 'keep' },
         { path: 'docs/old.md', content: 'old' }
       ]
@@ -57,7 +57,7 @@ async function runPartialMergeTest(): Promise<void> {
   const remotePackage = {
     metadata: { name: 'partial-merge', version: '1.0.0' } as any,
     files: [
-      { path: '.openpackage/package.yml', content: manifest },
+      { path: 'openpackage.yml', content: manifest },
       { path: 'docs/old.md', content: 'remote' },
       { path: 'docs/new.md', content: 'new' }
     ]
@@ -99,7 +99,7 @@ async function runPartialMergeTest(): Promise<void> {
   const kept = await readFile(join(pkgPath, 'docs/keep.md'), 'utf8');
   const overwritten = await readFile(join(pkgPath, 'docs/old.md'), 'utf8');
   const added = await readFile(join(pkgPath, 'docs/new.md'), 'utf8');
-  const manifestContent = await readFile(join(pkgPath, '.openpackage', 'package.yml'), 'utf8');
+  const manifestContent = await readFile(join(pkgPath, 'openpackage.yml'), 'utf8');
 
   assert.equal(kept, 'keep');
   assert.equal(overwritten, 'remote');
@@ -118,7 +118,7 @@ async function runIntegritySkipTest(): Promise<void> {
   const pkg = {
     metadata: { name: 'integrity-partial', version: '1.0.0' } as any,
     files: [
-      { path: '.openpackage/package.yml', content: manifest },
+      { path: 'openpackage.yml', content: manifest },
       { path: 'docs/file.md', content: 'hello' }
     ]
   };

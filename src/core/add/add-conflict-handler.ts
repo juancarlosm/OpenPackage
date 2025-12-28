@@ -17,15 +17,7 @@ type ConflictDecision = 'keep-existing' | 'overwrite';
  * - Otherwise, write to package root directory
  */
 function resolveTargetPath(packageContext: PackageContext, registryPath: string): string {
-  const openpackagePrefix = `${DIR_PATTERNS.OPENPACKAGE}/`;
-  
-  if (registryPath.startsWith(openpackagePrefix)) {
-    // Universal content: strip prefix and write to content directory
-    const relativePath = registryPath.slice(openpackagePrefix.length);
-    return join(packageContext.packageFilesDir, relativePath);
-  }
-  
-  // Root-level content: write to package root directory
+  // V2: registry paths are package-root-relative (universal subdirs already at root)
   return join(packageContext.packageRootDir, registryPath);
 }
 

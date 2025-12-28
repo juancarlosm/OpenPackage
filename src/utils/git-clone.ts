@@ -46,11 +46,11 @@ export async function cloneRepoToTempDir(options: GitCloneOptions): Promise<stri
     await runGit(['clone', '--depth', '1', url, tempDir]);
   }
 
-  // Validate OpenPackage root
-  const manifestPath = join(tempDir, DIR_PATTERNS.OPENPACKAGE, FILE_PATTERNS.PACKAGE_YML);
+  // Validate OpenPackage root (v2 layout: openpackage.yml at repository root)
+  const manifestPath = join(tempDir, FILE_PATTERNS.OPENPACKAGE_YML);
   if (!(await exists(manifestPath))) {
     throw new ValidationError(
-      `Cloned repository is not an OpenPackage (missing ${DIR_PATTERNS.OPENPACKAGE}/${FILE_PATTERNS.PACKAGE_YML})`
+      `Cloned repository is not an OpenPackage (missing ${FILE_PATTERNS.OPENPACKAGE_YML} at repository root)`
     );
   }
 

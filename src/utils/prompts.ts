@@ -73,7 +73,7 @@ export async function promptPackageDelete(packageName: string): Promise<boolean>
  */
 export async function promptCreatePackage(): Promise<boolean> {
   return await promptConfirmation(
-    'No package.yml found. Would you like to create a new package?',
+    'No openpackage.yml found. Would you like to create a new package?',
     true
   );
 }

@@ -22,7 +22,7 @@ import { getAllPlatformDirs } from '../utils/platform-utils.js';
 // Centralized discovery is used instead of bespoke platform iteration
 
 /**
- * Get protected packages from cwd package.yml
+ * Get protected packages from cwd openpackage.yml
  */
 async function getProtectedPackages(targetDir: string): Promise<Set<string>> {
   const protectedPackages = new Set<string>();
@@ -42,17 +42,17 @@ async function getProtectedPackages(targetDir: string): Promise<Set<string>> {
     allDeps.forEach(dep => protectedPackages.add(dep.name));
     logger.debug(`Protected packages: ${Array.from(protectedPackages).join(', ')}`);
   } catch (error) {
-    logger.warn(`Failed to parse package.yml for protected packages: ${error}`);
+    logger.warn(`Failed to parse openpackage.yml for protected packages: ${error}`);
   }
   
   return protectedPackages;
 }
 
 /**
- * Remove package from package.yml file
+ * Remove package from openpackage.yml file
  */
 async function removePackageFromYml(targetDir: string, packageName: string): Promise<boolean> {
-  // Check for .openpackage/package.yml
+  // Check for .openpackage/openpackage.yml
   const configPaths = [
     getLocalPackageYmlPath(targetDir)
   ];
@@ -66,7 +66,7 @@ async function removePackageFromYml(targetDir: string, packageName: string): Pro
   }
   
   if (!configPath) {
-    logger.warn('No package.yml file found to update');
+    logger.warn('No openpackage.yml file found to update');
     return false;
   }
   
@@ -95,7 +95,7 @@ async function removePackageFromYml(targetDir: string, packageName: string): Pro
       return false;
     }
   } catch (error) {
-    logger.error(`Failed to update package.yml: ${error}`);
+    logger.error(`Failed to update openpackage.yml: ${error}`);
     return false;
   }
 }
@@ -123,12 +123,12 @@ async function displayDryRunInfo(
   }
 
 
-  // Check package.yml files and README.md files that would be removed
+  // Check openpackage.yml files and README.md files that would be removed
   const packageYmlFilesToRemove: string[] = [];
   const readmeFilesToRemove: string[] = [];
   for (const pkg of packagesToRemove) {
     const packageDir = getLocalPackageDir(cwd, pkg);
-    const packageYmlPath = join(packageDir, FILE_PATTERNS.PACKAGE_YML);
+    const packageYmlPath = join(packageDir, FILE_PATTERNS.OPENPACKAGE_YML);
     const readmePath = join(packageDir, FILE_PATTERNS.README_MD);
     if (await exists(packageYmlPath)) {
       packageYmlFilesToRemove.push(pkg);
@@ -142,7 +142,7 @@ async function displayDryRunInfo(
   if (totalMetadataFiles > 0) {
     console.log(`\n✓ Package metadata to remove (${totalMetadataFiles}):`);
     for (const pkg of packageYmlFilesToRemove) {
-      console.log(`├── ${pkg}/package.yml`);
+      console.log(`├── ${pkg}/${FILE_PATTERNS.OPENPACKAGE_YML}`);
     }
     for (const pkg of readmeFilesToRemove) {
       console.log(`├── ${pkg}/README.md`);
@@ -189,7 +189,7 @@ async function displayDryRunInfo(
     console.log(`   ├── ${file}`);
   }
 
-  // Check package.yml updates
+  // Check openpackage.yml updates
   const configPaths = [
     getLocalPackageYmlPath(targetDir)
   ];
@@ -201,7 +201,7 @@ async function displayDryRunInfo(
       console.log(`├── ${pkg}`);
     }
   } else {
-    console.log('✓ No package.yml file to update');
+    console.log('✓ No openpackage.yml file to update');
   }
 
 }
@@ -249,7 +249,7 @@ function displayUninstallSuccess(
     }
   }
 
-  // Report package.yml updates
+  // Report openpackage.yml updates
   const successfulRemovals = Object.entries(ymlRemovalResults).filter(([, success]) => success);
   const failedRemovals = Object.entries(ymlRemovalResults).filter(([, success]) => !success);
 
@@ -261,7 +261,7 @@ function displayUninstallSuccess(
   }
 
   if (failedRemovals.length > 0) {
-    console.log(`⚠️ Could not update package.yml for:`);
+    console.log(`⚠️ Could not update openpackage.yml for:`);
     for (const [pkg] of failedRemovals) {
       console.log(`   ├── ${pkg} (not found or not listed)`);
     }
@@ -367,16 +367,16 @@ async function uninstallPackageCommand(
       packagesToRemove.map(async (name) => ({ name, files: await discoverPackageFilesForUninstall(name) }))
     );
 
-    // Remove package.yml files and directories for all packages being removed
+    // Remove openpackage.yml files and directories for all packages being removed
     const packagesDir = getLocalPackagesDir(cwd);
     for (const pkg of packagesToRemove) {
       const packageDir = getLocalPackageDir(cwd, pkg);
-      const packageYmlPath = join(packageDir, FILE_PATTERNS.PACKAGE_YML);
+      const packageYmlPath = join(packageDir, FILE_PATTERNS.OPENPACKAGE_YML);
 
-      // Remove the package.yml file if it exists
+      // Remove the openpackage.yml file if it exists
       if (await exists(packageYmlPath)) {
         await remove(packageYmlPath);
-        logger.debug(`Removed package.yml file: ${packageYmlPath}`);
+        logger.debug(`Removed openpackage.yml file: ${packageYmlPath}`);
       }
 
       // Remove the package directory if it exists
@@ -469,7 +469,7 @@ async function uninstallPackageCommand(
       await removeEmptyDirectories(openpackagePath);
     }
 
-    // Remove all packages being uninstalled from package.yml
+    // Remove all packages being uninstalled from openpackage.yml
     const ymlRemovalResults: Record<string, boolean> = {};
     for (const pkg of packagesToRemove) {
       ymlRemovalResults[pkg] = await removePackageFromYml(cwd, pkg);
@@ -519,7 +519,7 @@ export function setupUninstallCommand(program: Command): void {
     .argument('<package-name>', 'name of the package to uninstall')
     .argument('[target-dir]', 'target directory (defaults to current directory)', '.')
     .option('--dry-run', 'preview changes without applying them')
-    .option('--recursive', 'recursively remove dangling dependencies (packages not depended upon by any remaining packages, excluding those listed in cwd package.yml)')
+    .option('--recursive', 'recursively remove dangling dependencies (packages not depended upon by any remaining packages, excluding those listed in cwd openpackage.yml)')
     .action(withErrorHandling(async (packageName: string, targetDir: string, options: UninstallOptions) => {
       const result = await uninstallPackageCommand(packageName, targetDir, options);
       if (!result.success && result.error !== 'Package not found') {

@@ -11,12 +11,12 @@ import { getVersionInfoFromDependencyTree } from './install-helpers.js';
 import { promptPackageOverwrite } from './prompts.js';
 
 /**
- * Get currently installed version from .openpackage/packages/<package>/package.yml
+ * Get currently installed version from .openpackage/packages/<package>/openpackage.yml
  */
 async function getInstalledPackageVersion(cwd: string, packageName: string): Promise<string | undefined> {
   try {
     const packageDir = getLocalPackageDir(cwd, packageName);
-    const packageYmlPath = join(packageDir, FILE_PATTERNS.PACKAGE_YML);
+    const packageYmlPath = join(packageDir, FILE_PATTERNS.OPENPACKAGE_YML);
     if (await exists(packageYmlPath)) {
       const config = await parsePackageYml(packageYmlPath);
       return config.version;

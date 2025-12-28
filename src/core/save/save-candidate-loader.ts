@@ -14,7 +14,7 @@ import type { SaveCandidate } from './save-types.js';
 
 function isValidLocalCandidatePath(normalizedPath: string): boolean {
   if (
-    normalizedPath === FILE_PATTERNS.PACKAGE_INDEX_YML ||
+    normalizedPath === FILE_PATTERNS.OPENPACKAGE_INDEX_YML ||
     normalizedPath === PACKAGE_PATHS.INDEX_RELATIVE ||
     normalizedPath === FILE_PATTERNS.AGENTS_MD
   ) {

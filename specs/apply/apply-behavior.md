@@ -14,7 +14,7 @@ Apply may be invoked:
 #### 2. Purpose
 
 - Keep platform-specific working directories (e.g. `.cursor/`, `.opencode/`, etc.) consistent with the package’s canonical content.
-- Ensure `package.index.yml` reflects the **paths that actually exist** after apply.
+- Ensure `openpackage.index.yml` reflects the **paths that actually exist** after apply.
 
 ---
 

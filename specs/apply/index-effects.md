@@ -28,7 +28,7 @@ workspace:
   hash: abc123
   version: 1.0.0-abc123.xyz
 files:
-  .openpackage/commands/test.md:
+  commands/test.md:
     - .cursor/commands/test.md    # Only the source path that exists
 ```
 
@@ -39,10 +39,10 @@ workspace:
   hash: abc123
   version: 1.0.0-abc123.xyz
 files:
-  .openpackage/commands/test.md:
+  commands/test.md:
     - .cursor/commands/test.md    # Original source
     - .opencode/command/test.md   # Synced by apply
-  .openpackage/rules/auth.md:
+  rules/auth.md:
     - .cursor/rules/auth.mdc
   # Note: package.yml is NOT included (it's the manifest, not synced content)
   # Note: <dir>/helper.md is SKIPPED for root packages (maps to itself)
@@ -55,7 +55,7 @@ workspace:
   hash: abc123
   version: 1.0.0
 files:
-  .openpackage/commands/test.md:
+  commands/test.md:
     - .cursor/commands/test.md
     - .opencode/command/test.md
   <dir>/helper.md:

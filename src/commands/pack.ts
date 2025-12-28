@@ -21,7 +21,7 @@ export function setupPackCommand(program: Command): void {
     .description(
       'Promote the current workspace package to a stable registry copy.\n' +
       'Usage:\n' +
-      '  opkg pack                  # Pack cwd package (requires .openpackage/package.yml)\n' +
+      '  opkg pack                  # Pack cwd package (requires openpackage.yml)\n' +
       '  opkg pack <package-name>   # Pack specific package by name'
     )
     .option('-f, --force', 'overwrite existing stable versions or skip confirmations')

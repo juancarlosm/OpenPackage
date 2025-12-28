@@ -54,7 +54,7 @@ export interface PathInstallPipelineResult {
  * 2. Resolve dependencies recursively (handles path-based deps)
  * 3. Copy to workspace .openpackage/packages/ for consistency
  * 4. Install to workspace platforms
- * 5. Update workspace package.yml with path field
+ * 5. Update workspace openpackage.yml with path field
  */
 export async function runPathInstallPipeline(
   options: PathInstallPipelineOptions
@@ -275,7 +275,7 @@ export async function runPathInstallPipeline(
     await writeLocalPackageFromRegistry(cwd, resolved.name, resolved.version);
   }
 
-  // Update workspace package.yml with path-based dependency
+  // Update workspace openpackage.yml with path-based dependency
   const mainPackage = finalResolvedPackages.find(pkg => pkg.isRoot);
   if (packageYmlExists && mainPackage) {
     // Store relative path if possible, otherwise absolute

@@ -2,11 +2,11 @@
  * Unified Package Context
  * 
  * Provides consistent package location resolution for all pipelines.
- * Root packages store files under .openpackage/<subdir>/
- * Nested packages store files under .openpackage/packages/<name>/<subdir>/
+ * Package payloads store content at the package root alongside openpackage.yml.
+ * Cached packages (workspace) live under .openpackage/packages/<name>/ with the same layout.
  */
 
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 import { DIR_PATTERNS, FILE_PATTERNS, OPENPACKAGE_DIRS } from '../constants/index.js';
 import type { PackageYml } from '../types/index.js';
@@ -25,31 +25,28 @@ export type PackageLocation = 'root' | 'nested';
  * Unified package context used by all pipelines.
  * 
  * Key distinction:
- * - packageRootDir: the package root directory (parent of .openpackage/)
- * - packageFilesDir: the content directory (.openpackage/) where package.yml and content live
- * - packageYmlPath: where package.yml lives (inside .openpackage/)
+ * - packageRootDir: the package root directory (content lives directly here)
+ * - packageYmlPath: <packageRootDir>/openpackage.yml
  * 
  * For root packages:
  *   packageRootDir = cwd/
- *   packageFilesDir = cwd/.openpackage/
- *   packageYmlPath = cwd/.openpackage/package.yml
+ *   packageYmlPath = cwd/openpackage.yml
  * 
- * For nested packages:
+ * For cached packages:
  *   packageRootDir = cwd/.openpackage/packages/<name>/
- *   packageFilesDir = cwd/.openpackage/packages/<name>/.openpackage/
- *   packageYmlPath = cwd/.openpackage/packages/<name>/.openpackage/package.yml
+ *   packageYmlPath = cwd/.openpackage/packages/<name>/openpackage.yml
  */
 export interface PackageContext {
   /** Normalized package name */
   name: string;
   
-  /** Package version from package.yml */
+  /** Package version from openpackage.yml */
   version?: string;
   
-  /** Full config from package.yml */
+  /** Full config from openpackage.yml */
   config: PackageYml;
   
-  /** Absolute path to package.yml */
+  /** Absolute path to openpackage.yml */
   packageYmlPath: string;
   
   /** 
@@ -60,9 +57,7 @@ export interface PackageContext {
   packageRootDir: string;
   
   /** 
-   * Absolute path to the content directory (.openpackage/) containing package files
-   * - Root: <cwd>/.openpackage/
-   * - Nested: <cwd>/.openpackage/packages/<name>/.openpackage/
+   * Absolute path to the content directory (same as package root for v2 layout)
    */
   packageFilesDir: string;
   
@@ -106,42 +101,26 @@ export function getPackageRootDir(cwd: string, location: PackageLocation, packag
 }
 
 /**
- * Get the package content directory (.openpackage/) based on location.
- * This is where package.yml, the package index file, and universal content live.
+ * Get the package content directory (v2 layout: same as the package root).
  */
 export function getPackageFilesDir(cwd: string, location: PackageLocation, packageName?: string): string {
-  if (location === 'root') {
-    return join(cwd, DIR_PATTERNS.OPENPACKAGE);
-  }
-  
-  if (!packageName) {
-    throw new Error('Package name required for nested packages');
-  }
-  
-  // Nested: cwd/.openpackage/packages/<name>/.openpackage/
-  return join(
-    cwd,
-    DIR_PATTERNS.OPENPACKAGE,
-    OPENPACKAGE_DIRS.PACKAGES,
-    normalizePackageName(packageName),
-    DIR_PATTERNS.OPENPACKAGE
-  );
+  // In v2, content lives at the package root.
+  return getPackageRootDir(cwd, location, packageName);
 }
 
 /**
- * Get the package.yml path based on location.
- * package.yml is always inside the content directory (.openpackage/)
+ * Get the openpackage.yml path based on location.
  */
 export function getPackageYmlPath(cwd: string, location: PackageLocation, packageName?: string): string {
-  const contentDir = getPackageFilesDir(cwd, location, packageName);
-  return join(contentDir, FILE_PATTERNS.PACKAGE_YML);
+  const contentDir = getPackageRootDir(cwd, location, packageName);
+  return join(contentDir, FILE_PATTERNS.OPENPACKAGE_YML);
 }
 
 /**
- * Core rule: any directory that contains `.openpackage/package.yml` is a valid package.
+ * Core rule: any directory that contains `openpackage.yml` is a valid package.
  */
 export async function isValidPackageDirectory(dir: string): Promise<boolean> {
-  const packageYmlPath = join(dir, DIR_PATTERNS.OPENPACKAGE, FILE_PATTERNS.PACKAGE_YML);
+  const packageYmlPath = join(dir, FILE_PATTERNS.OPENPACKAGE_YML);
   return exists(packageYmlPath);
 }
 
@@ -149,7 +128,7 @@ export async function isValidPackageDirectory(dir: string): Promise<boolean> {
  * Load package config from a directory that satisfies the core rule.
  */
 export async function loadPackageConfig(dir: string): Promise<PackageYml | null> {
-  const packageYmlPath = join(dir, DIR_PATTERNS.OPENPACKAGE, FILE_PATTERNS.PACKAGE_YML);
+  const packageYmlPath = join(dir, FILE_PATTERNS.OPENPACKAGE_YML);
   if (!(await exists(packageYmlPath))) {
     return null;
   }
@@ -157,7 +136,7 @@ export async function loadPackageConfig(dir: string): Promise<PackageYml | null>
   try {
     return await parsePackageYml(packageYmlPath);
   } catch (error) {
-    logger.debug(`Failed to parse package.yml at ${packageYmlPath}: ${error}`);
+    logger.debug(`Failed to parse openpackage.yml at ${packageYmlPath}: ${error}`);
     return null;
   }
 }
@@ -197,7 +176,7 @@ export async function detectPackageContext(
         isCwdPackage: true
       };
     } catch (error) {
-      logger.warn(`Failed to parse root package.yml: ${error}`);
+      logger.warn(`Failed to parse root openpackage.yml: ${error}`);
       return null;
     }
   }
@@ -221,42 +200,39 @@ export async function detectPackageContext(
         };
       }
     } catch (error) {
-      logger.debug(`Failed to parse root package.yml: ${error}`);
+      logger.debug(`Failed to parse root openpackage.yml: ${error}`);
     }
   }
 
   // Check nested packages directory
-  const nestedPackageYmlPath = getPackageYmlPath(cwd, 'nested', packageName);
-  const nestedPackageRootDir = getPackageRootDir(cwd, 'nested', packageName);
-  const nestedPackageFilesDir = getPackageFilesDir(cwd, 'nested', packageName);
-
-  if (await exists(nestedPackageYmlPath)) {
-    try {
-      const nestedConfig = await parsePackageYml(nestedPackageYmlPath);
-      if (arePackageNamesEquivalent(nestedConfig.name, packageName)) {
-        return {
-          name: normalizedName,
-          version: nestedConfig.version,
-          config: nestedConfig,
-          packageYmlPath: nestedPackageYmlPath,
-          packageRootDir: nestedPackageRootDir,
-          packageFilesDir: nestedPackageFilesDir,
-          location: 'nested',
-          isCwdPackage: false
-        };
-      }
-    } catch (error) {
-      logger.debug(`Failed to parse nested package.yml at ${nestedPackageYmlPath}: ${error}`);
-    }
-  }
-
-  // Scan nested packages for cases where directory name differs from package name
+  // Check cached packages directory for a matching package name
   const packagesDir = join(cwd, DIR_PATTERNS.OPENPACKAGE, OPENPACKAGE_DIRS.PACKAGES);
   if (await exists(packagesDir) && (await isDirectory(packagesDir))) {
     try {
+      // Direct match on expected path
+      const nestedPackageRootDir = getPackageRootDir(cwd, 'nested', packageName);
+      const nestedPackageYmlPath = getPackageYmlPath(cwd, 'nested', packageName);
+
+      if (await exists(nestedPackageYmlPath)) {
+        const nestedConfig = await parsePackageYml(nestedPackageYmlPath);
+        if (arePackageNamesEquivalent(nestedConfig.name, packageName)) {
+          return {
+            name: normalizedName,
+            version: nestedConfig.version,
+            config: nestedConfig,
+            packageYmlPath: nestedPackageYmlPath,
+            packageRootDir: nestedPackageRootDir,
+            packageFilesDir: nestedPackageRootDir,
+            location: 'nested',
+            isCwdPackage: false
+          };
+        }
+      }
+
+      // Fallback: scan for mismatched directory name
       const packageDirs = await findDirectoriesContainingFile(
         packagesDir,
-        FILE_PATTERNS.PACKAGE_YML,
+        FILE_PATTERNS.OPENPACKAGE_YML,
         async filePath => {
           try {
             return await parsePackageYml(filePath);
@@ -270,15 +246,15 @@ export async function detectPackageContext(
         if (!parsedContent) continue;
 
         if (arePackageNamesEquivalent(parsedContent.name, packageName)) {
-          // dirPath is the content directory (.openpackage/), so package root is parent
-          const packageRootDir = dirname(dirPath);
+          // dirPath is the package root containing openpackage.yml
+          const packageRootDir = dirPath;
           return {
             name: normalizedName,
             version: parsedContent.version,
             config: parsedContent,
-            packageYmlPath: join(dirPath, FILE_PATTERNS.PACKAGE_YML),
+            packageYmlPath: join(dirPath, FILE_PATTERNS.OPENPACKAGE_YML),
             packageRootDir,
-            packageFilesDir: dirPath,
+            packageFilesDir: packageRootDir,
             location: 'nested',
             isCwdPackage: false
           };
@@ -345,15 +321,15 @@ export function getNoPackageDetectedMessage(packageName?: string): string {
     return (
       `Package '${packageName}' not found.\n\n` +
       `Checked locations:\n` +
-      `  • Root package: .openpackage/package.yml\n` +
-      `  • Nested packages: .openpackage/packages/${packageName}/\n\n` +
+      `  • Root package: openpackage.yml\n` +
+      `  • Cached packages: .openpackage/packages/${packageName}/\n\n` +
       `💡 To create a new package, run: opkg save ${packageName}`
     );
   }
 
   return (
     `No package detected at current directory.\n\n` +
-    `A valid package requires .openpackage/package.yml to exist.\n\n` +
+    `A valid package requires openpackage.yml to exist.\n\n` +
     `💡 To initialize a package:\n` +
     `   • Run 'opkg init' to create a new package\n` +
     `   • Or specify a package name: 'opkg save <package-name>'`

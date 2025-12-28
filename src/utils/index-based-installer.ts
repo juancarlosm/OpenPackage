@@ -436,7 +436,7 @@ async function collectPackageDirectories(
   const results: Array<{ packageName: string; dir: string }> = [];
 
   async function recurse(currentDir: string, relativeBase: string): Promise<void> {
-    const packageYmlPath = join(currentDir, FILE_PATTERNS.PACKAGE_YML);
+    const packageYmlPath = join(currentDir, FILE_PATTERNS.OPENPACKAGE_YML);
     if (await exists(packageYmlPath)) {
       const packageName = relativeBase.replace(new RegExp(`\\${sep}`, 'g'), '/');
       results.push({ packageName, dir: currentDir });
@@ -469,7 +469,7 @@ export async function loadOtherPackageIndexes(
 
   for (const entry of directories) {
     if (entry.packageName === excludePackage) continue;
-    const indexPath = join(entry.dir, FILE_PATTERNS.PACKAGE_INDEX_YML);
+    const indexPath = join(entry.dir, FILE_PATTERNS.OPENPACKAGE_INDEX_YML);
     if (!(await exists(indexPath))) continue;
 
     const record = await readPackageIndex(cwd, entry.packageName);

@@ -31,10 +31,10 @@ export async function ensureLocalOpenPackageStructure(cwd: string): Promise<void
 }
 
 /**
- * Create a basic package.yml file for workspace if it doesn't exist
+ * Create a basic openpackage.yml file for workspace if it doesn't exist
  * Shared utility for both install and save commands
- * @param force - If true, overwrite existing package.yml
- * @returns the package.yml if it was created, null if it already existed and force=false
+ * @param force - If true, overwrite existing openpackage.yml
+ * @returns the openpackage.yml if it was created, null if it already existed and force=false
  */
 export async function createWorkspacePackageYml(cwd: string, force: boolean = false): Promise<PackageYml | null> {
   await ensureLocalOpenPackageStructure(cwd);
@@ -49,17 +49,17 @@ export async function createWorkspacePackageYml(cwd: string, force: boolean = fa
 
   if (await exists(packageYmlPath)) {
     if (!force) {
-      return null; // package.yml already exists, no need to create
+      return null; // openpackage.yml already exists, no need to create
     }
     await writePackageYml(packageYmlPath, basicPackageYml);
-    logger.info(`Overwrote basic package.yml with name: ${projectName}`);
-    console.log(`📋 Overwrote basic package.yml in .openpackage/ with name: ${projectName}`);
+    logger.info(`Overwrote basic openpackage.yml with name: ${projectName}`);
+    console.log(`📋 Overwrote basic openpackage.yml in .openpackage/ with name: ${projectName}`);
     return basicPackageYml;
   }
 
   await writePackageYml(packageYmlPath, basicPackageYml);
-  logger.info(`Initialized workspace package.yml`);
-  console.log(`📋 Initialized workspace package.yml in .openpackage/`);
+  logger.info(`Initialized workspace openpackage.yml`);
+  console.log(`📋 Initialized workspace openpackage.yml in .openpackage/`);
   return basicPackageYml;
 }
 
@@ -77,7 +77,7 @@ export interface EnsurePackageWithYmlResult {
 }
 
 /**
- * Ensure a nested package directory and package.yml exist, optionally prompting for details.
+ * Ensure a cached package directory and openpackage.yml exist, optionally prompting for details.
  * This is for NESTED packages only. Root packages use different flow.
  */
 export async function ensurePackageWithYml(
@@ -110,11 +110,11 @@ export async function ensurePackageWithYml(
           name: normalizedName,
           partial: true
         };
-        logger.info(`Loaded package.yml for '${normalizedName}' from local registry copy`);
-        console.log(`✓ Loaded package.yml from local registry for ${normalizedName}`);
+        logger.info(`Loaded openpackage.yml for '${normalizedName}' from local registry copy`);
+        console.log(`✓ Loaded openpackage.yml from local registry for ${normalizedName}`);
       }
     } catch (error) {
-      logger.debug('Unable to seed package.yml from registry; falling back to prompts', { normalizedName, error });
+      logger.debug('Unable to seed openpackage.yml from registry; falling back to prompts', { normalizedName, error });
     }
 
     if (!packageConfig) {
@@ -131,13 +131,6 @@ export async function ensurePackageWithYml(
       packageConfig = {
         ...packageConfig,
         partial: true
-      };
-    }
-
-    if (!packageConfig.include || packageConfig.include.length === 0) {
-      packageConfig = {
-        ...packageConfig,
-        include: ['**']
       };
     }
 
@@ -163,7 +156,7 @@ export async function ensurePackageWithYml(
 }
 
 /**
- * Add a package dependency to package.yml with smart placement logic
+ * Add a package dependency to openpackage.yml with smart placement logic
  * Shared utility for both install and save commands
  */
 export async function addPackageToYml(
@@ -181,7 +174,7 @@ export async function addPackageToYml(
   const packageYmlPath = getLocalPackageYmlPath(cwd);
   
   if (!(await exists(packageYmlPath))) {
-    return; // If no package.yml exists, ignore this step
+    return; // If no openpackage.yml exists, ignore this step
   }
   
   const config = await parsePackageYml(packageYmlPath);
@@ -308,14 +301,14 @@ export async function addPackageToYml(
       targetArrayRef[existingTargetIndex] = dependency;
       if (!silent) {
         logger.info(`Updated existing package dependency: ${nameWithVersion}`);
-        console.log(`✓ Updated ${nameWithVersion} in main package.yml`);
+        console.log(`✓ Updated ${nameWithVersion} in main openpackage.yml`);
       }
     }
   } else {
     targetArrayRef.push(dependency);
     if (!silent) {
       logger.info(`Added new package dependency: ${nameWithVersion}`);
-      console.log(`✓ Added ${nameWithVersion} to main package.yml`);
+      console.log(`✓ Added ${nameWithVersion} to main openpackage.yml`);
     }
   }
   
@@ -341,7 +334,7 @@ export async function writeLocalPackageFromRegistry(
 
 /**
  * Copy a subset of package files from the local registry into the project cache (.openpackage/packages/<pkg>/),
- * always including package.yml. Used for partial installs.
+ * always including openpackage.yml. Used for partial installs.
  */
 export async function writePartialLocalPackageFromRegistry(
   cwd: string,
@@ -368,7 +361,7 @@ export async function writePartialLocalPackageFromRegistry(
 }
 
 /**
- * Update only the include list for an existing dependency in package.yml.
+ * Update only the include list for an existing dependency in openpackage.yml.
  * - include: string[] => set/dedupe
  * - include: null     => clear include field
  * - include: undefined => no-op
@@ -413,7 +406,7 @@ function rangeIncludesVersion(range: string, version: string): boolean {
 }
 
 /**
- * Check if a package is a path-based dependency in the workspace package.yml.
+ * Check if a package is a path-based dependency in the workspace openpackage.yml.
  * Path-based dependencies should be skipped during save operations.
  */
 export async function isPathBasedDependency(cwd: string, packageName: string): Promise<boolean> {

@@ -4,7 +4,7 @@ import { computeWipVersion, computePackTargetVersion } from '../src/core/save/sa
 const fixedDate = new Date('2024-11-23T12:34:56Z');
 const testWorkspacePath = '/test/workspace';
 
-// First save with no index: WIP derived directly from package.yml.version
+// First save with no index: WIP derived directly from openpackage.yml.version
 const wipFromStable = computeWipVersion('1.2.3', undefined, testWorkspacePath, { now: fixedDate });
 console.log('wipFromStable', wipFromStable);
 assert.equal(wipFromStable.stable, '1.2.3');
@@ -41,7 +41,7 @@ assert.ok(wipAfterStable.wipVersion.startsWith('1.2.4-'));
 assert.equal(wipAfterStable.shouldBumpPackageYml, true);
 assert.equal(wipAfterStable.nextStable, '1.2.4');
 
-// Changing the version line in package.yml should trigger a reset, not a bump
+// Changing the version line in openpackage.yml should trigger a reset, not a bump
 const resetWip = computeWipVersion(
   '3.0.0',
   '2.0.0-zzzzzz.abc',

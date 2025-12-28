@@ -47,7 +47,7 @@ function deriveSourceEntry(absFilePath: string, cwd: string): SourceEntry | null
     // Universal content: prefix with .openpackage/
     return {
       sourcePath: absFilePath,
-      registryPath: [DIR_PATTERNS.OPENPACKAGE, mapping.subdir, mapping.relPath].filter(Boolean).join('/')
+      registryPath: [mapping.subdir, mapping.relPath].filter(Boolean).join('/')
     };
   }
 

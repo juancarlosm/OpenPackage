@@ -1,78 +1,95 @@
 ### Package Root Layout
 
-Every package root directory (workspace root, nested, or registry) uses this structure:
+This document describes the **v2 package payload layout** and how it relates to
+workspace-local metadata.
 
 ```text
 <package-root>/
-  .openpackage/                # REQUIRED – package content directory
-    package.yml                # REQUIRED – package manifest (marks this as a package)
-    package.index.yml          # OPTIONAL – install/index metadata (never in registry payload)
-    agents/                    # universal content subdirs (standard + custom from platforms.jsonc)
-    rules/
-    commands/
-    skills/
-    <custom-subdirs>/          # any additional universal content (e.g., memories/, tools/)
-  <root-dirs>/                 # OPTIONAL – root-level content (outside .openpackage/)
+  openpackage.yml              # REQUIRED – package manifest (marks this as a package)
+
+  # Universal content (platform-mapped)
+  commands/                    # standard + custom universal subdirs (from platforms.jsonc)
+  rules/
+  agents/
+  skills/
+  <custom-subdirs>/
+
+  # Root files (installed/processed)
   AGENTS.md                    # OPTIONAL – universal root file
-  <other-root-files>           # OPTIONAL – platform-specific root files (e.g. CLAUDE.md)
-  README.md                    # OPTIONAL – documentation
-  packages/                    # OPTIONAL – nested packages (workspace root only)
+  <platform-root-files>        # OPTIONAL – platform-specific root files (e.g. CLAUDE.md)
+
+  # Escape hatch: direct copy to workspace root
+  root/                        # OPTIONAL – files copied 1:1 into the workspace root
+    <any-files-or-dirs>/
+
+  # Other root-level files/dirs (not installed by default)
+  README.md                    # OPTIONAL – documentation (not installed)
+  LICENSE.md                   # OPTIONAL – license (not installed)
 ```
 
 ---
 
-#### Two Types of Package Content
+#### Installation Semantics (v2)
 
-1. **Root-level content** (outside `.openpackage/`):
-   - Any files/directories at the package root (e.g., `<dir>/foo.md`, `AGENTS.md`, `CLAUDE.md`)
-   - Live directly at the package root level, outside `.openpackage/`
-   - Stored and mapped without transformation
+1. **Universal subdirs at package root** (`commands/`, `rules/`, `agents/`, `skills/`, plus any platform-defined custom subdirs):
+   - Stored in a platform-normalized “universal” format.
+   - Mapped to platform-specific locations during install (e.g., `.cursor/commands/`, `.opencode/commands/`).
 
-2. **Universal content** (inside `.openpackage/`):
-   - Platform-normalized files stored under `.openpackage/<subdir>/`
-   - Source files like `.cursor/commands/test.md` are normalized to `.openpackage/commands/test.md`
-   - Mapped to platform-specific locations during install (e.g., `.cursor/commands/`, `.opencode/commands/`)
+2. **Root files at package root**:
+   - `AGENTS.md` is universal and can be used to populate platform root files during install.
+   - Platform-specific root files at package root (e.g., `CLAUDE.md`) act as **overrides** when present.
+
+3. **`root/` directory**:
+   - Files under `root/**` are copied **1:1 to the workspace root**, stripping the `root/` prefix.
+   - Example: `root/tools/helper.sh` → `<workspace>/tools/helper.sh`.
 
 ---
 
 #### Key Invariants
 
-- **`.openpackage/package.yml`** marks a directory as a package root.
-- **Universal content** (rules, agents, commands, skills, custom subdirs) lives **under `.openpackage/`**.
-- **Root-level content** (any directories/files outside `.openpackage/`) lives **at the package root** (sibling of `.openpackage/`).
-- **Nested packages** live under `packages/` and are treated as **independent packages**.
-- The **same structure** applies to workspace root packages, nested packages, and registry copies.
+- **`openpackage.yml`** marks a directory as a package root.
+- **Universal content** lives at the **package root** under universal subdirs (no `.openpackage/<subdir>/` container in v2 payloads).
+- **Install mapping**:
+  - Universal-subdir paths are platform-mapped.
+  - `root/` is the only prefix that uses a **strip-prefix** rule (copy-to-root).
+  - Other root-level files/dirs are **not installed** by default.
+- **Cached packages** (workspace-local installed copies) live under `cwd/.openpackage/packages/<name>/` and mirror the v2 payload layout.
+- **Global registry copies** (under `~/.openpackage/registry/...`) store the v2 payload layout and **never include** workspace index files.
 
 ---
 
 #### Concrete Examples
 
-**Workspace root package** (package root = effective `cwd` or `--cwd` target dir):
+**Package repo on disk** (payload shape; same shape used in registry copies):
+
+```text
+<package-root>/
+  openpackage.yml
+  commands/
+    test.md
+  rules/
+    auth.md
+  AGENTS.md
+  root/
+    tools/
+      helper.sh
+  README.md
+```
+
+**Workspace metadata + cached package copy** (package root = `cwd/.openpackage/packages/foo/`):
 
 ```text
 cwd/
   .openpackage/
-    package.yml
-    package.index.yml
-    commands/
-      test.md
-    rules/
-      auth.md
-  <root-dir>/                  # any root-level directory
-    helper.md
-  AGENTS.md
-```
-
-**Nested package** (package root = `cwd/.openpackage/packages/foo/`):
-
-```text
-cwd/.openpackage/packages/foo/
-  .openpackage/
-    package.yml
-    package.index.yml
-    commands/
-      test.md
-  <root-dir>/                  # any root-level directory
-    helper.md
+    openpackage.yml                        # workspace manifest (dependency intent)
+    openpackage.index.yml                  # OPTIONAL – workspace-local root index (never in registry payload)
+    packages/
+      foo/
+        openpackage.yml                    # cached payload (mirrors package root)
+        openpackage.index.yml              # workspace-local per-package index (never in registry payload)
+        commands/
+          test.md
+        root/
+          tools/helper.sh
 ```
 

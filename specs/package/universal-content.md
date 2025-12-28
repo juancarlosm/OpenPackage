@@ -6,75 +6,69 @@ Packages contain two types of content:
 
 | Type | Location | Description | Install Behavior |
 |------|----------|-------------|------------------|
-| **Universal content** | `<package-root>/.openpackage/<subdir>/` | Platform-normalized files | Mapped to platform-specific paths |
-| **Root-level content** | `<package-root>/<path>` (outside `.openpackage/`) | Any files/dirs at package root | Copied 1:1 to same relative path |
+| **Universal content** | `<package-root>/<subdir>/` | Platform-normalized files | Mapped to platform-specific paths |
+| **Root-level content** | `<package-root>/<path>` | Any files/dirs at package root | Not installed unless under `root/` (copy-to-root) or a root file |
 
 ---
 
-#### Universal Content Layout under `.openpackage/`
+#### Universal Content Layout (v2)
 
 Universal subdirs (standard: `agents/`, `rules/`, `commands/`, `skills/`; plus any custom defined in `platforms.jsonc`) are canonical inside `.openpackage/`. The full set is dynamically discovered from platform configs.
 
 ```text
 <package-root>/
-  .openpackage/
-    package.yml                # package manifest
-    <universal-subdir>/        # e.g., agents/, rules/, commands/, skills/, or custom (from platforms.jsonc)
-      <name>.md                # universal markdown
-      <name>.<platform>.md     # platform-suffixed markdown (optional)
-    ...                         # other standard/custom subdirs
+  openpackage.yml              # package manifest
+  <universal-subdir>/          # e.g., agents/, rules/, commands/, skills/, or custom (from platforms.jsonc)
+    <name>.md                  # universal markdown
+    <name>.<platform>.md       # platform-suffixed markdown (optional)
+  ...                           # other standard/custom subdirs
 ```
 
 **Definitions:**
 
 - **Universal markdown**:
-  - Paths like `.openpackage/agents/foo.md`
+  - Paths like `agents/foo.md`
   - Contains shared body and (after save) shared frontmatter
   
 - **Platform-suffixed markdown**:
-  - Paths like `.openpackage/agents/foo.<platform>.md`
+  - Paths like `agents/foo.<platform>.md`
   - Represents platform-specific variants of a universal file
   
 ---
 
-#### Root-Level Content (Outside `.openpackage/`)
+#### Root-Level Content
 
 Root-level content lives at the package root, **not** under `.openpackage/`:
 
 ```text
 <package-root>/
-  .openpackage/
-    ...                        # universal content inside
-  <root-dir>/                  # any root-level directory
-    helper.md
-    prompts/
-      system.md
+  <root-dir>/                  # any root-level directory (not installed by default)
   AGENTS.md                    # root files
   CLAUDE.md
   README.md
 ```
 
 Root-level content:
-- Is stored and copied **without transformation**
-- Maps to the **same relative path** in the workspace
-- Includes any directories at the package root, platform root files (`AGENTS.md`, `CLAUDE.md`), etc.
+- Is **not installed** unless it is:
+  - A root file (`AGENTS.md` or platform root files), or
+  - Under `root/**` (copied to workspace root with prefix stripped).
 
 ---
 
-#### Registry Paths (Keys in `package.index.yml`)
+#### Registry Paths (Keys in `openpackage.index.yml`)
 
 Registry paths are **relative to the package root**:
 
 | Content Type | Example Registry Path |
 |--------------|----------------------|
-| Universal content | `.openpackage/commands/test.md` |
-| Root-level content | `<dir>/helper.md` |
+| Universal content | `commands/test.md` |
+| Root-level content | `<dir>/helper.md` (not installed by default) |
 | Root files | `AGENTS.md` |
 
 **Rules:**
 
-- Universal subdir content **always** has `.openpackage/` prefix
-- Root-level content uses its natural path (no prefix)
+- Universal subdir content lives under the universal subdir name at package root
+- Root-level content uses its natural path (no prefix) but is not installed by default
 - Root files use their filename directly
 
 ---
@@ -85,15 +79,16 @@ Registry paths are **relative to the package root**:
 
 | Registry Path | Installed Paths |
 |---------------|-----------------|
-| `.openpackage/commands/test.md` | `.cursor/commands/test.md`, `.opencode/commands/test.md`, etc. |
-| `.openpackage/rules/auth.md` | `.cursor/rules/auth.mdc`, etc. |
+| `commands/test.md` | `.cursor/commands/test.md`, `.opencode/commands/test.md`, etc. |
+| `rules/auth.md` | `.cursor/rules/auth.mdc`, etc. |
 
-**Root-level content** (1:1 mapping):
+**Root-level content**:
 
 | Registry Path | Installed Path |
 |---------------|----------------|
-| `<dir>/helper.md` | `<dir>/helper.md` |
 | `AGENTS.md` | `AGENTS.md` |
+| `root/tools/helper.sh` | `tools/helper.sh` (strip `root/` prefix) |
+| `<dir>/helper.md` | _not installed by default_ |
 
 ---
 
@@ -101,9 +96,9 @@ Registry paths are **relative to the package root**:
 
 These layouts apply identically whether the package lives at:
 
-- **Workspace root**: `cwd/` (content at `cwd/.openpackage/...`)
-- **Nested package**: `cwd/.openpackage/packages/<name>/` (content at `cwd/.openpackage/packages/<name>/.openpackage/...`)
-- **Registry**: `~/.openpackage/registry/<name>/<version>/` (content at `.../.openpackage/...`)
+- **Workspace root**: `cwd/` (content at `cwd/<subdir>/...`)
+- **Nested package**: `cwd/.openpackage/packages/<name>/` (content at `cwd/.openpackage/packages/<name>/<subdir>/...`)
+- **Registry**: `~/.openpackage/registry/<name>/<version>/` (content at `.../<subdir>/...`)
 
 ---
 
@@ -111,7 +106,7 @@ These layouts apply identically whether the package lives at:
 
 In the canonical structure:
 
-- Each universal markdown file (`.openpackage/<subdir>/<name>.md`) is the **single source of truth** for:
+- Each universal markdown file (`<subdir>/<name>.md`) is the **single source of truth** for:
   - Markdown body
   - Shared frontmatter keys/common metadata
   - Platform overrides embedded inline under `openpackage.<platform>` (ids/aliases, only diffs)

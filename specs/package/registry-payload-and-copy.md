@@ -7,11 +7,11 @@ The **registry payload** for a given version is defined by two layers of rules.
 #### 1. Static Rules
 
 **Always exclude:**
-- `package.index.yml` (workspace-local metadata)
-- Anything under `packages/` (nested packages are separate units)
+- `openpackage.index.yml` (workspace-local metadata)
+- Anything under `.openpackage/packages/` (cached nested packages are separate units and workspace-local)
 
 **Always include (cannot be excluded):**
-- `.openpackage/package.yml` (package manifest)
+- `openpackage.yml` (package manifest)
 
 **Included by default (removable via manifest `exclude`):**
 - Every platform root file declared in `platforms.jsonc` (or user overrides in `~/.openpackage/platforms.jsonc` or `.openpackage/platforms.jsonc`) (e.g., `CLAUDE.md`, `WARP.md`, `AGENTS.md`) when it exists
@@ -24,12 +24,12 @@ The **registry payload** for a given version is defined by two layers of rules.
 
 #### 2. Manifest Filters
 
-In `package.yml`:
+In `openpackage.yml`:
 
 - **`include`** (array): Expands the payload by listing additional glob-like patterns relative to the package root
 - **`exclude`** (array): Removes matches after include rules are applied (but never overrides hard includes/excludes)
 
-> **Note**: Newly created nested packages default their `package.yml` to `include: ["**"]`, so they start including all files until the author narrows the list.
+> **Note**: Newly created nested packages default their `openpackage.yml` to `include: ["**"]`, so they start including all files until the author narrows the list.
 
 ---
 
@@ -54,8 +54,8 @@ Registry copies maintain the same structure as workspace packages:
 
 ```text
 ~/.openpackage/registry/<name>/<version>/
+  openpackage.yml              # package manifest
   .openpackage/
-    package.yml                # package manifest
     commands/                  # universal content
       test.md
     rules/

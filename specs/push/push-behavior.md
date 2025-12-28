@@ -2,7 +2,7 @@
 
 ### Effective Working Directory
 The command determines the source package via the **effective cwd** (shell `cwd` or global `--cwd <dir>` override; see [../../cli-options.md]):
-- Detects package context at effective cwd (root `.openpackage/package.yml` or nested `packages/<name>/`).
+- Detects package context at effective cwd (root `openpackage.yml` or nested `.openpackage/packages/<name>/`).
 - Packs from that dir's content/layout.
 - Enables monorepo pushes: `opkg push --cwd ./sub-pkg` targets sub-dir package without `cd`.
 
@@ -13,7 +13,7 @@ If no valid package detected, errors early ("No package project at <dir>").
 The `opkg push` command uploads a local package version from the **local registry** to the **remote registry**.
 It allows:
 - **Stable versions** (`x.y.z`).
-- **Unversioned packages** (when `package.yml` omits `version`, represented as `0.0.0`).
+- **Unversioned packages** (when `openpackage.yml` omits `version`, represented as `0.0.0`).
 It still rejects prerelease versions like `1.2.3-dev.abc`.
 
 This document focuses on user-facing behavior:
@@ -119,12 +119,12 @@ High-level flow:
      - Missing paths fail the push with a clear missing-path message.
   3. Tarball is narrowed to:
      - The requested file set.
-     - `.openpackage/package.yml`.
+     - `openpackage.yml`.
   4. Upload uses the standard `/packages/push` endpoint.
 
 Notes:
 - This replaces the previous single-file `f` flow; single-file pushes are just partial pushes with one path.
-- Manifest is required; if `.openpackage/package.yml` is missing locally, the CLI errors.
+- Manifest is required; if `openpackage.yml` is missing locally, the CLI errors.
 
 
 ## Stable-only guarantees (behavioral view)

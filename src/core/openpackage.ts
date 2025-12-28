@@ -23,16 +23,17 @@ export interface OpenPackagePackage {
 }
 
 /**
- * Find package config file (.openpackage/package.yml or package.yml) in a directory
+ * Find package config file in a directory.
+ * Prefers v2 layout: <dir>/openpackage.yml, then <dir>/.openpackage/openpackage.yml (workspace-style).
  */
 async function findPackageConfigFile(directoryPath: string): Promise<string | null> {
-  const openpackagePackageYmlPath = getLocalPackageYmlPath(directoryPath);
-  const packageYmlPath = join(directoryPath, FILE_PATTERNS.PACKAGE_YML);
+  const rootManifest = join(directoryPath, FILE_PATTERNS.OPENPACKAGE_YML);
+  const workspaceManifest = getLocalPackageYmlPath(directoryPath);
   
-  if (await exists(openpackagePackageYmlPath)) {
-    return openpackagePackageYmlPath;
-  } else if (await exists(packageYmlPath)) {
-    return packageYmlPath;
+  if (await exists(rootManifest)) {
+    return rootManifest;
+  } else if (await exists(workspaceManifest)) {
+    return workspaceManifest;
   }
   
   return null;
@@ -109,7 +110,7 @@ export async function scanOpenPackagePackages(openpackagePath: string): Promise<
   }
 
   try {
-    // Find all package.yml files recursively under the packages directory
+    // Find all openpackage.yml files recursively under the packages directory
     const packagesDir = getLocalPackagesDir(openpackagePath);
     if (!(await exists(packagesDir))) {
       return packages;
@@ -117,7 +118,7 @@ export async function scanOpenPackagePackages(openpackagePath: string): Promise<
 
     const packageDirs = await findDirectoriesContainingFile(
       packagesDir,
-      FILE_PATTERNS.PACKAGE_YML,
+      FILE_PATTERNS.OPENPACKAGE_YML,
       async (filePath) => {
         try {
           return await parsePackageYml(filePath);
@@ -149,7 +150,7 @@ export async function scanOpenPackagePackages(openpackagePath: string): Promise<
 }
 
 /**
- * Gather version constraints from the main and nested package.yml files
+ * Gather version constraints from the main and cached package openpackage.yml files
  */
 export async function gatherGlobalVersionConstraints(cwd: string, includeResolutions: boolean = true): Promise<Map<string, string[]>> {
   const constraints = new Map<string, Set<string>>();
@@ -182,14 +183,14 @@ export async function gatherGlobalVersionConstraints(cwd: string, includeResolut
     config['dev-packages']?.forEach(dep => addConstraint(dep.name, dep.version));
   };
 
-  // Collect from main .openpackage/package.yml if present
+  // Collect from main .openpackage/openpackage.yml if present
   const mainPackagePath = getLocalPackageYmlPath(cwd);
   if (await exists(mainPackagePath)) {
     try {
       const mainConfig = await parsePackageYml(mainPackagePath);
       collectFromConfig(mainConfig);
     } catch (error) {
-      logger.debug(`Failed to parse main package.yml for constraints: ${error}`);
+      logger.debug(`Failed to parse main openpackage.yml for constraints: ${error}`);
     }
   }
 
@@ -199,12 +200,12 @@ export async function gatherGlobalVersionConstraints(cwd: string, includeResolut
     try {
       const packageDirs = await findDirectoriesContainingFile(
         packagesDir,
-        FILE_PATTERNS.PACKAGE_YML,
+        FILE_PATTERNS.OPENPACKAGE_YML,
         async (filePath) => {
           try {
             return await parsePackageYml(filePath);
           } catch (error) {
-            logger.debug(`Failed to parse package.yml at ${filePath}: ${error}`);
+            logger.debug(`Failed to parse openpackage.yml at ${filePath}: ${error}`);
             return null;
           }
         }
@@ -227,7 +228,7 @@ export async function gatherGlobalVersionConstraints(cwd: string, includeResolut
 }
 
 /**
- * Gather version constraints only from the main .openpackage/package.yml
+ * Gather version constraints only from the main .openpackage/openpackage.yml
  * Used to treat root-declared versions as authoritative overrides
  */
 export async function gatherRootVersionConstraints(cwd: string): Promise<Map<string, string[]>> {
@@ -250,7 +251,7 @@ export async function gatherRootVersionConstraints(cwd: string): Promise<Map<str
       mainConfig.packages?.forEach(dep => addConstraint(dep.name, dep.version));
       mainConfig['dev-packages']?.forEach(dep => addConstraint(dep.name, dep.version));
     } catch (error) {
-      logger.debug(`Failed to parse main package.yml for root constraints: ${error}`);
+      logger.debug(`Failed to parse main openpackage.yml for root constraints: ${error}`);
     }
   }
 

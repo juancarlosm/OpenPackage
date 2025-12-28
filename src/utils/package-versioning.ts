@@ -48,7 +48,7 @@ export function dumpYamlWithScopedQuoting(config: PackageYml, options: yaml.Dump
 
 /**
  * Transform package files for version change only (no name change)
- * Updates package.yml version field
+ * Updates openpackage.yml version field
  */
 export function transformPackageFilesForVersionChange(
   files: PackageFile[],
@@ -56,7 +56,7 @@ export function transformPackageFilesForVersionChange(
   packageName: string
 ): PackageFile[] {
   return files.map((file) => {
-    if (file.path === FILE_PATTERNS.PACKAGE_YML) {
+    if (file.path === FILE_PATTERNS.OPENPACKAGE_YML) {
       try {
         const parsed = yaml.load(file.content) as PackageYml;
         const updated: PackageYml = {
@@ -81,7 +81,7 @@ export function transformPackageFilesForVersionChange(
 
 /**
  * Transform package files metadata for name and version changes
- * Updates package.yml only
+ * Updates openpackage.yml only
  */
 export function transformPackageFilesMetadata(
   files: PackageFile[],
@@ -90,8 +90,8 @@ export function transformPackageFilesMetadata(
   newVersion: string | undefined
 ): PackageFile[] {
   return files.map((file) => {
-    // Update package.yml
-    if (file.path === FILE_PATTERNS.PACKAGE_YML) {
+    // Update openpackage.yml
+    if (file.path === FILE_PATTERNS.OPENPACKAGE_YML) {
       try {
         const parsed = yaml.load(file.content) as PackageYml;
         const updated: PackageYml = {

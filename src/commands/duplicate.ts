@@ -46,7 +46,7 @@ async function duplicatePackageCommand(
   // Determine new version
   const newVersion = newVersionInput || sourcePackage.metadata.version;
 
-  // Transform files: update package.yml
+  // Transform files: update openpackage.yml
   const transformedFiles = transformPackageFilesMetadata(
     sourcePackage.files,
     sourceName,

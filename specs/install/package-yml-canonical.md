@@ -1,15 +1,15 @@
-### `package.yml` as Canonical for Install
+### `openpackage.yml` as Canonical for Install
 
-This document defines how `.openpackage/package.yml` interacts with the `install` command, and what it means for `package.yml` to be the **canonical** declaration of dependency intent.
+This document defines how `openpackage.yml` interacts with the `install` command, and what it means for `openpackage.yml` to be the **canonical** declaration of dependency intent.
 
-The aim is to make behavior predictable and avoid “CLI overrides” that silently diverge from `package.yml`.
+The aim is to make behavior predictable and avoid “CLI overrides” that silently diverge from `openpackage.yml`.
 
 ---
 
 ## 1. Canonical responsibility
 
 - **Canonical source of truth**:
-  - For the **current workspace**, `.openpackage/package.yml` is the **only authoritative declaration** of:
+  - For the **current workspace**, `openpackage.yml` is the **only authoritative declaration** of:
     - Which **direct dependencies** exist.
     - Which **source** and **version intent** apply to those dependencies.
   - This applies to both:
@@ -18,7 +18,7 @@ The aim is to make behavior predictable and avoid “CLI overrides” that silen
 
 - **Install’s role**:
   - `install` **never changes intent by itself**:
-    - It does **not mutate existing ranges** in `package.yml` unless explicitly asked by a future higher-level command (e.g. an `upgrade`).
+    - It does **not mutate existing ranges** in `openpackage.yml` unless explicitly asked by a future higher-level command (e.g. an `upgrade`).
     - It **materializes or refreshes** dependencies so the workspace matches the declared intent.
 
 ---
@@ -26,13 +26,13 @@ The aim is to make behavior predictable and avoid “CLI overrides” that silen
 ## 2. Direct vs transitive dependencies
 
 - **Direct dependencies**:
-  - Declared in the workspace `.openpackage/package.yml`.
+  - Declared in the workspace `openpackage.yml`.
   - Fully controlled by the user.
-  - Canonical range comes from `package.yml`.
+  - Canonical range comes from `openpackage.yml`.
 
 - **Transitive dependencies**:
-  - Declared in other packages’ `package.yml` files (inside registry packages).
-  - Resolved entirely by the dependency resolver according to version constraints; they do not appear in the root `package.yml`.
+  - Declared in other packages’ `openpackage.yml` files (inside registry packages).
+  - Resolved entirely by the dependency resolver according to version constraints; they do not appear in the root `openpackage.yml`.
   - `install` may upgrade them within the declared ranges, but they are **not canonical at the root level**.
 
 ---
@@ -54,16 +54,16 @@ Additional rules:
 
 This keeps dependency intent unambiguous and aligns with modern package managers that treat source types as mutually exclusive.
 
-### 3.1 Fresh packages (not yet in `package.yml`)
+### 3.1 Fresh packages (not yet in `openpackage.yml`)
 
 - **Case A – `opkg install <name>`**:
   - No explicit range is provided.
   - The CLI:
     - Resolves **latest suitable version** from local+remote (see `version-resolution.md`).
-    - Adds `<name>` to `package.yml` with a **default range derived from that version**, e.g.:
+    - Adds `<name>` to `openpackage.yml` with a **default range derived from that version**, e.g.:
       - `^S` where `S` is the selected stable version.
       - If only WIP/pre-release exists, the policy may:
-        - Use an **exact WIP version** in `package.yml`, or
+        - Use an **exact WIP version** in `openpackage.yml`, or
         - Use a range that explicitly includes that pre-release.
       - If the selected version is **unversioned** (manifest omits `version`, represented as `0.0.0` internally), persist the dependency entry **without a `version` field** (bare name), rather than writing `0.0.0`.
 
@@ -73,11 +73,11 @@ This keeps dependency intent unambiguous and aligns with modern package managers
     - Uses `<spec>` as the range for selecting a concrete version.
     - On success:
       - Installs the selected version.
-      - **Persists `<spec>` as-is** in `package.yml` (except for any normalization strictly required by the version-range parser).
+      - **Persists `<spec>` as-is** in `openpackage.yml` (except for any normalization strictly required by the version-range parser).
 
-### 3.2 Existing packages (already in `package.yml`)
+### 3.2 Existing packages (already in `openpackage.yml`)
 
-- Let **`R_pkg`** be the range string stored in `package.yml` for `<name>`.
+- Let **`R_pkg`** be the range string stored in `openpackage.yml` for `<name>`.
 
 - **Case C – `opkg install <name>`**:
   - The canonical range is **`R_pkg`**.
@@ -98,10 +98,10 @@ This keeps dependency intent unambiguous and aligns with modern package managers
     - Outcomes:
       - If `<spec>` is **compatible** with `R_pkg`:
         - Proceed using **`R_pkg` as the effective range** for resolution.
-        - Optionally log a message: “Using version range from package.yml (`R_pkg`); CLI spec `<spec>` is compatible.”
+        - Optionally log a message: “Using version range from openpackage.yml (`R_pkg`); CLI spec `<spec>` is compatible.”
       - If `<spec>` is **incompatible** with `R_pkg`:
         - **Fail with a clear error**, for example:
-          - “Version spec `<spec>` conflicts with `package.yml` range `R_pkg` for `<name>`. Edit `.openpackage/package.yml` if you intend to change the dependency line.”
+          - “Version spec `<spec>` conflicts with `openpackage.yml` range `R_pkg` for `<name>`. Edit `openpackage.yml` if you intend to change the dependency line.”
         - No installs or upgrades are performed.
 
 ### 3.3 Path and git dependencies (non-registry sources)
@@ -109,7 +109,7 @@ This keeps dependency intent unambiguous and aligns with modern package managers
 When a dependency uses `path` or `git`, it is treated as a **source-pinned** dependency rather than a semver-ranged registry dependency:
 
 - The installed content is loaded from that source.
-- The installed package version comes from the dependency’s own `.openpackage/package.yml`.
+- The installed package version comes from the dependency’s own `openpackage.yml`.
 - `install` MUST NOT write a registry `version` range for `path`/`git` dependencies.
 
 For git dependencies:
@@ -119,7 +119,7 @@ For git dependencies:
 
 ---
 
-## 4. When and how `package.yml` is mutated
+## 4. When and how `openpackage.yml` is mutated
 
 ### 4.1 Allowed mutations by `install`
 
@@ -136,7 +136,7 @@ For git dependencies:
   - It must not add a `version` field in these cases (source-pinned dependencies are not semver-ranged).
 
 - **Rewriting malformed entries (edge case)**:
-  - If `package.yml` contains a **syntactically invalid** version range for a dependency that the user is trying to install:
+  - If `openpackage.yml` contains a **syntactically invalid** version range for a dependency that the user is trying to install:
     - The primary expectation is to **fail with a clear error** and ask the user to fix the YAML.
     - Auto-rewriting malformed entries should **not** happen silently.
 
@@ -146,13 +146,13 @@ For git dependencies:
   - `save` / `pack` and any future `upgrade`-like commands are responsible for:
     - Intentionally changing version lines.
     - Bumping base versions for stable lines.
-  - Therefore, `install` **never auto-bumps** the declared ranges in `package.yml`.
+  - Therefore, `install` **never auto-bumps** the declared ranges in `openpackage.yml`.
 
 - **Auto-tracking of workspace-owned packages (`save` / `pack`)**:
   - When a package developed in the current workspace is first added as a dependency:
     - `save` / `pack` persist a **default caret range** derived from the new stable, e.g. `^1.2.3`.
   - On subsequent `save` / `pack` operations for that same package:
-    - Let `R_pkg` be the existing range in `package.yml` and `S_new` the new stable base version (e.g. `2.0.0`).
+    - Let `R_pkg` be the existing range in `openpackage.yml` and `S_new` the new stable base version (e.g. `2.0.0`).
     - **Special case: Prerelease-to-stable transition during `pack`**:
       - If `R_pkg` includes explicit prerelease intent (e.g. `^1.0.0-0`) and `S_new` is a stable version on the same base line (e.g. `1.0.0`):
         - Then `pack` **updates** `R_pkg` to a stable range (e.g. `^1.0.0`) to reflect the transition from prerelease to stable.
@@ -161,7 +161,7 @@ For git dependencies:
     - If `S_new` **already satisfies** `R_pkg` (e.g. `R_pkg = ^1.0.0`, `S_new = 1.0.1`):
       - **The constraint is left unchanged**; `save` / `pack` do not rewrite `R_pkg`.
     - If `S_new` is **outside** `R_pkg` (e.g. `R_pkg = ^1.0.0`, `S_new = 2.0.0`):
-      - `save` / `pack` may **auto-update** the dependency line in `package.yml` to a new caret range `^S_new` to keep the workspace tracking the new stable line.
+      - `save` / `pack` may **auto-update** the dependency line in `openpackage.yml` to a new caret range `^S_new` to keep the workspace tracking the new stable line.
   - This auto-tracking behavior:
     - Applies only to dependencies managed via `save` / `pack` for workspace-owned packages.
     - Never changes constraints that already include the new stable version (except for the prerelease-to-stable transition exception above).
@@ -170,22 +170,22 @@ For git dependencies:
 
 ## 5. Conflict scenarios & UX
 
-### 5.1 CLI vs `package.yml` disagreement
+### 5.1 CLI vs `openpackage.yml` disagreement
 
 - **Scenario**:
-  - `package.yml`: `foo: ^1.2.0`
+  - `openpackage.yml`: `foo: ^1.2.0`
   - User runs: `opkg install foo@2.0.0`
 
 - **Behavior**:
   - Detect that `<spec> = 2.0.0` is **outside** `^1.2.0`.
   - Fail with a message similar to:
-    - “Requested `foo@2.0.0`, but `.openpackage/package.yml` declares `foo` with range `^1.2.0`. Edit `package.yml` to change the dependency line, then re-run `opkg install`.”
+    - “Requested `foo@2.0.0`, but `openpackage.yml` declares `foo` with range `^1.2.0`. Edit `openpackage.yml` to change the dependency line, then re-run `opkg install`.”
 
-### 5.2 Existing install but changed `package.yml`
+### 5.2 Existing install but changed `openpackage.yml`
 
 - **Scenario**:
   - Previously: `foo` declared as `^1.2.0`, installed `1.3.0`.
-  - User edits `package.yml` to `foo: ^2.0.0`.
+  - User edits `openpackage.yml` to `foo: ^2.0.0`.
   - Then runs `opkg install` or `opkg install foo`.
 
 - **Behavior**:
@@ -194,10 +194,10 @@ For git dependencies:
   - Install or upgrade to that version, even if it requires pulling from remote.
   - Optionally log a message noting that the base line changed, similar to the save/pack reset messages (but this is informational only).
 
-### 5.3 Dependency removed from `package.yml`
+### 5.3 Dependency removed from `openpackage.yml`
 
 - **Scenario**:
-  - `foo` used to be in `package.yml`.
+  - `foo` used to be in `openpackage.yml`.
   - User removes `foo` from both `packages` and `dev-packages`.
   - `foo` may still be installed under `.openpackage` from a previous state.
 
@@ -219,7 +219,7 @@ For git dependencies:
   - Re-installs with an existing `files` list **reuse** that list as canonical; a TTY prompt may offer to clear it to switch back to a full install.
   - Supplying a new path via CLI for a dependency that already has `files` **adds** the path (deduped) before install.
   - Removing the `files` field (or setting it to `null`/empty) returns the dependency to **full-install semantics**.
-  - If a dependency is currently full (no `files`), a path-based install attempt is **rejected**; convert to partial by editing `package.yml` or reinstalling after removal.
+  - If a dependency is currently full (no `files`), a path-based install attempt is **rejected**; convert to partial by editing `openpackage.yml` or reinstalling after removal.
 
 - **Matching rules**:
   - Paths in `files` are **exact registry paths** (no globs) and are normalized when persisted.
@@ -230,7 +230,7 @@ For git dependencies:
 ## 7. Summary invariants
 
 - **I1 – Canonical intent**:
-  - For direct dependencies, **`package.yml` is always the source of truth**.
+  - For direct dependencies, **`openpackage.yml` is always the source of truth**.
   - CLI specs cannot silently override it; at most they can:
     - Seed new entries (fresh installs).
     - Act as compatibility hints for existing entries.
@@ -241,8 +241,8 @@ For git dependencies:
     - Only **adds new entries** when installing fresh dependencies.
 
 - **I3 – Explicit edits for semantic changes**:
-  - To change which major version line a dependency tracks, the user **edits `package.yml`**, not `install` flags.
+  - To change which major version line a dependency tracks, the user **edits `openpackage.yml`**, not `install` flags.
   - This mirrors the mental model from the save/pack specs:
-    - “`package.yml` version is what I’m working toward; commands operate relative to that declaration.”
+    - “`openpackage.yml` version is what I’m working toward; commands operate relative to that declaration.”
 
 

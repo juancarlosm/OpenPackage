@@ -44,7 +44,7 @@ export function setupSaveCommand(program: Command): void {
     .description(
       'Save a package snapshot for this workspace.\n' +
       'Usage:\n' +
-      '  opkg save                  # Save cwd package (requires .openpackage/package.yml)\n' +
+      '  opkg save                  # Save cwd package (requires openpackage.yml)\n' +
       '  opkg save <package-name>   # Save specific package by name\n' +
       '  opkg save <package-name> <path>   # Add path to package, then save snapshot\n' +
       'Use `opkg pack` to create a stable copy in the registry.'

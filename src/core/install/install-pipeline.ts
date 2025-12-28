@@ -128,7 +128,7 @@ export async function runInstallPipeline(
   if (await isRootPackage(cwd, options.packageName)) {
     console.log(`⚠️  Cannot install ${options.packageName} - it matches your project's root package name`);
     console.log(`   This would create a circular dependency.`);
-    console.log(`💡 Tip: Use 'opkg install' without specifying a package name to install all packages referenced in your .openpackage/package.yml file.`);
+    console.log(`💡 Tip: Use 'opkg install' without specifying a package name to install all packages referenced in your .openpackage/openpackage.yml file.`);
     return {
       success: true,
       data: {

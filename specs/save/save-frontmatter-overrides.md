@@ -57,14 +57,14 @@ After all conflicts and frontmatter merges are resolved, the pipeline reads the 
 
 ##### Excluded
 
-- `package.index.yml`.
+- `openpackage.index.yml`.
 - Internal files that are not considered part of the package content.
 
 ##### Included
 
 - Paths allowed by the regular registry path rules.
 - Root files (the unified root agents file and related root docs).
-- Root‑level files adjacent to `package.yml` that are intended as part of the package.
+- Root‑level files adjacent to `openpackage.yml` that are intended as part of the package.
 
 ---
 

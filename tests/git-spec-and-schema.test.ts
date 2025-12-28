@@ -25,7 +25,7 @@ import { parsePackageYml } from '../src/utils/package-yml.js';
 // schema validation: must choose exactly one source
 await (async () => {
   const dir = await mkdtemp(join(tmpdir(), 'opkg-schema-'));
-  const path = join(dir, 'package.yml');
+  const path = join(dir, 'openpackage.yml');
   await writeFile(
     path,
     `
@@ -45,7 +45,7 @@ packages:
 // schema validation: ref requires git
 await (async () => {
   const dir = await mkdtemp(join(tmpdir(), 'opkg-schema-'));
-  const path = join(dir, 'package.yml');
+  const path = join(dir, 'openpackage.yml');
   await writeFile(
     path,
     `
@@ -64,7 +64,7 @@ packages:
 // schema validation: valid git dependency passes
 await (async () => {
   const dir = await mkdtemp(join(tmpdir(), 'opkg-schema-'));
-  const path = join(dir, 'package.yml');
+  const path = join(dir, 'openpackage.yml');
   await writeFile(
     path,
     `

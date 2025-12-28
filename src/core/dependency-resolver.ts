@@ -50,7 +50,7 @@ export interface DependencyNode {
   version: string;
   dependencies: Set<string>;
   dependents: Set<string>;
-  isProtected: boolean; // Listed in cwd package.yml
+  isProtected: boolean; // Listed in cwd openpackage.yml
 }
 
 interface DependencyResolverOptions {
@@ -128,11 +128,11 @@ export async function resolveDependencies(
    // Track where the final selected version came from for UX purposes
   let resolutionSource: 'local' | 'remote' | undefined;
 
-  // Precedence: root overrides (from root package.yml) > combined constraints
+  // Precedence: root overrides (from root openpackage.yml) > combined constraints
   let allRanges: string[] = [];
 
   if (rootOverrides?.has(packageName)) {
-    // Root package.yml versions act as authoritative overrides
+    // Root openpackage.yml versions act as authoritative overrides
     allRanges = [...(rootOverrides.get(packageName)!)];
   } else {
     // No root override - combine all constraints
@@ -365,7 +365,7 @@ export async function resolveDependencies(
 
   // Use the resolved version (from directory name) rather than metadata version
   // This ensures WIP packages use their full version string (e.g., 1.0.0-000fz8.a3k)
-  // instead of the base version from package.yml (e.g., 1.0.0)
+  // instead of the base version from openpackage.yml (e.g., 1.0.0)
   const currentVersion = resolvedVersion;
   if (!currentVersion) {
     throw new Error(`Resolved version is undefined for package ${packageName}`);
@@ -445,10 +445,10 @@ export async function resolveDependencies(
     requiredRange: versionRange // Track the original range
   });
   
-  // 5. Parse dependencies from package's package.yml
+  // 5. Parse dependencies from package's openpackage.yml
   const packageYmlFile =
     pkg.files.find(f => f.path === PACKAGE_PATHS.MANIFEST_RELATIVE) ||
-    pkg.files.find(f => f.path === 'package.yml');
+    pkg.files.find(f => f.path === 'openpackage.yml');
   if (packageYmlFile) {
     const config = yaml.load(packageYmlFile.content) as PackageYml;
     
@@ -717,7 +717,7 @@ export async function findDanglingDependencies(
     const depNode = dependencyTree.get(depName);
     if (!depNode) continue;
     
-    // Skip if protected (listed in cwd package.yml)
+    // Skip if protected (listed in cwd openpackage.yml)
     if (depNode.isProtected) {
       logger.debug(`Skipping protected package: ${depName}`);
       continue;

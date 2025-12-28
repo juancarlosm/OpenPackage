@@ -78,7 +78,7 @@ export async function classifyPackageInput(
     if (await exists(resolvedPath)) {
       throw new ValidationError(
         `Path '${raw}' exists but is not a valid OpenPackage directory. ` +
-        `Valid packages must contain .openpackage/package.yml`
+        `Valid packages must contain openpackage.yml`
       );
     }
   }
