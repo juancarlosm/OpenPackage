@@ -193,8 +193,10 @@ export interface SaveOptions {
 }
 
 export interface PackOptions {
-  force?: boolean;
-  rename?: string;
+  force?: boolean; // legacy flag (ignored by 0.7.0 pack)
+  rename?: string; // legacy flag (ignored by 0.7.0 pack)
+  output?: string;
+  dryRun?: boolean;
 }
 
 // Registry types

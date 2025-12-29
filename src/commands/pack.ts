@@ -1,17 +1,13 @@
 import { Command } from 'commander';
 import { PackOptions, CommandResult } from '../types/index.js';
 import { withErrorHandling } from '../utils/errors.js';
-import { runSavePipeline } from '../core/save/save-pipeline.js';
+import { runPackPipeline } from '../core/pack/pack-pipeline.js';
 
 async function packPackageCommand(
   packageName: string | undefined,
   options?: PackOptions
 ): Promise<CommandResult> {
-  return runSavePipeline(packageName, {
-    mode: 'stable',
-    force: options?.force,
-    rename: options?.rename
-  });
+  return runPackPipeline(packageName, options);
 }
 
 export function setupPackCommand(program: Command): void {
@@ -19,13 +15,14 @@ export function setupPackCommand(program: Command): void {
     .command('pack')
     .argument('[package-name]', 'package name (optional if cwd is a package)')
     .description(
-      'Promote the current workspace package to a stable registry copy.\n' +
+      'Snapshot the package source into the local registry directory.\n' +
       'Usage:\n' +
       '  opkg pack                  # Pack cwd package (requires openpackage.yml)\n' +
       '  opkg pack <package-name>   # Pack specific package by name'
     )
-    .option('-f, --force', 'overwrite existing stable versions or skip confirmations')
-    .option('--rename <newName>', 'Rename package during pack')
+    .option('-f, --force', 'legacy flag (ignored by pack)')
+    .option('--output <path>', 'write snapshot directly into the target directory instead of the registry path')
+    .option('--dry-run', 'print the destination and files that would be written')
     .action(withErrorHandling(async (packageName: string | undefined, options?: PackOptions) => {
       const result = await packPackageCommand(packageName, options);
       if (!result.success) {

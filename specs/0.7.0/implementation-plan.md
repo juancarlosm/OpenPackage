@@ -245,7 +245,7 @@ Todos:
 - **Idempotent overwrite**:
   - If version directory exists, overwrite the entire directory (matches `registry.md`).
 - **Support options** (from spec):
-  - `--output <path>`: copy to target directory instead of registry
+  - `--output <path>`: copy the snapshot directly into `<path>` (no `<name>/<version>` subdirs are added)
   - `--dry-run`: print what would be written
 
 Exit criteria:
@@ -307,7 +307,7 @@ Exit criteria:
 - **Compatibility strategy**: **Replace defaults (breaking)**.
 - **Conflict strategy** for `apply/install` overwrites: **Reuse existing conflict/overwrite logic in the codebase** (including prompting/flags like `--force`).
 - **Status sync detection**: **Hash-based** comparison.
-- **Filtering / `include:`**: **Removed** for 0.7.0 (legacy feature; do not implement).
+- **Filtering / `include:`**: **Supported** for `install` as a partial-install mechanism (persisted in `openpackage.yml`; applies only to install/apply mapping, not to registry payload membership).
 - **Package content rules**:
   - **Authoritative spec**:
     - Payload membership + 1:1 copy boundary: `specs/package/registry-payload-and-copy.md`

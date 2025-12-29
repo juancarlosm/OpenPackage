@@ -394,6 +394,41 @@ export async function updatePackageDependencyInclude(
   await writePackageYml(packageYmlPath, config);
 }
 
+/**
+ * Remove a dependency entry from openpackage.yml (both packages and dev-packages).
+ */
+export async function removePackageFromOpenpackageYml(
+  cwd: string,
+  packageName: string
+): Promise<boolean> {
+  const packageYmlPath = getLocalPackageYmlPath(cwd);
+  if (!(await exists(packageYmlPath))) return false;
+
+  try {
+    const config = await parsePackageYml(packageYmlPath);
+    const sections: Array<'packages' | 'dev-packages'> = [DEPENDENCY_ARRAYS.PACKAGES, DEPENDENCY_ARRAYS.DEV_PACKAGES];
+    let removed = false;
+
+    for (const section of sections) {
+      const arr = config[section];
+      if (!arr) continue;
+      const next = arr.filter(dep => !arePackageNamesEquivalent(dep.name, packageName));
+      if (next.length !== arr.length) {
+        config[section] = next as any;
+        removed = true;
+      }
+    }
+
+    if (removed) {
+      await writePackageYml(packageYmlPath, config);
+    }
+    return removed;
+  } catch (error) {
+    logger.warn(`Failed to update openpackage.yml when removing ${packageName}: ${error}`);
+    return false;
+  }
+}
+
 function rangeIncludesVersion(range: string, version: string): boolean {
   if (!range || !version) {
     return false;

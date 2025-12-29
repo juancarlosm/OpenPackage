@@ -78,7 +78,8 @@ opkg install my-pkg@1.0.0
 # 1. Locate ~/.openpackage/registry/my-pkg/1.0.0/
 # 2. Read files directly (no extraction)
 # 3. Apply to workspace
-# 4. Update openpackage.yml with path to registry location
+# 4. Persist the dependency constraint in openpackage.yml (version only; no path)
+# 5. Record the resolved source path + installed version in .openpackage/openpackage.index.yml
 ```
 
 ## Immutability Guarantee

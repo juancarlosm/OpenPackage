@@ -106,7 +106,7 @@ opkg pack my-pkg
 ```
 
 **Options**:
-- `--output <path>`: Copy to specific location instead of registry
+- `--output <path>`: Copy the snapshot directly into `<path>` (i.e., `<path>` becomes the package root for the snapshot; no `<name>/<version>` subdirs are added)
 - `--dry-run`: Show what would be packed without writing
 
 ---
@@ -180,8 +180,8 @@ opkg install community-pkg@^1.2.0
 1. Read unified openpackage.index.yml
 2. For each package:
    - Validate source path exists
-   - Check if files are in sync
-   - Report version and status
+   - Compare source-of-truth files to mapped workspace targets using content hashes
+   - Report sync state and path
 ```
 
 **Example**:
@@ -189,9 +189,9 @@ opkg install community-pkg@^1.2.0
 opkg status
 
 # Output:
-# my-rules          1.0.0   ✓ synced    ./.openpackage/packages/my-rules/
-# shared-tools      2.1.0   ✓ synced    ~/.openpackage/packages/shared-tools/
-# community-pkg     1.2.3   ✓ synced    ~/.openpackage/registry/community-pkg/1.2.3/
+# ✅ my-rules@1.0.0  synced    ./.openpackage/packages/my-rules/
+# ⚠️ my-rules@1.0.0  modified  ./.openpackage/packages/my-rules/
+# ❌ my-rules@1.0.0  missing   ./.openpackage/packages/my-rules/
 ```
 
 ---
@@ -203,7 +203,8 @@ opkg status
 **Flow**:
 ```
 1. Read package entry from unified openpackage.index.yml
-2. Delete all mapped files from workspace
+2. Delete all mapped files from workspace (only those paths; never delete the package source directory)
+3. Update root files (AGENTS.md / platform root files) by removing the package-marked section
 3. Remove package entry from openpackage.index.yml
 4. Remove dependency from openpackage.yml
 ```
