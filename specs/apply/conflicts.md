@@ -19,7 +19,7 @@ CLI mapping:
 
 - `opkg apply` defaults to `ask`.
 - `opkg apply --force` uses `overwrite`.
-- Apply is a standalone operation in the v0.7.0 model (there is no `save --apply` registry-snapshot step; `save` syncs workspace edits back to source).
+- Apply is a standalone operation in the model (there is no `save --apply` registry-snapshot step; `save` syncs workspace edits back to source).
 
 ---
 

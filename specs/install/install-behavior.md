@@ -216,7 +216,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
       - Selected versions are **guaranteed to exist remotely**; local-only versions are ignored for selection.
   - Intended for:
     - Ensuring compatibility with what is actually **published** remotely.
-    - CI / reproducibility scenarios where local cache should not affect choices.
+    - CI / reproducibility scenarios where local registry state should not affect choices.
 
 ---
 

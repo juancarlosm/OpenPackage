@@ -26,36 +26,50 @@ no manifest-level include/exclude filtering.
 
 ---
 
-#### Save and Install Operations
+#### Save, Pack, and Install Operations
 
-**When saving:**
+**Pack (Source → Registry)**:
+- From mutable source, creates immutable snapshot in `~/.openpackage/registry/<name>/<version>/`.
+- Copies full package root (per payload rules); idempotent overwrite.
+- Example: `opkg pack my-pkg` → dir copy, no extraction.
 
-1. The save pipeline reads files from the package root using the rules above
-2. Files are written **unchanged** to: `~/.openpackage/registry/<name>/<version>/...`
+**Save (Workspace → Source, then optional pack)**:
+- Syncs edits to mutable source root.
+- Files written unchanged; can pack after to registry.
+- Does not directly write to registry (pack does that).
 
-**When installing:**
+**Install/Apply (Registry/Source → Workspace)**:
+- Reads from registry version dir or source path.
+- Maps payload to workspace (universal → platforms, root/ → root, root files → root).
+- Updates index with mappings; yml with intent (no path for registry).
+- Example: `opkg install my-pkg@1.0.0` → copies from registry dir.
 
-1. The install pipeline loads `pkg.files` from the registry
-2. Files are written 1:1 to: `cwd/.openpackage/packages/<name>/...` for local cache
-3. Universal content is mapped to platform-specific locations in the workspace
+> **Note**: `cwd/.openpackage/packages/` reserved for nested workspace packages. See [Pack](pack/), [Install](install/), [Save](save/) for flows; [Registry](registry.md) for storage.
 
 ---
 
-#### Package Structure in Registry
+#### Example Registry Version Directory
 
-Registry copies maintain the same structure as workspace packages:
+Each version directory in the registry is a complete, self-contained copy of the package root (per payload rules above):
 
 ```text
-~/.openpackage/registry/<name>/<version>/
-  openpackage.yml              # package manifest
-  commands/                    # universal content
-    test.md
-  rules/
-    auth.md
-  <root-dir>/                  # root-level content (any directory)
-    helper.md
-  AGENTS.md                    # root files
+~/.openpackage/registry/my-rules/1.0.0/
+├── openpackage.yml            # Package manifest (name, version, deps)
+├── commands/                  # Universal subdirs (from platforms.jsonc)
+│   └── *.md
+├── rules/
+│   └── *.md
+├── agents/                   # Example universal subdir
+│   └── *.md
+├── root/                     # Copy-to-root content (prefix stripped on install)
+│   └── utils/
+│       └── helper.md
+├── AGENTS.md                 # Root files (universal or platform-specific)
+└── README.md                 # Other root files (docs, etc.)
 ```
+
+- Matches [Package Root Layout](package-root-layout.md).
+- Installed via [Install Flow](install/install-behavior.md).
 
 ---
 
@@ -63,7 +77,7 @@ Registry copies maintain the same structure as workspace packages:
 
 This system guarantees that:
 
-- The **workspace package**, **local cache**, and **registry version directory** all share the **same tree shape**
+- The **workspace package root** (root or nested) and the **registry version directory** share the **same tree shape**
 - Save and install operations are **pure copies** at the package boundary, without structural rewrites
 - Packages can be moved between locations (workspace root ↔ nested ↔ registry) without modification
 

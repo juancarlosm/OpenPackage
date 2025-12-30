@@ -20,7 +20,7 @@
     openpackage.index.yml                      # workspace index (never in registry payload)
     packages/                                  # nested packages directory
       alpha/                                   # nested package (package root = .openpackage/packages/alpha/)
-        openpackage.yml                        # cached payload mirror
+        openpackage.yml                        # nested package manifest (package root)
         commands/
           alpha-command.md
         root/                                  # direct copy for nested package
@@ -29,7 +29,7 @@
         docs/                                  # NOT installed
           notes.md
       beta/                                    # nested package (package root = .openpackage/packages/beta/)
-        openpackage.yml                        # cached payload mirror
+        openpackage.yml                        # nested package manifest (package root)
         rules/
           beta-rule.md
 ```

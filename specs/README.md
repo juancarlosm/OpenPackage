@@ -1,31 +1,84 @@
 ### OpenPackage CLI Specs
 
-This directory contains the **canonical** implementation-guiding specifications for the OpenPackage CLI.
+This directory contains the **canonical** implementation-guiding specifications for the OpenPackage CLI, with the primary architecture being the path-based model. The codebase reflects this (path-based source of truth, mutable vs. immutable sources, unified workspace index, directory-based local registry). Specifications are organized by topic, with top-level overview files providing cohesion.
 
-The codebase currently reflects the **v0.7.0 architecture** (path-based source of truth, mutable vs immutable sources, unified workspace index, directory-based local registry), but the specs are organized by **topic** rather than by version.
+#### Design Principles
+
+- **Focused**: Each command serves one clear purpose, avoiding overload.
+- **Surgical**: Strict separation of mutable development sources from immutable distribution snapshots, with enforcement via errors.
+- **Simple**: Paths are the universal source of truth; a single unified index manages all tracking.
+- **Reliable**: Built-in guards prevent common errors, like mutating published registry content.
+
+For full philosophy, data flows, and layered model, see [Architecture](architecture.md).
+
+#### Key Concepts
+
+- **Path-Based Source of Truth**: All packages resolve to a filesystem path. Dependencies use explicit `path:` or infer from `version:` (registry) or `git:` (cloned path).
+- **Mutable vs. Immutable Sources**: 
+  - Mutable (e.g., local/global packages dirs): Support editing via `save`/`add`.
+  - Immutable (e.g., registry dirs): Read-only; `save`/`add` fail.
+- **Unified Workspace Index**: `.openpackage/openpackage.index.yml` tracks packages, sources, versions, and file mappings across the workspace—no fragmented per-package files.
+- **Directory-Based Local Registry**: `~/.openpackage/registry/<name>/<version>/` for simple, direct access without tarballs.
+
+#### Command Flow Diagram
+
+```
+Workspace ←──apply/install── Source/Registry (mutable or immutable)
+Workspace ──save/add──────→ Source (mutable only; fails on registry)
+Source ────pack───────────→ Registry (immutable snapshot)
+Registry ──push/pull─────→ Remote Registry (future)
+```
+
+Detailed semantics in [Commands Overview](commands-overview.md) and command subdirs (e.g., [Save](save/), [Pack](pack/)).
+
+#### Breaking Changes from Prior Versions
+
+The architecture introduces breaking changes with no automated migration—re-initialize workspaces:
+- Removed complex WIP versioning (now prereleases in registry), workspace hash tracking, per-package metadata directories, and tarball-based registry.
+- Unified `openpackage.index.yml` replaces scattered index files.
+- All registry storage is directory-based for inspectability and path compatibility.
+- Path-based dependencies and mutability guards replace prior behaviors; re-run `opkg init` and `opkg install` for workspaces.
+- No backward compatibility for removed features like staging mutations or link-only WIP layouts.
+
+Consult git history (e.g., commit 9d23bf2) for prior version details. See [Architecture](architecture.md) for removed/retained metadata.
 
 ---
 
 #### Where to look
 
-- **Package structure & payload rules**: `specs/package/`
-  - Payload boundary + registry copy rules: `specs/package/registry-payload-and-copy.md`
-  - Universal vs root-level content + mapping terminology: `specs/package/universal-content.md`
-  - Index file schema: `specs/package/package-index-yml.md`
-  - Root layout expectations: `specs/package/package-root-layout.md`
-- **Install**: `specs/install/`
-  - CLI UX + scenarios (including partial installs via registry paths and `files:`): `specs/install/install-behavior.md`
-  - Git installs: `specs/install/git-sources.md`
-- **Apply/sync**: `specs/apply/`
-- **Save**: `specs/save/`
-- **Push**: `specs/push/`
-- **Auth**: `specs/auth/`
-- **Platforms**: `specs/platforms.md`
-- **Global CLI flags**: `specs/cli-options.md`
+- **Architecture & Overviews**: 
+  - High-level design, flows, philosophy: `architecture.md`
+  - Command semantics and matrix: `commands-overview.md`
+  - Directory structures (global/workspace): `directory-layout.md`
+- **Core Concepts**:
+  - Package source types, resolution, mutability: `package-sources.md`
+  - Registry storage and operations: `registry.md`
+  - Scopes (workspace/global; deferred transitions): `scope-management.md`
+- **Package Structure & Payload**: `package/`
+  - Copy rules to/from registry: `registry-payload-and-copy.md`
+  - Universal/root content mappings: `universal-content.md`
+  - Unified index schema: `package-index-yml.md`
+  - Package root layout: `package-root-layout.md`
+- **Commands**:
+  - `add` (new files to source): `add/`
+  - `apply`/`sync`: `apply/`
+  - `install` (from registry/git): `install/`
+    - Behavior/scenarios: `install-behavior.md`
+    - Git sources: `git-sources.md`
+  - `pack` (to registry): `pack/`
+  - `save` (edits to source; WIP versioning): `save/`
+    - Versioning details: `save-versioning.md`
+  - `push`: `push/`
+  - `status`: `status/`
+  - `uninstall`: `uninstall/`
+- **Other**:
+  - Auth: `auth/`
+  - Platforms: `platforms.md`
+  - CLI flags/options: `cli-options.md`
 
 ---
 
-#### Note on the former `specs/0.7.0/` directory
+#### Note on the former `specs/0.7.0/` Directory
 
-The prior versioned folder `specs/0.7.0/` was an architectural bundle used during rollout. Its contents were consolidated into the topic-based specs above and the directory was removed to avoid stale/duplicated docs.
+The versioned `specs/0.7.0/` folder bundled rollout specs for the path-based model. Its contents (e.g., architecture, commands, directory-structure, package-sources, registry) have been ported and adapted into the top-level overviews and topic files above, establishing this as the primary, cohesive spec set. Duplicates removed; deferred/future aspects (e.g., remote registries, scope transitions) noted where relevant. For historical diffs, see git commit 9d23bf2473cd4f7de185f9be1be2b833259962f7.
 

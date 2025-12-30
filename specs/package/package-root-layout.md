@@ -55,7 +55,7 @@ workspace-local metadata.
   - Other root-level files/dirs are **not installed** by default.
 - **Reserved directory**:
   - `packages/` is reserved and **never included** in the package payload.
-- **Cached packages** (workspace-local installed copies) live under `cwd/.openpackage/packages/<name>/` and mirror the package payload layout.
+- **Nested workspace packages** live under `cwd/.openpackage/packages/<name>/` and are **canonical package roots** (same internal layout as any package root).
 - **Global registry copies** (under `~/.openpackage/registry/...`) store the package payload layout and **never include** workspace index files.
 
 ---
@@ -78,7 +78,7 @@ workspace-local metadata.
   README.md
 ```
 
-**Workspace metadata + cached package copy** (package root = `cwd/.openpackage/packages/foo/`):
+**Workspace metadata + nested workspace package** (package root = `cwd/.openpackage/packages/foo/`):
 
 ```text
 cwd/
@@ -87,7 +87,7 @@ cwd/
     openpackage.index.yml                  # workspace index (never in registry payload)
     packages/
       foo/
-        openpackage.yml                    # cached payload (mirrors package root)
+        openpackage.yml                    # nested package manifest (package root)
         commands/
           test.md
         root/

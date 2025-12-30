@@ -8,7 +8,7 @@ This document specifies behavior for global CLI flags available across all `opkg
 The `--cwd` global option overrides the effective working directory for the entire command execution. It simulates running the CLI from `<dir>` instead of the shell's current directory, affecting:
 - Path resolutions (relative files, globs).
 - Package/workspace detection (e.g., `openpackage.yml` lookup at effective cwd).
-- File operations (install/save/push/pull target the specified dir's context).
+- File operations (install/save/add/pack/apply/uninstall/status target the specified dir's context).
 - Any code using `process.cwd()` (captured post-`--cwd` processing).
 
 This enables monorepo workflows without `cd` (e.g., `opkg install --cwd ./packages/web some-dep` installs into `./packages/web` from root).

@@ -1,6 +1,6 @@
 ### Save Pipeline Specs
 
-This directory contains specifications for the **`save` behavior** in the v0.7.0 model:
+This directory contains specifications for the **`save` behavior** in the model:
 
 - `opkg save`: **Workspace → Source** (sync workspace edits back to a mutable package source)
 
@@ -27,7 +27,8 @@ Key integration: Save ops use effective cwd (shell or --cwd; see [../../cli-opti
 
 | File | Topic |
 |------|-------|
-| `save-modes-inputs.md` | Overview, inputs, and flags |
+| `save-modes-inputs.md` | Overview, inputs, modes, and flags |
+| `save-versioning.md` | WIP prerelease scheme, save/pack computation, invariants |
 | `save-conflict-resolution.md` | Conflict resolution rules and platform-specific selection |
 | `save-frontmatter-overrides.md` | Markdown frontmatter extraction and YAML overrides (when applicable) |
 | `save-registry-sync.md` | Save-to-source specifics: mutability, mapping-driven writes, and error cases |
@@ -36,5 +37,7 @@ Key integration: Save ops use effective cwd (shell or --cwd; see [../../cli-opti
 
 #### Related Documents
 
-- `../save-pack.md` – High‑level split between `save` and `pack` commands (v0.7.0 behavior).
+- [Commands Overview](../commands-overview.md) – High-level `save` vs. `pack` split and flows.
+- `save-versioning.md` – WIP prerelease scheme, computation, and pack promotion.
 - `../package/package-index-yml.md` – Unified workspace index schema used by `save`.
+- [Package Sources](../package-sources.md) – Mutability enforcement during resolution.
