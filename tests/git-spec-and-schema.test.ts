@@ -38,7 +38,7 @@ packages:
   );
   await assert.rejects(
     parsePackageYml(path),
-    /must specify exactly one source/
+    /has multiple sources/
   );
 })();
 

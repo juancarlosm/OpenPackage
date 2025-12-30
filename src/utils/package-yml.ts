@@ -15,14 +15,9 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
       if (!deps) return;
       for (const dep of deps) {
         const sources = [dep.version, dep.path, dep.git].filter(Boolean);
-        if (sources.length === 0) {
-          throw new Error(
-            `openpackage.yml ${section}: dependency '${dep.name}' must specify exactly one source: version, path, or git`
-          );
-        }
         if (sources.length > 1) {
           throw new Error(
-            `openpackage.yml ${section}: dependency '${dep.name}' has multiple sources; choose exactly one of version, path, or git`
+            `openpackage.yml ${section}: dependency '${dep.name}' has multiple sources; specify at most one of version, path, or git`
           );
         }
         if (dep.ref && !dep.git) {
