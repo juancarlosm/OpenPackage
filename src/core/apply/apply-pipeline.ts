@@ -6,7 +6,6 @@ import { applyPlannedSyncForPackageFiles } from '../../utils/index-based-install
 import { readPackageFilesForRegistry } from '../../utils/package-copy.js';
 import { PACKAGE_PATHS } from '../../constants/index.js';
 import { printPlatformSyncSummary } from '../sync/platform-sync-summary.js';
-import { getLocalOpenPackageDir } from '../../utils/paths.js';
 import { getDetectedPlatforms } from '../platforms.js';
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { stripRootCopyPrefix, isRootCopyPath } from '../../utils/platform-root-files.js';
@@ -76,8 +75,7 @@ async function applySinglePackage(
     };
   }
 
-  const baseDir = getLocalOpenPackageDir(cwd);
-  const resolved = resolveDeclaredPath(entry.path, baseDir);
+  const resolved = resolveDeclaredPath(entry.path, cwd);
   const absolutePath = join(resolved.absolute, sep);
   const mutability = isRegistryPath(absolutePath) ? MUTABILITY.IMMUTABLE : MUTABILITY.MUTABLE;
   const sourceType = isRegistryPath(absolutePath) ? SOURCE_TYPES.REGISTRY : SOURCE_TYPES.PATH;

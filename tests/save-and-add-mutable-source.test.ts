@@ -18,13 +18,13 @@ function writeFile(p: string, content: string) {
   fs.writeFileSync(p, content, { encoding: UTF8 });
 }
 
-function writeWorkspaceManifest(cwd: string, pkgName: string, pkgPath: string) {
+function writeWorkspaceManifest(cwd: string, pkgName: string) {
   const manifest = [
     `name: workspace`,
     `version: 0.0.0`,
     `packages:`,
     `  - name: ${pkgName}`,
-    `    path: ${pkgPath}`,
+    `    version: ^1.0.0`,
     ''
   ].join('\n');
   writeFile(path.join(cwd, '.openpackage', 'openpackage.yml'), manifest);
@@ -42,23 +42,22 @@ async function testSaveSyncsWorkspaceToSource(): Promise<void> {
     process.chdir(tmp);
 
     const pkgName = 'pkg-save';
-    const pkgPath = './packages/pkg-save/';
     const pkgDir = path.join(tmp, '.openpackage', 'packages', 'pkg-save');
 
-    writeWorkspaceManifest(tmp, pkgName, pkgPath);
+    writeWorkspaceManifest(tmp, pkgName);
     writePackageManifest(pkgDir, pkgName);
 
     // Workspace edit (use a platform with no extension transformation)
     const wsFile = path.join(tmp, '.claude', 'rules', 'foo.md');
     writeFile(wsFile, 'hello-from-workspace');
 
-    // Unified index mapping
+    // Unified index mapping (workspace-relative path)
     await writeWorkspaceIndex({
       path: getWorkspaceIndexPath(tmp),
       index: {
         packages: {
           [pkgName]: {
-            path: pkgPath,
+            path: './.openpackage/packages/pkg-save/',
             files: { 'rules/foo.md': ['.claude/rules/foo.md'] }
           }
         }
@@ -85,11 +84,23 @@ async function testAddCopiesToRootAndUpdatesIndex(): Promise<void> {
     process.chdir(tmp);
 
     const pkgName = 'pkg-add';
-    const pkgPath = './packages/pkg-add/';
     const pkgDir = path.join(tmp, '.openpackage', 'packages', 'pkg-add');
 
-    writeWorkspaceManifest(tmp, pkgName, pkgPath);
+    writeWorkspaceManifest(tmp, pkgName);
     writePackageManifest(pkgDir, pkgName);
+
+    // Create workspace index with pkg-add entry
+    await writeWorkspaceIndex({
+      path: getWorkspaceIndexPath(tmp),
+      index: {
+        packages: {
+          [pkgName]: {
+            path: './.openpackage/packages/pkg-add/',
+            files: {}
+          }
+        }
+      }
+    });
 
     const wsDoc = path.join(tmp, 'docs', 'guide.md');
     writeFile(wsDoc, 'doc-content');

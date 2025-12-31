@@ -18,7 +18,14 @@ async function setupWorkspace(): Promise<{ cwd: string; home: string }> {
 
   await fs.writeFile(
     path.join(openpkgDir, 'openpackage.yml'),
-    ['name: workspace', 'packages:', '  - name: my-pkg', '    path: ./packages/my-pkg/', ''].join('\n'),
+    ['name: workspace', 'packages:', '  - name: my-pkg', '    version: ^1.0.0', ''].join('\n'),
+    'utf8'
+  );
+
+  // Create workspace index with my-pkg entry pointing to workspace-scoped package
+  await fs.writeFile(
+    path.join(openpkgDir, 'openpackage.index.yml'),
+    ['packages:', '  my-pkg:', '    path: ./.openpackage/packages/my-pkg/', '    version: 1.0.0', '    files: {}', ''].join('\n'),
     'utf8'
   );
 
@@ -46,7 +53,7 @@ async function cleanup(paths: string[]) {
     const entry = index.index.packages['my-pkg'];
     assert.ok(entry, 'workspace index should include my-pkg after apply');
     assert.ok(entry.files, 'workspace index entry should include files mapping');
-    assert.equal(entry.path, './packages/my-pkg/');
+    assert.equal(entry.path, './.openpackage/packages/my-pkg/');
     assert.ok(
       entry.files['rules/hello.md']?.includes('.claude/rules/hello.md'),
       'mapping should include rules/hello.md -> .claude/rules/hello.md'

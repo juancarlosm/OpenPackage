@@ -1,6 +1,5 @@
 import path from 'path';
 
-import { getLocalOpenPackageDir } from '../../utils/paths.js';
 import { resolveDeclaredPath } from '../../utils/path-resolution.js';
 import { arePackageNamesEquivalent, normalizePackageName } from '../../utils/package-name.js';
 import { isRegistryPath } from '../../utils/source-mutability.js';
@@ -25,8 +24,7 @@ export async function resolvePackageSource(
     );
   }
 
-  const baseDir = getLocalOpenPackageDir(workspaceRoot);
-  const resolved = resolveDeclaredPath(entry.path, baseDir);
+  const resolved = resolveDeclaredPath(entry.path, workspaceRoot);
   const absolutePath = path.join(resolved.absolute, path.sep);
   const mutability = isRegistryPath(absolutePath) ? MUTABILITY.IMMUTABLE : MUTABILITY.MUTABLE;
   const sourceType = isRegistryPath(absolutePath) ? SOURCE_TYPES.REGISTRY : SOURCE_TYPES.PATH;

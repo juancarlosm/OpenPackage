@@ -54,8 +54,7 @@ async function comparePackage(
   pkgName: string,
   entry: WorkspaceIndexPackage
 ): Promise<StatusPackageReport> {
-  const openpkgDir = getLocalOpenPackageDir(cwd);
-  const resolved = resolveDeclaredPath(entry.path, openpkgDir);
+  const resolved = resolveDeclaredPath(entry.path, cwd);
   const sourceRoot = resolved.absolute;
 
   if (!(await exists(sourceRoot))) {

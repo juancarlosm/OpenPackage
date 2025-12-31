@@ -18,21 +18,28 @@ async function setupWorkspaceWithPathDependency(): Promise<{
   await fs.mkdir(pkgDir, { recursive: true });
   await fs.writeFile(
     path.join(openpackageDir, 'openpackage.yml'),
-    // Note: relative paths are resolved relative to the manifest directory (.openpackage/)
-    ['name: root', 'packages:', '  - name: pkg-a', '    path: ./packages/pkg-a/', ''].join('\n'),
+    ['name: root', 'packages:', '  - name: pkg-a', '    version: ^1.0.0', ''].join('\n'),
+    'utf8'
+  );
+
+  // Create workspace index with pkg-a entry
+  // Note: workspace index paths are resolved relative to workspace root
+  await fs.writeFile(
+    path.join(openpackageDir, 'openpackage.index.yml'),
+    ['packages:', '  pkg-a:', '    path: ./.openpackage/packages/pkg-a/', '    files: {}', ''].join('\n'),
     'utf8'
   );
 
   return { workspace, openpackageDir, pkgDir };
 }
 
-// resolvePackageSource: path dependency
+// resolvePackageSource: path dependency from workspace index
 {
   const { workspace, pkgDir } = await setupWorkspaceWithPathDependency();
   try {
     const result = await resolvePackageSource(workspace, 'pkg-a');
     assert.equal(result.packageName, 'pkg-a');
-    assert.equal(result.declaredPath, './packages/pkg-a/');
+    assert.equal(result.declaredPath, './.openpackage/packages/pkg-a/');
     assert.equal(result.absolutePath, path.join(pkgDir, path.sep));
     assert.equal(result.mutability, 'mutable');
     assert.equal(result.sourceType, 'path');
@@ -41,20 +48,26 @@ async function setupWorkspaceWithPathDependency(): Promise<{
   }
 }
 
-// resolveDependencyGraph: walks manifests without workspace index cache
+// resolveDependencyGraph: walks manifests after initial workspace index resolution
 {
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'opkg-dep-graph-'));
   const openpackageDir = path.join(workspace, '.openpackage');
   await fs.mkdir(openpackageDir, { recursive: true });
 
-  // Root declares pkg-a as a relative path (resolved relative to .openpackage/)
+  // Root workspace index has pkg-a entry (resolved relative to workspace root)
   await fs.writeFile(
     path.join(openpackageDir, 'openpackage.yml'),
-    ['name: root', 'packages:', '  - name: pkg-a', '    path: ./packages/pkg-a/', ''].join('\n'),
+    ['name: root', 'packages:', '  - name: pkg-a', '    version: ^1.0.0', ''].join('\n'),
     'utf8'
   );
 
-  // pkg-a depends on pkg-b
+  await fs.writeFile(
+    path.join(openpackageDir, 'openpackage.index.yml'),
+    ['packages:', '  pkg-a:', '    path: ./.openpackage/packages/pkg-a/', '    files: {}', ''].join('\n'),
+    'utf8'
+  );
+
+  // pkg-a depends on pkg-b (resolved relative to pkg-a's manifest directory)
   const pkgADir = path.join(openpackageDir, 'packages', 'pkg-a');
   await fs.mkdir(pkgADir, { recursive: true });
   await fs.writeFile(
