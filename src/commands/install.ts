@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { resolve } from 'path';
 
 import type { CommandResult, InstallOptions } from '../types/index.js';
 import { DIR_PATTERNS, PACKAGE_PATHS } from '../constants/index.js';
@@ -6,9 +7,11 @@ import { runBulkInstallPipeline } from '../core/install/bulk-install-pipeline.js
 import { runInstallPipeline, determineResolutionMode } from '../core/install/install-pipeline.js';
 import { runPathInstallPipeline } from '../core/install/path-install-pipeline.js';
 import { loadPackageFromGit } from '../core/install/git-package-loader.js';
+import { inferSourceType } from '../core/install/path-package-loader.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { normalizePlatforms } from '../utils/platform-mapper.js';
 import { classifyPackageInput } from '../utils/package-input.js';
+import { findExistingPathOrGitSource } from '../utils/install-helpers.js';
 import { logger } from '../utils/logger.js';
 import { normalizePathForProcessing } from '../utils/path-normalization.js';
 
@@ -50,6 +53,44 @@ async function installCommand(
 
   // Classify the input to determine if it's a registry name, directory, or tarball
   const classification = await classifyPackageInput(packageInput, cwd);
+  
+  // For registry-type inputs (package names), check if it's actually a path/git dependency in openpackage.yml
+  // This ensures we respect the manifest's declared source type on subsequent installs
+  if (classification.type === 'registry' && classification.name) {
+    const existingSource = await findExistingPathOrGitSource(cwd, classification.name);
+    
+    if (existingSource) {
+      if (existingSource.type === 'git') {
+        logger.info(`Using git source from openpackage.yml for '${classification.name}': ${existingSource.url}`);
+        console.log(`✓ Using git source from openpackage.yml: ${existingSource.url}${existingSource.ref ? `#${existingSource.ref}` : ''}`);
+        
+        const { sourcePath } = await loadPackageFromGit({
+          url: existingSource.url,
+          ref: existingSource.ref
+        });
+        return await runPathInstallPipeline({
+          ...options,
+          sourcePath,
+          sourceType: 'directory',
+          targetDir,
+          gitUrl: existingSource.url,
+          gitRef: existingSource.ref
+        });
+      } else if (existingSource.type === 'path') {
+        logger.info(`Using path source from openpackage.yml for '${classification.name}': ${existingSource.path}`);
+        console.log(`✓ Using path source from openpackage.yml: ${existingSource.path}`);
+        
+        const resolvedPath = resolve(cwd, existingSource.path);
+        const sourceType = inferSourceType(existingSource.path);
+        return await runPathInstallPipeline({
+          ...options,
+          sourcePath: resolvedPath,
+          sourceType,
+          targetDir
+        });
+      }
+    }
+  }
   
   if (classification.type === 'git') {
     const { sourcePath } = await loadPackageFromGit({

@@ -77,6 +77,38 @@ Other: Absolute/custom paths treated by resolved location.
 
 Details in [Dependency Resolver](../core/dependency-resolver.ts); errors in [Install Errors](../core/install/install-errors.ts).
 
+### Source Persistence on Install
+
+When installing packages, the **source type declared in `openpackage.yml` is always respected**:
+
+- **First install**: `opkg install /path/to/package` or `opkg install git:<url>` persists `path:` or `git:` in `openpackage.yml`
+- **Subsequent installs**: `opkg install <package-name>` **always uses the declared source** (path/git/version) from the manifest
+- **Consistency**: Both `opkg install` (no args) and `opkg install <name>` behave identically for existing dependencies
+
+This ensures:
+- Local development packages stay in sync with their source
+- Git-based dependencies always pull from the declared repository
+- The manifest is the single source of truth for dependency intent
+
+**Example workflow**:
+
+```bash
+# First install from local path
+$ opkg install /path/to/my-package
+# → Stores: path: /path/to/my-package in openpackage.yml
+
+# Later, install by name - uses the path
+$ opkg install my-package
+# → Output: ✓ Using path source from openpackage.yml: /path/to/my-package
+# → Installs from /path/to/my-package (not registry)
+
+# To switch to registry version:
+# 1. Edit openpackage.yml: remove 'path:', add 'version: ^1.0.0'
+# 2. Run: opkg install my-package
+```
+
+See [Install Behavior](install/install-behavior.md) for complete install semantics.
+
 ## Mutability Rules
 
 | Source Type                      | `save`   | `add`   | `pack`               | `apply` | `install` | Notes             |

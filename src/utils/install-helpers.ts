@@ -3,6 +3,9 @@ import { PackageYml } from '../types/index.js';
 import { resolveDependencies, ResolvedPackage } from '../core/dependency-resolver.js';
 import { gatherRootVersionConstraints } from '../core/openpackage.js';
 import { arePackageNamesEquivalent } from './package-name.js';
+import { getLocalPackageYmlPath } from './paths.js';
+import { parsePackageYml } from './package-yml.js';
+import { exists } from './fs.js';
 
 /**
  * Extract packages from openpackage.yml configuration
@@ -121,4 +124,40 @@ export async function getVersionInfoFromDependencyTree(
   }
   
   return { highestVersion, requiredVersion: highestRequiredVersion };
+}
+
+/**
+ * Check if a package name refers to an existing path/git-based dependency in openpackage.yml
+ * Returns the dependency source if found, null otherwise
+ */
+export async function findExistingPathOrGitSource(
+  cwd: string,
+  packageName: string
+): Promise<
+  | { type: 'path'; path: string }
+  | { type: 'git'; url: string; ref?: string }
+  | null
+> {
+  const packageYmlPath = getLocalPackageYmlPath(cwd);
+  if (!(await exists(packageYmlPath))) {
+    return null;
+  }
+
+  const config = await parsePackageYml(packageYmlPath);
+  const allDeps = [...(config.packages || []), ...(config['dev-packages'] || [])];
+  
+  const dep = allDeps.find(d => arePackageNamesEquivalent(d.name, packageName));
+  if (!dep) {
+    return null;
+  }
+
+  if (dep.git) {
+    return { type: 'git', url: dep.git, ref: dep.ref };
+  }
+
+  if (dep.path) {
+    return { type: 'path', path: dep.path };
+  }
+
+  return null;
 }

@@ -117,16 +117,25 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
   - Optional CLI `<spec>` from `install <name>@<spec>`.
 
 - **Behavior**:
-  - `opkg install <name>`:
-    - Use the **canonical range from `openpackage.yml`**.
-    - Resolve versions using the same **local-first with remote-fallback** policy (per `version-resolution.md`):
-      - First attempt to satisfy the canonical range using **only local registry versions**.
-      - Only when no satisfying local version exists, and remote is enabled and reachable, **include remote versions** and retry selection over the combined set.
-    - **Install / upgrade to the latest satisfying version** (if newer than current).
-  - `opkg install <name>@<spec>`:
-    - Treat `<spec>` as a **sanity check** against the canonical range:
-      - If compatible (according to rules in `package-yml-canonical.md`), proceed as above.
-      - If incompatible, **fail with a clear error** instructing the user to edit `openpackage.yml` instead of using CLI-only overrides.
+  - **Path/Git Source Persistence**:
+    - If the dependency entry in `openpackage.yml` has a `path:` or `git:` field, `opkg install <name>` **always uses that declared source**, regardless of whether a registry version exists.
+    - This ensures that path-based and git-based dependencies remain consistent with their declared intent, supporting local development workflows and monorepo scenarios.
+    - User feedback: `✓ Using path source from openpackage.yml: <path>` or `✓ Using git source from openpackage.yml: <url>#<ref>`
+    - To switch from path/git to registry:
+      - Edit `openpackage.yml`: remove `path:` or `git:` field, add `version:` field
+      - Or: `opkg uninstall <name>` then `opkg install <name>@<version>`
+  
+  - **Registry-based dependencies** (have `version:` field, no `path:` or `git:`):
+    - `opkg install <name>`:
+      - Use the **canonical range from `openpackage.yml`**.
+      - Resolve versions using the same **local-first with remote-fallback** policy (per `version-resolution.md`):
+        - First attempt to satisfy the canonical range using **only local registry versions**.
+        - Only when no satisfying local version exists, and remote is enabled and reachable, **include remote versions** and retry selection over the combined set.
+      - **Install / upgrade to the latest satisfying version** (if newer than current).
+    - `opkg install <name>@<spec>`:
+      - Treat `<spec>` as a **sanity check** against the canonical range:
+        - If compatible (according to rules in `package-yml-canonical.md`), proceed as above.
+        - If incompatible, **fail with a clear error** instructing the user to edit `openpackage.yml` instead of using CLI-only overrides.
 
 ### 3.4 Registry-path / single-file installs
 
