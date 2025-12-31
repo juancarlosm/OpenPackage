@@ -979,12 +979,13 @@ export async function installPackageByIndex(
   version: string,
   platforms: Platform[],
   options: InstallOptions,
-  includePaths?: string[]
+  includePaths?: string[],
+  contentRoot?: string
 ): Promise<IndexInstallResult> {
-  const contentRoot = await resolvePackageContentRoot({ cwd, packageName, version });
+  const resolvedContentRoot = contentRoot ?? await resolvePackageContentRoot({ cwd, packageName, version });
   const registryEntries = await loadRegistryFileEntries(packageName, version, {
     cwd,
-    contentRoot
+    contentRoot: resolvedContentRoot
   });
 
   const normalizedIncludes = includePaths && includePaths.length > 0

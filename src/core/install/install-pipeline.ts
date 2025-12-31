@@ -442,8 +442,25 @@ export async function runInstallPipeline(
     installationOutcome.allUpdatedFiles,
     installationOutcome.rootFileResults,
     missingPackages,
-    remoteOutcomes
+    remoteOutcomes,
+    installationOutcome.errorCount,
+    installationOutcome.errors
   );
+
+  // Check if installation actually failed
+  const hadErrors = installationOutcome.errorCount > 0;
+  const installedAnyFiles = installationOutcome.allAddedFiles.length > 0 || 
+                            installationOutcome.allUpdatedFiles.length > 0 ||
+                            installationOutcome.rootFileResults.installed.length > 0 ||
+                            installationOutcome.rootFileResults.updated.length > 0;
+  
+  if (hadErrors && !installedAnyFiles) {
+    // Complete failure - return error
+    return {
+      success: false,
+      error: `Failed to install ${options.packageName}: ${installationOutcome.errors?.join('; ')}`,
+    };
+  }
 
   return {
     success: true,

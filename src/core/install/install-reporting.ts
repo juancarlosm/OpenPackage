@@ -39,8 +39,28 @@ export function displayInstallationResults(
   allUpdatedFiles?: string[],
   rootFileResults?: { installed: string[]; updated: string[]; skipped: string[] },
   missingPackages?: string[],
-  missingPackageOutcomes?: Record<string, PackageRemoteResolutionOutcome>
+  missingPackageOutcomes?: Record<string, PackageRemoteResolutionOutcome>,
+  errorCount?: number,
+  errors?: string[]
 ): void {
+  // Check if installation actually succeeded
+  const hadErrors = (errorCount && errorCount > 0) || false;
+  const installedAnyFiles = (allAddedFiles && allAddedFiles.length > 0) || 
+                            (allUpdatedFiles && allUpdatedFiles.length > 0) ||
+                            (rootFileResults && (rootFileResults.installed.length > 0 || rootFileResults.updated.length > 0));
+  
+  if (hadErrors && !installedAnyFiles) {
+    // Complete failure - nothing was installed
+    console.log(`❌ Failed to install ${packageName}${mainPackage ? `@${mainPackage.version}` : ''}`);
+    if (errors && errors.length > 0) {
+      console.log(`\n❌ Installation errors:`);
+      for (const error of errors) {
+        console.log(`   • ${error}`);
+      }
+    }
+    return;
+  }
+  
   let summaryText = `✓ Installed ${packageName}`;
   if (mainPackage) {
     summaryText += `@${mainPackage.version}`;

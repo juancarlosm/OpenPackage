@@ -115,7 +115,8 @@ export async function runPathInstallPipeline(
         version: packageVersion,
         pkg: sourcePackage,
         isRoot: true,
-        source: 'path'
+        source: 'path',
+        contentRoot: options.sourcePath  // Store the source path for installation phase
       });
 
       // Resolve dependencies from the source package
@@ -298,8 +299,25 @@ export async function runPathInstallPipeline(
     installationOutcome.allUpdatedFiles,
     installationOutcome.rootFileResults,
     missingPackages,
-    remoteOutcomes
+    remoteOutcomes,
+    installationOutcome.errorCount,
+    installationOutcome.errors
   );
+
+  // Check if installation actually failed
+  const hadErrors = installationOutcome.errorCount > 0;
+  const installedAnyFiles = installationOutcome.allAddedFiles.length > 0 || 
+                            installationOutcome.allUpdatedFiles.length > 0 ||
+                            installationOutcome.rootFileResults.installed.length > 0 ||
+                            installationOutcome.rootFileResults.updated.length > 0;
+  
+  if (hadErrors && !installedAnyFiles) {
+    // Complete failure - return error
+    return {
+      success: false,
+      error: `Failed to install ${packageName}: ${installationOutcome.errors?.join('; ')}`,
+    };
+  }
 
   return {
     success: true,

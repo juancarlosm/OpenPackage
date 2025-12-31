@@ -43,6 +43,11 @@ export interface ResolvedPackage {
    * affect any resolution logic.
    */
   source?: 'local' | 'remote' | 'path' | 'git';
+  /**
+   * For path-based and git-based sources, stores the absolute path to the package content root.
+   * This allows the installation phase to load files from the correct location.
+   */
+  contentRoot?: string;
   conflictResolution?: 'kept' | 'overwritten' | 'skipped';
   requiredVersion?: string; // The version required by the parent package
   requiredRange?: string; // The version range required by the parent package
@@ -125,6 +130,189 @@ export async function resolveDependencies(
     if (resolverOptions.onWarning) {
       resolverOptions.onWarning(warning);
     }
+    return buildResolveResult(resolvedPackages, missing, remoteOutcomes);
+  }
+  
+  // 1.5. Check if already resolved (e.g., from path/git source)
+  // This avoids expensive version resolution, remote lookups, and package loading
+  // for packages that have already been resolved (e.g., path-based installs)
+  const alreadyResolved = resolvedPackages.get(packageName);
+  if (alreadyResolved) {
+    logger.debug(`Package '${packageName}' already resolved to v${alreadyResolved.version} from ${alreadyResolved.source || 'unknown'}, validating constraints`);
+    
+    // Still need to validate version constraints even for pre-resolved packages
+    // Gather all constraints for this package
+    let allRanges: string[] = [];
+    if (rootOverrides?.has(packageName)) {
+      allRanges = [...(rootOverrides.get(packageName)!)];
+    } else {
+      if (version) allRanges.push(version);
+      const globalRanges = globalConstraints?.get(packageName);
+      if (globalRanges) allRanges.push(...globalRanges);
+      const priorRanges = requiredVersions.get(packageName) || [];
+      if (priorRanges.length > 0) allRanges.push(...priorRanges);
+    }
+    
+    const dedupedRanges = Array.from(new Set(allRanges));
+    const normalizedRanges = dedupedRanges.map(r => r.trim()).filter(Boolean);
+    const isWildcardRange = (range: string) => {
+      const normalized = range.toLowerCase();
+      return normalized === '*' || normalized === 'latest';
+    };
+    const constraintRanges = normalizedRanges.filter(range => !isWildcardRange(range));
+    
+    // Validate existing version against constraints
+    if (constraintRanges.length > 0) {
+      const existingVersion = alreadyResolved.version;
+      const allSatisfied = constraintRanges.every(range => {
+        try {
+          return semver.satisfies(existingVersion, range, { includePrerelease: true });
+        } catch (error) {
+          logger.debug(
+            `Failed to evaluate semver for ${packageName}@${existingVersion} against range '${range}': ${error}`
+          );
+          return false;
+        }
+      });
+      
+      if (!allSatisfied) {
+        // Version conflict with pre-resolved package
+        const sourceDescription = alreadyResolved.source === 'path' ? 'local path' :
+                                  alreadyResolved.source === 'git' ? 'git repository' :
+                                  alreadyResolved.source || 'unknown source';
+        const conflictMessage = `Package '${packageName}' was resolved to version ${existingVersion} (from ${sourceDescription}) but other dependencies require: ${constraintRanges.join(', ')}`;
+        logger.error(conflictMessage);
+        throw new VersionConflictError(packageName, {
+          ranges: constraintRanges,
+          availableVersions: [existingVersion]
+        });
+      }
+      
+      logger.debug(`Package '${packageName}' v${existingVersion} satisfies constraints: ${constraintRanges.join(', ')}`);
+    }
+    
+    // Track required version if specified
+    if (version) {
+      if (!requiredVersions.has(packageName)) {
+        requiredVersions.set(packageName, []);
+      }
+      requiredVersions.get(packageName)!.push(version);
+    }
+    
+    // Constraints satisfied - process dependencies without re-loading package
+    const pkg = alreadyResolved.pkg;
+    const packageYmlFile =
+      pkg.files.find(f => f.path === PACKAGE_PATHS.MANIFEST_RELATIVE) ||
+      pkg.files.find(f => f.path === 'openpackage.yml');
+    
+    if (packageYmlFile) {
+      const config = yaml.load(packageYmlFile.content) as PackageYml;
+      
+      // Recursively resolve dependencies
+      visitedStack.add(packageName);
+      
+      // Only process 'packages' array (NOT 'dev-packages' for transitive dependencies)
+      const dependencies = config.packages || [];
+      
+      // Determine the source directory for resolving relative paths
+      const baseDir = currentPackageSourcePath ? dirname(currentPackageSourcePath) : targetDir;
+
+      const resolveLocalPackage = async (
+        pkg: Package,
+        sourceType: 'git' | 'path',
+        sourcePath: string,
+        requiredRange?: string
+      ) => {
+        if (!resolvedPackages.has(pkg.metadata.name)) {
+          resolvedPackages.set(pkg.metadata.name, {
+            name: pkg.metadata.name,
+            version: pkg.metadata.version || '0.0.0',
+            pkg: pkg,
+            isRoot: false,
+            source: sourceType,
+            contentRoot: sourcePath,
+            requiredVersion: pkg.metadata.version,
+            requiredRange
+          });
+
+          const child = await resolveDependencies(
+            pkg.metadata.name,
+            targetDir,
+            false,
+            visitedStack,
+            resolvedPackages,
+            pkg.metadata.version,
+            requiredVersions,
+            globalConstraints,
+            rootOverrides,
+            resolverOptions,
+            remoteOutcomes,
+            sourcePath
+          );
+          for (const m of child.missingPackages) missing.add(m);
+        }
+      };
+
+      const processDependencyEntry = async (dep: any) => {
+        // Git-based dependency
+        if (dep.git) {
+          try {
+            const { pkg: depPkg, sourcePath } = await loadPackageFromGit({
+              url: dep.git,
+              ref: dep.ref
+            });
+            await resolveLocalPackage(depPkg, 'git', sourcePath, dep.version);
+          } catch (error) {
+            logger.error(`Failed to load git-based dependency '${dep.name}' from '${dep.git}': ${error}`);
+            missing.add(dep.name);
+          }
+        } else if (dep.path) {
+          // Resolve path relative to the current package's location
+          const resolvedPath = resolve(baseDir, dep.path);
+          
+          try {
+            // Load package from path
+            const pathPackage = await loadPackageFromPath(resolvedPath);
+            await resolveLocalPackage(pathPackage, 'path', resolvedPath, dep.version);
+          } catch (error) {
+            logger.error(`Failed to load path-based dependency '${dep.name}' from '${dep.path}': ${error}`);
+            missing.add(dep.name);
+          }
+        } else {
+          // Standard registry-based dependency resolution
+          const child = await resolveDependencies(
+            dep.name,
+            targetDir,
+            false,
+            visitedStack,
+            resolvedPackages,
+            dep.version,
+            requiredVersions,
+            globalConstraints,
+            rootOverrides,
+            resolverOptions,
+            remoteOutcomes
+          );
+          for (const m of child.missingPackages) missing.add(m);
+        }
+      };
+      
+      // Process regular packages
+      for (const dep of dependencies) {
+        await processDependencyEntry(dep);
+      }
+      
+      // For root package, also process dev-packages
+      if (isRoot) {
+        const devDependencies = config['dev-packages'] || [];
+        for (const dep of devDependencies) {
+          await processDependencyEntry(dep);
+        }
+      }
+      
+      visitedStack.delete(packageName);
+    }
+    
     return buildResolveResult(resolvedPackages, missing, remoteOutcomes);
   }
   

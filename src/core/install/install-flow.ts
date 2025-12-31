@@ -50,10 +50,12 @@ export interface InstallationPhasesParams {
 export interface InstallationPhasesResult {
   installedCount: number;
   skippedCount: number;
+  errorCount: number;
   allAddedFiles: string[];
   allUpdatedFiles: string[];
   rootFileResults: { installed: string[]; updated: string[]; skipped: string[] };
   totalOpenPackageFiles: number;
+  errors?: string[];
 }
 
 export interface OpenPackagePackageResult {
@@ -195,9 +197,11 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
   let totalUpdated = 0;
   let totalDeleted = 0;
   let totalSkipped = 0;
+  let totalErrors = 0;
   const allAddedFiles: string[] = [];
   const allUpdatedFiles: string[] = [];
   const allDeletedFiles: string[] = [];
+  const errors: string[] = [];
 
   for (const resolved of packages) {
     try {
@@ -210,7 +214,8 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
         resolved.version,
         platforms,
         options,
-        filtersForPackage
+        filtersForPackage,
+        resolved.contentRoot  // Pass contentRoot for path-based packages
       );
 
       totalInstalled += installResult.installed;
@@ -229,8 +234,10 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
       if (error instanceof UserCancellationError) {
         throw error; // Re-throw to allow clean exit
       }
-      logger.error(`Failed index-based install for ${resolved.name}: ${error}`);
-      totalSkipped++;
+      const errorMsg = `Failed index-based install for ${resolved.name}: ${error}`;
+      logger.error(errorMsg);
+      errors.push(errorMsg);
+      totalErrors++;
     }
   }
 
@@ -248,7 +255,8 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
         resolved.name,
         resolved.version,
         platforms,
-        filtersForPackage
+        filtersForPackage,
+        resolved.contentRoot  // Pass contentRoot for path-based packages
       );
       const installResult = await installRootFilesFromMap(
         cwd,
@@ -278,14 +286,19 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
       if (error instanceof UserCancellationError) {
         throw error; // Re-throw to allow clean exit
       }
-      logger.error(`Failed root file install for ${resolved.name}: ${error}`);
+      const errorMsg = `Failed root file install for ${resolved.name}: ${error}`;
+      logger.error(errorMsg);
+      errors.push(errorMsg);
+      totalErrors++;
     }
   }
 
   return {
     installedCount: totalInstalled,
     skippedCount: totalSkipped,
+    errorCount: totalErrors,
     allAddedFiles,
+    errors: errors.length > 0 ? errors : undefined,
     allUpdatedFiles,
     rootFileResults: {
       installed: Array.from(rootFileResults.installed),

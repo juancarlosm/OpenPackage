@@ -15,10 +15,13 @@ export async function discoverAndCategorizeFiles(
   packageName: string,
   version: string,
   platforms: Platform[],
-  includePaths?: string[]
+  includePaths?: string[],
+  contentRoot?: string
 ): Promise<CategorizedInstallFiles> {
   // Load once
-  const pkg = await packageManager.loadPackage(packageName, version);
+  const pkg = await packageManager.loadPackage(packageName, version, {
+    packageRootDir: contentRoot
+  });
 
   const normalizedIncludes = buildNormalizedIncludeSet(includePaths);
 
