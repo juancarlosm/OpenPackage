@@ -38,8 +38,8 @@ export async function runApplyPipeline(
     return {
       success: false,
       error:
-        `No packages found in .openpackage/openpackage.index.yml. ` +
-        `Run 'opkg install ...' first to populate the unified workspace index.`
+        `No packages installed in this workspace.\n` +
+        `Run 'opkg install <package-name>' to install a package first.`
     };
   }
 
@@ -70,8 +70,8 @@ async function applySinglePackage(
     return {
       success: false,
       error:
-        `No entry for '${packageName}' found in .openpackage/openpackage.index.yml. ` +
-        `Run 'opkg install ...' first to populate the unified workspace index.`
+        `Package '${packageName}' is not installed in this workspace.\n` +
+        `Run 'opkg install ${packageName}' to install it first.`
     };
   }
 

@@ -19,8 +19,8 @@ export async function resolvePackageSource(
   const entry = entryKey ? ws.index.packages?.[entryKey] : undefined;
   if (!entry?.path) {
     throw new Error(
-      `No entry for '${packageName}' found in .openpackage/openpackage.index.yml. ` +
-        `Run 'opkg install ...' or 'opkg apply <package>' to create/update the workspace index first.`
+      `Package '${packageName}' is not installed in this workspace.\n` +
+        `Run 'opkg install ${packageName}' to install it first.`
     );
   }
 

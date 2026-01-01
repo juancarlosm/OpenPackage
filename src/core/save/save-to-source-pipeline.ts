@@ -167,8 +167,8 @@ async function validateSavePreconditions(
     return {
       valid: false,
       error:
-        `Package '${packageName}' not found in .openpackage/openpackage.index.yml. ` +
-        `Run 'opkg apply ${packageName}' or 'opkg install ...' first.`
+        `Package '${packageName}' is not installed in this workspace.\n` +
+        `Run 'opkg install ${packageName}' to install it first.`
     };
   }
   
@@ -177,8 +177,8 @@ async function validateSavePreconditions(
     return {
       valid: false,
       error:
-        `No mappings found for '${packageName}' in .openpackage/openpackage.index.yml. ` +
-        `Run 'opkg apply ${packageName}' or 'opkg install ...' first.`
+        `Package '${packageName}' has no files installed.\n` +
+        `Run 'opkg apply ${packageName}' to sync files to the workspace.`
     };
   }
   
