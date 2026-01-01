@@ -12,27 +12,39 @@ Package scopes distinguish local vs. shared mutable sources. Supports workspace 
 
 Registry is scope-neutral (immutable). See [Package Sources](package-sources.md).
 
-## Current Workflows (Manual)
+## Current Workflows
 
-### Creating Workspace Package
+### Creating Local Package (Workspace-Scoped)
 ```bash
-mkdir -p .openpackage/packages/my-rules
-# Init openpackage.yml (manual or future `opkg init <name>`)
-# Add to deps in .openpackage/openpackage.yml:
-# - name: my-rules
-#   path: ./.openpackage/packages/my-rules/
+# Interactive (prompts for scope)
+opkg new my-rules
+
+# Explicit
+opkg new my-rules --scope local
+# Creates: .openpackage/packages/my-rules/openpackage.yml
+# Automatically added to workspace manifest with path reference
 ```
 - Mutable; full ops.
+- Project-specific; not shared across workspaces.
 
-### Using Global Package
+### Creating Global Package (Cross-Workspace)
 ```bash
-mkdir -p ~/.openpackage/packages/shared-rules
-# Create openpackage.yml
-# In any workspace openpackage.yml:
+opkg new shared-rules --scope global
+# Creates: ~/.openpackage/packages/shared-rules/openpackage.yml
+# Reference in any workspace openpackage.yml:
 # - name: shared-rules
 #   path: ~/.openpackage/packages/shared-rules/
 ```
-- Mutable; shared.
+- Mutable; shared across all workspaces.
+- Useful for personal utilities, common rules, etc.
+
+### Creating Root Package (Current Directory)
+```bash
+opkg new my-package --scope root
+# Creates: ./openpackage.yml in current directory
+```
+- Mutable; current directory is the package.
+- Typical for dedicated package repositories.
 
 ### Manual Scope Transitions
 #### Workspace → Global (Elevate-like)

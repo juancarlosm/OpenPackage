@@ -110,7 +110,7 @@ export async function runUninstallPipeline(
 
   if (!(await exists(openpkgDir)) || !(await exists(manifestPath))) {
     throw new ValidationError(
-      `No .openpackage/openpackage.yml found in ${cwd}. Run 'opkg init' first.`
+      `No .openpackage/openpackage.yml found in ${cwd}.`
     );
   }
 

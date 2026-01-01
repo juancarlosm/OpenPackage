@@ -37,7 +37,7 @@ The architecture introduces breaking changes with no automated migration—re-in
 - Removed complex WIP versioning (now prereleases in registry), workspace hash tracking, per-package metadata directories, and tarball-based registry.
 - Unified `openpackage.index.yml` replaces scattered index files.
 - All registry storage is directory-based for inspectability and path compatibility.
-- Path-based dependencies and mutability guards replace prior behaviors; re-run `opkg init` and `opkg install` for workspaces.
+- Path-based dependencies and mutability guards replace prior behaviors; re-run `opkg install` for workspaces. Use `opkg new` to create packages.
 - No backward compatibility for removed features like staging mutations or link-only WIP layouts.
 
 Consult git history (e.g., commit 9d23bf2) for prior version details. See [Architecture](architecture.md) for removed/retained metadata.
@@ -60,6 +60,8 @@ Consult git history (e.g., commit 9d23bf2) for prior version details. See [Archi
   - Unified index schema: `package-index-yml.md`
   - Package root layout: `package-root-layout.md`
 - **Commands**:
+  - `new` (create packages): `new/`
+    - Scope behavior: `scope-behavior.md`
   - `add` (new files to source): `add/`
   - `apply`/`sync`: `apply/`
   - `install` (from registry/git): `install/`

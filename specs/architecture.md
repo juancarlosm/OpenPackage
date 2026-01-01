@@ -98,7 +98,8 @@ See [Package Sources](package-sources.md) for resolution details and [Registry](
 
 ## Breaking Changes
 The architecture introduces breaks with no auto-migration:
-- Re-init workspaces: `opkg init`.
+- Workspace manifests are now auto-created (no manual init needed).
+- Create packages: `opkg new <package>` with scope support (replaces `opkg init`).
 - Re-install packages: `opkg install`.
 - Path-based deps replace prior models; mutable guards enforce new flows.
 - Unified index requires manual recreation.

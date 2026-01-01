@@ -6,6 +6,7 @@ import { getPlatformDefinitions } from '../core/platforms.js';
 import type { PlatformDefinition } from '../core/platforms.js';
 import { normalizePackageName, validatePackageName } from './package-name.js';
 import { readTextFile } from './fs.js';
+import type { PackageScope } from './scope-resolution.js';
 
 /**
  * Common prompt types and utilities for user interaction
@@ -79,9 +80,46 @@ export async function promptCreatePackage(): Promise<boolean> {
 }
 
 /**
- * Package details prompt for interactive package creation
+ * Prompt user to select package scope
  */
-export async function promptPackageDetails(defaultName?: string): Promise<PackageYml> {
+export async function promptPackageScope(): Promise<PackageScope> {
+  const response = await safePrompts({
+    type: 'select',
+    name: 'scope',
+    message: 'Where should this package be created?',
+    choices: [
+      {
+        title: 'Root (current directory)',
+        description: 'Create openpackage.yml here - for standalone/distributable packages',
+        value: 'root'
+      },
+      {
+        title: 'Local (workspace-scoped)',
+        description: 'Create in .openpackage/packages/ - for project-specific packages',
+        value: 'local'
+      },
+      {
+        title: 'Global (cross-workspace)',
+        description: 'Create in ~/.openpackage/packages/ - shared across all workspaces on this machine',
+        value: 'global'
+      }
+    ],
+    initial: 0, // Default to root (first option)
+    hint: 'Use arrow keys to navigate, Enter to select'
+  });
+
+  return response.scope as PackageScope;
+}
+
+/**
+ * Package details prompt for interactive package creation
+ * @param defaultName - Default package name to suggest
+ * @param existsChecker - Optional async function to check if package name already exists
+ */
+export async function promptPackageDetails(
+  defaultName?: string,
+  existsChecker?: (name: string) => Promise<boolean>
+): Promise<PackageYml> {
   const cwd = process.cwd();
   const suggestedName = defaultName || basename(cwd);
 
@@ -91,14 +129,26 @@ export async function promptPackageDetails(defaultName?: string): Promise<Packag
       name: 'name',
       message: 'Package name:',
       initial: suggestedName,
-      validate: (value: string) => {
+      validate: async (value: string) => {
         if (!value) return 'Name is required';
         try {
           validatePackageName(value);
-          return true;
         } catch (error) {
-          return (error as Error).message.replace('%s', value);
+          // Strip "Validation error: " prefix to avoid duplication in prompts UI
+          const message = (error as Error).message;
+          return message.replace(/^Validation error:\s*/, '');
         }
+        
+        // Check if package already exists (if checker provided)
+        if (existsChecker) {
+          const normalized = normalizePackageName(value);
+          const alreadyExists = await existsChecker(normalized);
+          if (alreadyExists) {
+            return `Package '${normalized}' already exists. Please choose a different name.`;
+          }
+        }
+        
+        return true;
       }
     },
     {

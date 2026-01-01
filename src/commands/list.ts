@@ -44,7 +44,7 @@ async function listPackagesCommand(options: ListOptions): Promise<CommandResult>
       } else if (options.filter) {
         console.log(`No packages found matching filter: ${options.filter}`);
       } else {
-        console.log('No packages found. Use "opkg init" to create your first package.');
+        console.log('No packages found. Use "opkg new <package-name>" to create your first package.');
       }
       return { success: true, data: [] };
     }

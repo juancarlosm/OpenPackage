@@ -136,7 +136,7 @@ The platforms system provides helpers for:
     - Ensures all configured subdirectories (standard + custom) exist for each platform.
     - Creates directories as needed and returns relative paths of newly created ones (with debug logging).
 
-These helpers allow commands like `opkg init` or platform setup flows to create the necessary folder structure for one or more platforms.
+These helpers allow commands like `opkg new` or platform setup flows to create the necessary folder structure for one or more platforms.
 
 ---
 

@@ -7,26 +7,23 @@ import { PackageDependency } from '../types/index.js';
 export const SCOPED_PACKAGE_REGEX = /^@([^\/]+)\/(.+)$/;
 
 /**
- * Error messages for package name validation
- */
-const ERROR_MESSAGES = {
-  INVALID_PACKAGE_NAME: 'Invalid package name: %s. Package names must be 1-214 characters, contain only letters, numbers, hyphens, underscores, and dots. Cannot start with a number, dot, or hyphen. Cannot have consecutive dots, underscores, or hyphens. Scoped names must be in format @<scope>/<name>. Package names are case-insensitive and will be normalized to lowercase.'
-} as const;
-
-/**
  * Validate package name according to naming rules
  * @param name - The package name to validate
  * @throws ValidationError if the name is invalid
  */
 export function validatePackageName(name: string): void {
   // Check length
-  if (name.length === 0 || name.length > 214) {
-    throw new ValidationError(ERROR_MESSAGES.INVALID_PACKAGE_NAME.replace('%s', name));
+  if (name.length === 0) {
+    throw new ValidationError('Package name cannot be empty');
+  }
+  
+  if (name.length > 214) {
+    throw new ValidationError(`Package name '${name}' is too long (max 214 characters)`);
   }
 
   // Check for leading/trailing spaces
   if (name.trim() !== name) {
-    throw new ValidationError(ERROR_MESSAGES.INVALID_PACKAGE_NAME.replace('%s', name));
+    throw new ValidationError(`Package name '${name}' cannot have leading or trailing spaces`);
   }
 
   // Check if it's a scoped name (@scope/name format)
@@ -35,38 +32,44 @@ export function validatePackageName(name: string): void {
     const [, scope, localName] = scopedMatch;
 
     // Validate scope part
-    validatePackageNamePart(scope, name);
+    validatePackageNamePart(scope, name, 'scope');
 
     // Validate local name part
-    validatePackageNamePart(localName, name);
+    validatePackageNamePart(localName, name, 'name');
 
     return;
   }
 
   // Validate as regular name
-  validatePackageNamePart(name, name);
+  validatePackageNamePart(name, name, 'package');
 }
 
 /**
  * Validate a package name part (scope or local name)
  * @param part - The part to validate
  * @param fullName - The full original name for error messages
+ * @param partType - The type of part being validated (for better error messages)
  * @throws ValidationError if the part is invalid
  */
-function validatePackageNamePart(part: string, fullName: string): void {
+function validatePackageNamePart(part: string, fullName: string, partType: string): void {
+  // Check for uppercase letters first (most common issue)
+  if (/[A-Z]/.test(part)) {
+    throw new ValidationError(`Package name '${fullName}' must be lowercase`);
+  }
+
   // Check first character
   if (/^[0-9.\-]/.test(part)) {
-    throw new ValidationError(ERROR_MESSAGES.INVALID_PACKAGE_NAME.replace('%s', fullName));
+    throw new ValidationError(`Package ${partType} '${fullName}' cannot start with a number, dot, or hyphen`);
   }
 
   // Check for consecutive special characters
   if (/(\.\.|__|--)/.test(part)) {
-    throw new ValidationError(ERROR_MESSAGES.INVALID_PACKAGE_NAME.replace('%s', fullName));
+    throw new ValidationError(`Package name '${fullName}' cannot have consecutive dots, underscores, or hyphens`);
   }
 
   // Check allowed characters only
   if (!/^[a-z0-9._-]+$/.test(part)) {
-    throw new ValidationError(ERROR_MESSAGES.INVALID_PACKAGE_NAME.replace('%s', fullName));
+    throw new ValidationError(`Package name '${fullName}' contains invalid characters (use only: a-z, 0-9, ., _, -)`);
   }
 }
 

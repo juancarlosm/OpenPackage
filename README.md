@@ -62,12 +62,16 @@ npm install -g opkg
 ### Create a package
 
 ```bash title="Terminal"
-opkg init # Initialize the workspace as a package, or
-opkg init <package> # Initialize a package under cwd `.openpackage/packages`
-```  
+opkg new <package>                   # Interactive: prompt for scope (local/root/global)
+opkg new <package> --scope local     # Create local package in .openpackage/packages/<package>/
+opkg new <package> --scope root      # Create package in current directory
+opkg new <package> --scope global    # Create global package in ~/.openpackage/packages/<package>/
+```
 
 > [!NOTE]  
 > You can also use command `openpackage` instead of `opkg`
+> 
+> The workspace manifest (.openpackage/openpackage.yml) is created automatically when you first run install, save, or add commands.
 
 ### Add/update/remove package files
 
@@ -220,9 +224,12 @@ Packages are composed using the following directory structure:
 └── AGENTS.md # Platform root file
 ```
 
-There are two ways to compose packages:
-- In a project workspace: `opkg init <package>` will create a package in `.openpackage/packages/<packages>/`
-- In a dedicated package codebase: `opkg init` will create a package at cwd (similar to npm, pypi, etc.)
+There are three ways to compose packages:
+- **Local package** (workspace-scoped): `opkg new <package> --scope local` creates in `.openpackage/packages/<package>/`
+- **Root package** (current directory): `opkg new <package> --scope root` creates `openpackage.yml` at cwd
+- **Global package** (cross-workspace): `opkg new <package> --scope global` creates in `~/.openpackage/packages/<package>/`
+
+When running `opkg new` interactively without the `--scope` flag, you'll be prompted to choose the scope.
 
 > [!TIP]  
 > Learn more about packages from the [packages doc](https://openpackage.dev/docs/packages) from our official docs.

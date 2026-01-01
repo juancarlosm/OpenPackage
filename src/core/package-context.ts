@@ -72,18 +72,6 @@ export interface PackageContext {
 }
 
 /**
- * Legacy DetectedPackageContext for backward compatibility during migration.
- * @deprecated Use PackageContext instead
- */
-export interface DetectedPackageContext {
-  packageDir: string;
-  packageYmlPath: string;
-  config: PackageYml;
-  location: PackageLocation;
-  isCwdPackage: boolean;
-}
-
-/**
  * Get the package root directory based on location.
  * - Root: cwd/
  * - Nested: cwd/.openpackage/packages/<name>/
@@ -300,20 +288,6 @@ export function isRootPackage(ctx: PackageContext): boolean {
 }
 
 /**
- * Convert PackageContext to legacy DetectedPackageContext format.
- * @deprecated Use PackageContext directly
- */
-export function toDetectedPackageContext(ctx: PackageContext): DetectedPackageContext {
-  return {
-    packageDir: ctx.packageFilesDir,
-    packageYmlPath: ctx.packageYmlPath,
-    config: ctx.config,
-    location: ctx.location,
-    isCwdPackage: ctx.isCwdPackage
-  };
-}
-
-/**
  * Error message for when no package is detected.
  */
 export function getNoPackageDetectedMessage(packageName?: string): string {
@@ -330,8 +304,8 @@ export function getNoPackageDetectedMessage(packageName?: string): string {
   return (
     `No package detected at current directory.\n\n` +
     `A valid package requires openpackage.yml to exist.\n\n` +
-    `💡 To initialize a package:\n` +
-    `   • Run 'opkg init' to create a new package\n` +
+    `💡 To create a package:\n` +
+    `   • Run 'opkg new' to create a new package\n` +
     `   • Or specify a package name: 'opkg save <package-name>'`
   );
 }

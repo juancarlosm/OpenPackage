@@ -8,8 +8,6 @@ import { readPackageFilesForRegistry } from '../../utils/package-copy.js';
 import { ensurePackageWithYml } from '../../utils/package-management.js';
 import { isWithinDirectory } from '../../utils/path-normalization.js';
 import { exists, isDirectory, isFile, ensureDir } from '../../utils/fs.js';
-import { writePackageYml } from '../../utils/package-yml.js';
-import { promptPackageDetails } from '../../utils/prompts.js';
 import { logger } from '../../utils/logger.js';
 import { collectSourceEntries } from './source-collector.js';
 import {
@@ -22,9 +20,9 @@ import {
   getNoPackageDetectedMessage,
   getPackageFilesDir,
   getPackageYmlPath,
-  createPackageContext,
   type PackageContext 
 } from '../package-context.js';
+import { createPackage } from '../package-creation.js';
 import { DIR_PATTERNS } from '../../constants/index.js';
 
 export interface AddPipelineOptions {
@@ -139,18 +137,22 @@ async function resolveAddTargets(
 }
 
 async function initRootPackageForAdd(cwd: string): Promise<PackageContext> {
-  const packageFilesDir = getPackageFilesDir(cwd, 'root');
-  const packageYmlPath = getPackageYmlPath(cwd, 'root');
-
   logger.info(
-    `No package detected at current directory; initializing root package in: ${packageFilesDir}`
+    `No package detected at current directory; creating root package for add operation`
   );
 
-  await ensureDir(packageFilesDir);
-  const packageConfig = await promptPackageDetails();
-  await writePackageYml(packageYmlPath, packageConfig);
+  const result = await createPackage({
+    cwd,
+    scope: 'root',
+    interactive: true,
+    addToWorkspace: false
+  });
 
-  return createPackageContext(cwd, packageConfig, 'root');
+  if (!result.success || !result.context) {
+    throw new Error(result.error || 'Failed to create root package for add operation');
+  }
+
+  return result.context;
 }
 
 async function buildAddPackageContext(

@@ -6,8 +6,9 @@ This file provides high-level semantics for core commands in the path-based mode
 
 | Command | Direction | Purpose | Mutable Source | Immutable Source |
 |---------|-----------|---------|----------------|------------------|
-| `save` | Workspace → Source | Sync edits back | ✅ | ❌ Error |
+| `new` | N/A | Create package manifest | N/A | N/A |
 | `add` | Workspace → Source | Add new files | ✅ | ❌ Error |
+| `save` | Workspace → Source | Sync edits back | ✅ | ❌ Error |
 | `pack` | Source → Registry | Create immutable snapshot | ✅ | N/A |
 | `apply` | Source/Registry → Workspace | Sync content to platforms | ✅ | ✅ |
 | `install` | Registry → Workspace | Install version (git/path too) | N/A | ✅ |
@@ -15,7 +16,7 @@ This file provides high-level semantics for core commands in the path-based mode
 | `uninstall` | Workspace | Remove package files/mappings | ✅ | ✅ |
 | `push` | Local → Remote | Upload (deferred details) | N/A | N/A |
 
-Other: `init`, `list`, `prune`, `login`/`logout` in subdocs or future.
+Other: `list`, `prune`, `login`/`logout` in subdocs or future.
 
 ## Detailed Semantics
 
@@ -83,10 +84,22 @@ Remove package from workspace.
 - Example: `opkg uninstall my-pkg`.
 - See [Uninstall](uninstall/).
 
+### `new`
+
+Create a new package with manifest.
+
+- Flow: Prompt for scope (if interactive) → Validate scope/name → Resolve target path → Create directory → Write openpackage.yml → Optional workspace integration.
+- Scopes: `root` (cwd), `local` (workspace), `global` (cross-workspace).
+- Scope Selection: Interactive prompt when `--scope` not provided; required in non-interactive mode.
+- Options: `--scope`, `--force`, `--non-interactive`.
+- Example: `opkg new my-pkg` (prompts for scope), `opkg new utils --scope global` (explicit global).
+- See [New](new/).
+
 ## Mutability Matrix (Expanded)
 
 | Command | Mutable Source | Immutable Source | Creates Files In |
 |---------|----------------|------------------|------------------|
+| `new` | N/A | N/A | Package location (scope-dependent) |
 | `save` | ✅ Syncs to source | ❌ Error | Source path |
 | `add` | ✅ Adds to source | ❌ Error | Source path |
 | `pack` | ✅ Creates version | N/A | Registry |

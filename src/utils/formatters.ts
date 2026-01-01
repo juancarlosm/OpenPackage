@@ -1,4 +1,6 @@
 import { PackageYml } from '../types/index.js';
+import { toTildePath } from './path-resolution.js';
+import { relative } from 'path';
 
 /**
  * Formatting utilities for consistent display across commands
@@ -201,7 +203,29 @@ export function formatFileSize(bytes: number): string {
  */
 export function displayPackageConfig(packageConfig: PackageYml, path: string, isExisting: boolean = false): void {
   const action = isExisting ? 'already exists' : 'created';
-  console.log(`✓ ${path} ${action}`);
+  const cwd = process.cwd();
+  
+  // Format path: use tilde notation for absolute paths under ~/.openpackage/,
+  // otherwise use relative path from cwd
+  let displayPath: string;
+  if (path.startsWith('~')) {
+    // Already in tilde notation
+    displayPath = path;
+  } else if (path.startsWith('/')) {
+    // Absolute path - try tilde notation first, then relative
+    const tildePath = toTildePath(path);
+    if (tildePath.startsWith('~')) {
+      displayPath = tildePath;
+    } else {
+      // Not under ~/.openpackage/, use relative path
+      displayPath = relative(cwd, path);
+    }
+  } else {
+    // Already relative
+    displayPath = path;
+  }
+  
+  console.log(`✓ ${displayPath} ${action}`);
 
   console.log(`  - Name: ${packageConfig.name}`);
   if (packageConfig.version) {

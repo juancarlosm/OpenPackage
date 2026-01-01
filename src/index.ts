@@ -9,7 +9,7 @@ import { ensureOpenPackageDirectories } from './core/directory.js';
 import { getVersion } from './utils/package.js';
 
 // Import command setup functions
-import { setupInitCommand } from './commands/init.js';
+import { setupNewCommand } from './commands/new.js';
 import { setupAddCommand } from './commands/add.js';
 import { setupApplyCommand } from './commands/apply.js';
 import { setupSaveCommand } from './commands/save.js';
@@ -49,7 +49,7 @@ program
   });
 
 // === FORMULA APPLICATION COMMANDS ===
-setupInitCommand(program);
+setupNewCommand(program);
 setupAddCommand(program);
 setupApplyCommand(program);
 setupSaveCommand(program);
