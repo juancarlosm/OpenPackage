@@ -16,8 +16,116 @@ The `install` command operates on the **workspace root** determined by the effec
   - **Root files**: installed at workspace root (e.g., `AGENTS.md`).
   - **`root/` directory (direct copy)**: copied 1:1 to workspace root with `root/` prefix stripped.
 - Dependency resolution from workspace `openpackage.yml`.
+- **Package source discovery**: Searches workspace-local and global packages directories before falling back to registry.
 
 If no package detected at effective cwd, errors with "No package project found" (unless dry-run or flags allow).
+
+## 0.1 Package Source Resolution for Name-Based Install
+
+When `opkg install <name>` is invoked (no path, git, or tarball syntax), the system searches for packages in this priority order:
+
+### 1. Check Existing Dependency in openpackage.yml (Highest Priority)
+
+If `<name>` exists in `openpackage.yml`:
+- **With `path:`**: Always use the declared path source
+- **With `git:`**: Always use the declared git source  
+- **With `version:`**: Resolve from registry as normal
+
+This ensures explicit declarations in the manifest are always respected.
+
+### 2. Check Workspace-Local Packages (Override)
+
+If `./.openpackage/packages/<name>/` exists and is a valid package:
+- **Always use it** - no version comparison
+- This is an explicit local override (you're working on this project's fork)
+- Skip all other checks
+
+**User Feedback**:
+```
+✓ Found <name> in workspace packages
+💡 Workspace packages always override global/registry
+```
+
+### 3. Compare Global Packages vs Registry (Version-Aware)
+
+If both `~/.openpackage/packages/<name>/` and `~/.openpackage/registry/<name>/<version>/` exist:
+
+**Version Comparison**:
+- Read `version` from global packages `openpackage.yml`
+- Find latest version in registry
+- **Select source with higher semver version**
+- **Tie-breaker**: If versions equal, prefer global packages (mutable, development-friendly)
+
+**Rationale**: Global packages are for convenience/sharing. Users expect to get the latest version automatically. Unlike workspace packages (explicit override), global packages should track the latest available version to avoid outdated dependencies.
+
+**User Feedback** (comparison case):
+```
+Resolving <name>...
+  • Global packages: 0.2.0 (mutable)
+  • Registry: 0.5.0 (stable)
+✓ Using <name>@0.5.0 from registry (newer version)
+⚠️  Global packages has older version (0.2.0)
+💡 To update global: cd ~/.openpackage/packages/<name> && opkg pack
+```
+
+**User Feedback** (tie-breaker):
+```
+Resolving <name>...
+  • Global packages: 0.5.0 (mutable)
+  • Registry: 0.5.0 (stable)
+✓ Using <name>@0.5.0 from global packages (same version, prefer mutable)
+```
+
+### 4. Single Source Fallback
+
+If only global packages OR registry exists (not both):
+- Use the available source
+- No version comparison needed
+
+**User Feedback**:
+```
+✓ Found <name> in global packages
+```
+
+### 5. Remote Resolution
+
+If no local sources exist:
+- Fall back to normal registry resolution (local + remote)
+- Follow version-resolution.md semantics
+
+### Forcing Specific Sources
+
+To bypass version comparison and force a specific source:
+
+**Force global packages**:
+```bash
+opkg install ~/.openpackage/packages/<name>/
+```
+
+**Force registry version**:
+```bash
+opkg install <name>@0.2.0  # Explicit version
+```
+
+**Lock in openpackage.yml**:
+```yaml
+packages:
+  - name: <name>
+    path: ~/.openpackage/packages/<name>/  # Explicit path = no version check
+```
+
+### Summary Table
+
+| Scenario | Behavior | Reason |
+|----------|----------|--------|
+| In openpackage.yml with path/git | Use declared source | Explicit declaration |
+| Workspace pkg exists | Use workspace (no comparison) | Explicit override |
+| Global newer than registry | Use global | Higher version |
+| Registry newer than global | Use registry | Higher version |
+| Same version | Use global | Prefer mutable |
+| Only global exists | Use global | Single source |
+| Only registry exists | Use registry | Single source |
+| Neither exists locally | Remote resolution | Normal flow |
 
 ## 1. Command shapes
 

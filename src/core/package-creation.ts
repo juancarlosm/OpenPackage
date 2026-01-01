@@ -1,4 +1,4 @@
-import { basename, relative } from 'path';
+import { basename } from 'path';
 import type { PackageYml } from '../types/index.js';
 import type { PackageScope } from '../utils/scope-resolution.js';
 import {
@@ -14,7 +14,6 @@ import { displayPackageConfig } from '../utils/formatters.js';
 import { UserCancellationError } from '../utils/errors.js';
 import { exists, ensureDir } from '../utils/fs.js';
 import { normalizePackageName, validatePackageName } from '../utils/package-name.js';
-import { createWorkspacePackageYml, addPackageToYml } from '../utils/package-management.js';
 import type { PackageContext } from './package-context.js';
 
 /**
@@ -35,9 +34,6 @@ export interface CreatePackageOptions {
 
   /** Enable interactive prompts for package details */
   interactive?: boolean;
-
-  /** Add to workspace manifest (only applies to local scope) */
-  addToWorkspace?: boolean;
 }
 
 /**
@@ -66,7 +62,6 @@ export interface CreatePackageResult {
  * - Interactive prompts for package metadata
  * - Directory structure creation
  * - openpackage.yml writing
- * - Workspace manifest integration (for local scope)
  * 
  * @param options - Package creation options
  * @returns Result containing success status and package context
@@ -79,8 +74,7 @@ export async function createPackage(
     scope,
     packageName,
     force = false,
-    interactive = true,
-    addToWorkspace = true
+    interactive = true
   } = options;
 
   try {
@@ -180,34 +174,7 @@ export async function createPackage(
     // Step 7: Display success message
     displayPackageConfig(packageConfig, packageYmlPath, false);
 
-    // Step 8: Add to workspace manifest (for local scope only)
-    if (scope === 'local' && addToWorkspace) {
-      try {
-        // Ensure workspace manifest exists
-        await createWorkspacePackageYml(cwd, false);
-
-        // Add package to workspace dependencies with path reference
-        const relativePath = `./.openpackage/packages/${normalizedName}/`;
-        await addPackageToYml(
-          cwd,
-          normalizedName,
-          packageConfig.version,
-          false, // isDev
-          undefined, // originalVersion
-          true, // silent
-          undefined, // include
-          relativePath // path
-        );
-
-        console.log(`✓ Added to workspace manifest with path: ${relativePath}`);
-        logger.info(`Added package to workspace manifest: ${normalizedName}`);
-      } catch (error) {
-        logger.warn(`Failed to add package to workspace manifest: ${error}`);
-        console.log(`⚠️  Package created but not added to workspace manifest`);
-      }
-    }
-
-    // Step 9: Show scope info
+    // Step 8: Show scope info
     console.log(`\n📍 Scope: ${getScopeDescription(scope)}`);
     if (scope === 'global') {
       console.log(`💡 This package can be used across all workspaces`);
@@ -215,7 +182,7 @@ export async function createPackage(
       console.log(`💡 This package is local to the current workspace`);
     }
 
-    // Step 10: Return success with context
+    // Step 9: Return success with context
     return {
       success: true,
       context: {

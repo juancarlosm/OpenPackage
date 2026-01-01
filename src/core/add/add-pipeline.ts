@@ -144,8 +144,7 @@ async function initRootPackageForAdd(cwd: string): Promise<PackageContext> {
   const result = await createPackage({
     cwd,
     scope: 'root',
-    interactive: true,
-    addToWorkspace: false
+    interactive: true
   });
 
   if (!result.success || !result.context) {

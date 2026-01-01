@@ -90,15 +90,13 @@ opkg new my-package --scope local  # Explicit
 
 **Behavior:**
 - Creates package in `.openpackage/packages/<name>/`
-- Auto-creates workspace manifest (`.openpackage/openpackage.yml`)
-- Adds package to workspace manifest with path reference
 - Package content lives in nested directory
+- Not automatically added to workspace (use `opkg install` to add)
 
 **Example Structure:**
 ```
 project/
 ├── .openpackage/
-│   ├── openpackage.yml      # Workspace manifest (auto-created)
 │   └── packages/
 │       └── my-package/
 │           ├── openpackage.yml  # Package manifest
@@ -109,11 +107,9 @@ project/
 └── src/                     # Project source code
 ```
 
-**Workspace Manifest Entry:**
-```yaml
-packages:
-  - name: my-package
-    path: ./.openpackage/packages/my-package/
+**Installation:**
+```bash
+opkg install my-package  # Adds to workspace manifest and installs files
 ```
 
 ### Global Scope
@@ -134,6 +130,12 @@ opkg new shared-utils --scope global
 - Not added to workspace manifest (used via path reference)
 - Persists across all workspaces
 
+**Installation:**
+- **By name**: `opkg install <package-name>` (automatic discovery with version-aware resolution)
+- **By path**: `opkg install ~/.openpackage/packages/<package-name>/` (explicit)
+
+**Priority**: Global packages are checked after workspace-local packages. When both global packages and registry versions exist, the system compares versions and uses the newer one (with tie-breaker preferring global for mutability).
+
 **Example Structure:**
 ```
 ~/.openpackage/
@@ -147,6 +149,16 @@ opkg new shared-utils --scope global
 ```
 
 **Usage in Workspace:**
+```bash
+# Install by name - automatic discovery
+opkg install shared-utils
+
+# Or explicit path
+opkg install ~/.openpackage/packages/shared-utils/
+
+# Or add to openpackage.yml manually
+```
+
 ```yaml
 # Any workspace's .openpackage/openpackage.yml
 packages:
@@ -220,19 +232,15 @@ $ opkg new existing-package --force
 
 ### Workspace Integration
 
-For **local scope** packages:
-1. Auto-creates `.openpackage/openpackage.yml` if not exists
-2. Adds package to workspace manifest with path reference
-3. Uses workspace directory name as manifest name
+The `opkg new` command **creates** packages but does **not** automatically add them to the workspace manifest.
 
-```yaml
-# Auto-generated workspace manifest
-name: my-project
-packages:
-  - name: my-package
-    path: ./.openpackage/packages/my-package/
-dev-packages: []
+To use a package after creation, explicitly install it:
+```bash
+opkg new my-package --scope local
+opkg install my-package  # Adds to workspace manifest and installs files
 ```
+
+This separation keeps package creation (scaffolding) distinct from package usage (dependency management).
 
 ### Error Handling
 
@@ -318,16 +326,13 @@ $ opkg new my-tools --scope local
 # Skips scope prompt, goes directly to package details
 ✓ .openpackage/packages/my-tools/openpackage.yml created
   - Name: my-tools
-📋 Initialized workspace openpackage.yml in .openpackage/
-✓ Added to workspace manifest with path: ./.openpackage/packages/my-tools/
 
 📍 Scope: Workspace-local (.openpackage/packages/)
 💡 This package is local to the current workspace
 
 💡 Next steps:
    1. Add files to your package: cd .openpackage/packages/my-tools/
-   2. Save to registry: opkg pack my-tools
-   3. Use in workspace: opkg apply my-tools
+   2. Install to this workspace: opkg install my-tools
 ```
 
 ### Create Global Package
@@ -341,8 +346,8 @@ $ opkg new shared-prompts --scope global
 
 💡 Next steps:
    1. Add files to your package: cd ~/.openpackage/packages/shared-prompts/
-   2. Save to registry: opkg pack shared-prompts
-   3. Reference in any workspace with path: ~/.openpackage/packages/shared-prompts/
+   2. Install to any workspace: opkg install shared-prompts
+   3. Or use explicit path: opkg install ~/.openpackage/packages/shared-prompts/
 ```
 
 ### Create Root Package
@@ -364,7 +369,6 @@ $ opkg new my-package --scope root
 $ opkg new existing-package --scope local --force --non-interactive
 ✓ .openpackage/packages/existing-package/openpackage.yml created
   - Name: existing-package
-✓ Added to workspace manifest with path: ./.openpackage/packages/existing-package/
 
 📍 Scope: Workspace-local (.openpackage/packages/)
 💡 This package is local to the current workspace
@@ -384,7 +388,6 @@ Available scopes:
 $ opkg new my-package --scope local --non-interactive
 ✓ .openpackage/packages/my-package/openpackage.yml created
   - Name: my-package
-✓ Added to workspace manifest with path: ./.openpackage/packages/my-package/
 ```
 
 ### Create Scoped Package
@@ -392,8 +395,9 @@ $ opkg new my-package --scope local --non-interactive
 $ opkg new @myorg/utils
 ✓ .openpackage/packages/@myorg/utils/openpackage.yml created
   - Name: @myorg/utils
-📋 Initialized workspace openpackage.yml in .openpackage/
-✓ Added to workspace manifest with path: ./.openpackage/packages/@myorg/utils/
+
+📍 Scope: Workspace-local (.openpackage/packages/)
+💡 This package is local to the current workspace
 ```
 
 ## Integration with Other Commands
@@ -405,9 +409,9 @@ $ opkg new @myorg/utils
 opkg new my-package               # Create package
 cd .openpackage/packages/my-package/
 # Add files (rules, commands, etc.)
-opkg save my-package              # Save WIP to registry
+opkg install my-package           # Install to workspace
+opkg save my-package              # Save changes back to package
 opkg pack my-package              # Create stable release
-opkg apply my-package             # Sync to workspace platforms
 ```
 
 **Global Package Workflow:**

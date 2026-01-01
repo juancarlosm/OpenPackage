@@ -66,16 +66,74 @@ Other: Absolute/custom paths treated by resolved location.
 ## Source Resolution Flow
 
 ```text
-1. Parse dep from openpackage.yml
+1. Parse dep from openpackage.yml OR classify CLI input
 2. Determine type:
    - `path:` → Resolve (tilde/rel/abs); validate exists
    - `version:` → Query registry for matching version → Infer path
    - `git:` → Clone/fetch to local dir → Use resolved path
+   - Simple name → Search: workspace packages → global packages → registry
 3. Classify mutability: registry/ → immutable; packages/ or custom → mutable
 4. Ops proceed or error (e.g., save requires mutable)
 ```
 
 Details in [Dependency Resolver](../core/dependency-resolver.ts); errors in [Install Errors](../core/install/install-errors.ts).
+
+## Source Resolution Priority for Name-Based Install
+
+When installing by package name (e.g., `opkg install my-package`):
+
+1. **Existing dependency** (if in openpackage.yml)
+   - Respects declared `path:`, `git:`, or `version:`
+   
+2. **Workspace-local package**
+   - `./.openpackage/packages/my-package/`
+   - Mutable development source
+   - Always takes priority (override behavior)
+   
+3. **Global package vs Registry** (version-aware comparison)
+   - `~/.openpackage/packages/my-package/` vs `~/.openpackage/registry/my-package/<version>/`
+   - Compares versions, selects higher version
+   - Tie-breaker: prefer global (mutable)
+   
+4. **Single source fallback**
+   - If only global or only registry exists, use it
+   
+5. **Remote resolution**
+   - If no local sources, fetch from remote registry
+
+This hierarchy supports:
+- Local development takes precedence
+- Global utilities available without paths
+- Automatic version-aware resolution
+- Published packages as stable fallback
+- Explicit declarations always honored
+
+**Example workflows**:
+
+```bash
+# Create global package
+$ opkg new my-utils --scope global
+✓ Created ~/.openpackage/packages/my-utils/
+
+# Install by name in any workspace
+$ cd ~/project-a
+$ opkg install my-utils
+✓ Found my-utils in global packages
+✓ Installed my-utils@0.1.0 from global packages
+
+# Pack to registry
+$ cd ~/.openpackage/packages/my-utils
+$ opkg pack
+✓ Packed my-utils@0.2.0 to registry
+
+# Next install gets newer version
+$ cd ~/project-b
+$ opkg install my-utils
+Resolving my-utils...
+  • Global packages: 0.1.0 (mutable)
+  • Registry: 0.2.0 (stable)
+✓ Using my-utils@0.2.0 from registry (newer version)
+```
 
 ### Source Persistence on Install
 

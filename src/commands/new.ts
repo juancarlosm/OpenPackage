@@ -95,8 +95,7 @@ export function setupNewCommand(program: Command): void {
         scope,
         packageName,
         force: options?.force || false,
-        interactive: !options?.nonInteractive,
-        addToWorkspace: true
+        interactive: !options?.nonInteractive
       });
 
       if (!result.success) {
@@ -111,16 +110,16 @@ export function setupNewCommand(program: Command): void {
         const localPath = `.openpackage/packages/${actualPackageName}/`;
         console.log(`\n💡 Next steps:`);
         console.log(`   1. Add files to your package: cd ${localPath}`);
-        console.log(`   2. Install to any workspace: opkg install ${localPath}`);
+        console.log(`   2. Install to this workspace: opkg install ${actualPackageName}`);
       } else if (scope === 'global') {
         const globalPath = `~/.openpackage/packages/${actualPackageName}/`;
         console.log(`\n💡 Next steps:`);
         console.log(`   1. Add files to your package: cd ${globalPath}`);
-        console.log(`   2. Install to any workspace: opkg install ${globalPath}`);
+        console.log(`   2. Install to any workspace: opkg install ${actualPackageName}`);
       } else if (scope === 'root') {
         console.log(`\n💡 Next steps:`);
         console.log(`   1. Add files to your package in current directory`);
-        console.log(`   2. Install to any workspace: opkg install ${actualPackageName}`);
+        console.log(`   2. Install to other workspaces: opkg install ${actualPackageName}`);
       }
     }));
 }

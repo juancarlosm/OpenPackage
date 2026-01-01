@@ -108,6 +108,11 @@ async function installCommand(
   }
 
   if (classification.type === 'directory' || classification.type === 'tarball') {
+    // Display source comparison info if available
+    if (classification.sourceComparisonInfo) {
+      displayPackageSourceResolution(classification.sourceComparisonInfo);
+    }
+    
     return await runPathInstallPipeline({
       ...options,
       sourcePath: classification.resolvedPath!,
@@ -125,6 +130,57 @@ async function installCommand(
     registryPath,
     targetDir
   });
+}
+
+/**
+ * Display user-friendly information about package source resolution
+ */
+function displayPackageSourceResolution(info: any): void {
+  const { candidates, selected, reason } = info;
+  
+  // Workspace override - simple message
+  if (reason === 'workspace-override') {
+    console.log(`✓ Found ${selected.packageName} in workspace packages`);
+    console.log(`💡 Workspace packages always override global/registry`);
+    return;
+  }
+  
+  // Single source - simple message
+  if (reason === 'only-source' && candidates.length === 1) {
+    const sourceType = selected.type === 'global' ? 'global packages' : 
+                       selected.type === 'registry' ? 'registry' : 'workspace packages';
+    console.log(`✓ Found ${selected.packageName} in ${sourceType}`);
+    return;
+  }
+  
+  // Multiple sources - show comparison
+  if (candidates.length > 1) {
+    console.log(`Resolving ${selected.packageName}...`);
+    for (const candidate of candidates) {
+      const label = candidate.type === 'global' ? 'Global packages' : 'Registry';
+      const suffix = candidate.type === 'global' ? ' (mutable)' : ' (stable)';
+      console.log(`  • ${label}: ${candidate.version}${suffix}`);
+    }
+    
+    const sourceLabel = selected.type === 'global' ? 'global packages' : 'registry';
+    
+    if (reason === 'newer-version') {
+      console.log(`✓ Using ${selected.packageName}@${selected.version} from ${sourceLabel} (newer version)`);
+      
+      // Warn about outdated global if registry was selected
+      if (selected.type === 'registry') {
+        const global = candidates.find((c: any) => c.type === 'global');
+        if (global) {
+          console.log(`⚠️  Global packages has older version (${global.version})`);
+          console.log(`💡 To update global: cd ~/.openpackage/packages/${selected.packageName} && opkg pack`);
+        }
+      }
+    } else if (reason === 'same-version-prefer-mutable') {
+      console.log(`✓ Using ${selected.packageName}@${selected.version} from ${sourceLabel} (same version, prefer mutable)`);
+    } else {
+      console.log(`✓ Using ${selected.packageName}@${selected.version} from ${sourceLabel}`);
+    }
+  }
 }
 
 export function setupInstallCommand(program: Command): void {
