@@ -8,12 +8,16 @@
 import { formatPathForDisplay } from '../../utils/formatters.js';
 import { describeVersionRange, isExactVersion } from '../../utils/version-ranges.js';
 import { formatVersionLabel } from '../../utils/package-versioning.js';
-import type { ShowPackageInfo, ShowResolutionInfo } from './show-types.js';
+import type { ShowPackageInfo, ShowResolutionInfo, ScopeHintInfo } from './show-types.js';
 
 /**
  * Display package information to console
  */
-export function displayPackageInfo(info: ShowPackageInfo, cwd: string): void {
+export function displayPackageInfo(
+  info: ShowPackageInfo, 
+  cwd: string, 
+  scopeHintInfo?: ScopeHintInfo
+): void {
   const { name, version, unversioned, source, metadata, files, isPartial } = info;
 
   // Package name and version
@@ -66,6 +70,11 @@ export function displayPackageInfo(info: ShowPackageInfo, cwd: string): void {
 
   // Files section
   displayFileList(files);
+
+  // Scope hint section (if package exists in multiple scopes)
+  if (scopeHintInfo) {
+    displayScopeHint(scopeHintInfo);
+  }
 }
 
 /**
@@ -173,5 +182,20 @@ function getReasonText(reason: string): string {
       return 'only source found';
     default:
       return '';
+  }
+}
+
+/**
+ * Display scope hint when package exists in multiple scopes
+ */
+function displayScopeHint(scopeHintInfo: ScopeHintInfo): void {
+  console.log('');
+  console.log('💡 This package also exists in other scopes:');
+  
+  for (const otherScope of scopeHintInfo.otherScopes) {
+    const scopeLabel = getSourceLabel(otherScope.scope);
+    const versionInfo = otherScope.version ? ` (v${otherScope.version})` : '';
+    console.log(`   • ${scopeLabel}${versionInfo}`);
+    console.log(`     View with: ${otherScope.showCommand}`);
   }
 }

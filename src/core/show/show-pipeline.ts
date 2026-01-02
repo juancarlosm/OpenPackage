@@ -14,7 +14,7 @@ import { packageManager } from '../package.js';
 import { ensureRegistryDirectories } from '../directory.js';
 import { resolvePackageForShow } from './package-resolver.js';
 import { displayPackageInfo, displayResolutionInfo } from './show-output.js';
-import type { ShowPackageInfo } from './show-types.js';
+import type { ShowPackageInfo, ScopeHintInfo } from './show-types.js';
 import type { CommandResult } from '../../types/index.js';
 
 /**
@@ -125,7 +125,7 @@ export async function runShowPipeline(
     };
 
     // Step 3: Display package information
-    displayPackageInfo(completeInfo, cwd);
+    displayPackageInfo(completeInfo, cwd, resolved.scopeHintInfo);
 
     logger.debug('Show pipeline completed successfully');
 

@@ -79,6 +79,23 @@ Resolved from multiple sources:
 Selection reason: workspace packages always override
 ```
 
+### Scope Hint Display
+
+When a package with the same name exists in multiple scopes (workspace, global, registry), show displays a hint after the main package information:
+
+```
+💡 This package also exists in other scopes:
+   • global packages (v1.5.0)
+     View with: opkg show /Users/user/.openpackage/packages/my-package
+   • local registry (v1.8.0)
+     View with: opkg show /Users/user/.openpackage/registry/my-package/1.8.0
+```
+
+This helps users understand that:
+- The same package name can exist in multiple locations
+- Each scope may have a different version
+- Users can view each scope's package using the provided command
+
 ## Source Type Detection
 
 | Location | Type | Mutable | Label |
@@ -121,7 +138,15 @@ Mutability determines if the package can be modified via `save`/`add` commands.
    ├── README.md
    ├── rules/code-style.md
    ├── ...
+
+💡 This package also exists in other scopes:
+   • global packages (v1.5.0)
+     View with: opkg show /Users/user/.openpackage/packages/my-package
+   • local registry (v1.8.0)
+     View with: opkg show /Users/user/.openpackage/registry/my-package/1.8.0
 ```
+
+Note: The scope hint section only appears when the package exists in multiple scopes.
 
 ### Partial Package Indicator
 
@@ -142,6 +167,79 @@ For packages without a version field:
 ```
 
 Version line is omitted entirely.
+
+## Scope Awareness
+
+### Understanding Scopes
+
+OpenPackage supports multiple scopes where packages can exist:
+
+- **Workspace Scope** (`.openpackage/packages/`): Project-specific packages
+- **Global Scope** (`~/.openpackage/packages/`): Cross-project shared packages
+- **Registry Scope** (`~/.openpackage/registry/`): Immutable version snapshots
+
+The same package name can exist in multiple scopes simultaneously, each potentially with different versions or content.
+
+### Multi-Scope Detection
+
+When you run `opkg show <package-name>`, the command:
+
+1. **Resolves** using standard priority (CWD → Workspace → Global → Registry)
+2. **Displays** the selected package information
+3. **Discovers** if the same package exists in other scopes
+4. **Shows hint** with commands to view packages in other scopes
+
+### Example: Package in Multiple Scopes
+
+```bash
+$ opkg show my-rules
+
+✓ Package: my-rules
+✓ Version: 2.0.0
+✓ Source: workspace packages (.openpackage/packages/my-rules)
+✓ Type: mutable
+✓ Description: Project-specific rules
+✓ Files: 10
+   ├── openpackage.yml
+   ├── rules/coding-standards.md
+   ├── ...
+
+💡 This package also exists in other scopes:
+   • global packages (v1.5.0)
+     View with: opkg show /Users/user/.openpackage/packages/my-rules
+   • local registry (v1.8.0)
+     View with: opkg show /Users/user/.openpackage/registry/my-rules/1.8.0
+```
+
+In this example:
+- **Workspace version (2.0.0)** is shown (highest priority)
+- **Global version (1.5.0)** exists with different content
+- **Registry version (1.8.0)** is an older immutable snapshot
+- Each can be viewed separately using the provided commands
+
+### Use Cases for Multi-Scope Packages
+
+1. **Development Workflow**: Work on a package in workspace scope while keeping a stable version in registry
+2. **Testing Changes**: Compare workspace changes against global or registry versions
+3. **Version Management**: Maintain multiple versions for different purposes
+4. **Scope Migration**: Elevate workspace packages to global, or localize global packages
+
+### Viewing Specific Scopes
+
+To view a package in a specific scope, use the path directly:
+
+```bash
+# View workspace version
+opkg show .openpackage/packages/my-package
+
+# View global version
+opkg show ~/.openpackage/packages/my-package
+
+# View registry version
+opkg show ~/.openpackage/registry/my-package/1.2.3
+```
+
+This bypasses scope resolution and shows exactly what you specify.
 
 ## Examples
 
@@ -272,9 +370,10 @@ Located in `src/core/show/`:
 ```
 show/
 ├── show-types.ts           # Type definitions
-├── package-resolver.ts     # Resolution logic (230 lines)
-├── show-output.ts          # Display formatting (170 lines)
-└── show-pipeline.ts        # Orchestration (115 lines)
+├── package-resolver.ts     # Resolution logic (~270 lines)
+├── scope-discovery.ts      # Scope discovery logic (~200 lines)
+├── show-output.ts          # Display formatting (~200 lines)
+└── show-pipeline.ts        # Orchestration (~120 lines)
 ```
 
 ### Module Responsibilities
@@ -282,23 +381,35 @@ show/
 **show-types.ts**
 - Type definitions for show domain
 - `ShowSourceType`, `ShowPackageSource`, `ShowPackageInfo`, `ShowResolutionInfo`
+- `ScopeHintInfo` for multi-scope hints
 
 **package-resolver.ts**
 - Main: `resolvePackageForShow(packageInput, cwd)`
 - Handles all input types and resolution strategies
 - Determines source type and mutability
 - Converts resolution info to show-specific format
+- Integrates scope discovery for hints
+
+**scope-discovery.ts** (NEW)
+- Main: `discoverPackagesAcrossScopes(packageName, cwd)`
+- Helper: `hasMultipleScopes(packageName, cwd)`
+- Discovers packages in workspace, global, and registry scopes
+- Returns `ScopeDiscoveryResult` with all found packages
+- Generates show commands for each scope
 
 **show-output.ts**
-- Main: `displayPackageInfo(info, cwd)`
+- Main: `displayPackageInfo(info, cwd, scopeHintInfo?)`
 - Helper: `displayResolutionInfo(info)`
+- Helper: `displayScopeHint(scopeHintInfo)` (NEW)
 - All console output formatting
 - Dependency and file list display
+- Scope hint formatting
 
 **show-pipeline.ts**
 - Main: `runShowPipeline(packageInput, cwd)`
 - Orchestrates: resolve → collect → display
 - Error handling and result packaging
+- Passes scope hint info to display
 - Returns `CommandResult`
 
 ## Testing
@@ -312,6 +423,8 @@ Covers:
 - ✅ Show registry package
 - ✅ Show with version specifier
 - ✅ Error handling for non-existent packages
+- ✅ Multi-scope detection and hint display (NEW)
+- ✅ Scope discovery across workspace, global, and registry (NEW)
 
 ## Future Enhancements
 

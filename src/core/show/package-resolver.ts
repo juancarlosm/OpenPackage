@@ -13,7 +13,8 @@ import { classifyPackageInput } from '../../utils/package-input.js';
 import { resolvePackageByName } from '../../utils/package-name-resolution.js';
 import { loadPackageFromGit } from '../install/git-package-loader.js';
 import { isValidPackageDirectory, loadPackageConfig } from '../package-context.js';
-import type { ShowPackageSource, ShowResolutionInfo, ShowSourceType } from './show-types.js';
+import type { ShowPackageSource, ShowResolutionInfo, ShowSourceType, ScopeHintInfo } from './show-types.js';
+import { discoverPackagesAcrossScopes } from './scope-discovery.js';
 
 /**
  * Result of resolving a package for show
@@ -29,6 +30,8 @@ export interface ResolvedPackage {
   source: ShowPackageSource;
   /** Resolution info if multiple candidates were found */
   resolutionInfo?: ShowResolutionInfo;
+  /** Scope hint info if package exists in multiple scopes */
+  scopeHintInfo?: ScopeHintInfo;
 }
 
 /**
@@ -158,12 +161,43 @@ async function resolveFromPath(
     specificType = 'tarball';
   }
 
-  return {
+  const result: ResolvedPackage = {
     path: packagePath,
     name: manifest.name,
     version: manifest.version || '',
     source: createSourceInfo(packagePath, specificType)
   };
+
+  // Check for packages in other scopes (for hint display)
+  // Only do this for packages in workspace, global, or registry scopes
+  if (specificType === 'workspace' || specificType === 'global' || specificType === 'registry') {
+    const scopeDiscovery = await discoverPackagesAcrossScopes(manifest.name, cwd);
+    
+    if (scopeDiscovery.packagesInScopes.length > 1) {
+      // Filter out the currently selected package
+      const otherScopes = scopeDiscovery.packagesInScopes
+        .filter(pkg => pkg.path !== packagePath)
+        .map(pkg => ({
+          scope: pkg.scope,
+          version: pkg.version,
+          path: pkg.path,
+          showCommand: pkg.showCommand
+        }));
+
+      if (otherScopes.length > 0) {
+        result.scopeHintInfo = {
+          packageName: manifest.name,
+          otherScopes
+        };
+        logger.debug('Scope hint info added to result', { 
+          packageName: manifest.name, 
+          otherScopesCount: otherScopes.length 
+        });
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -225,6 +259,32 @@ async function resolveFromName(
   // Include resolution info if multiple candidates were found
   if (resolution.resolutionInfo && resolution.resolutionInfo.candidates.length > 1) {
     result.resolutionInfo = convertResolutionInfo(resolution.resolutionInfo);
+  }
+
+  // Check for packages in other scopes (for hint display)
+  const scopeDiscovery = await discoverPackagesAcrossScopes(name, cwd);
+  
+  if (scopeDiscovery.packagesInScopes.length > 1) {
+    // Filter out the currently selected package
+    const otherScopes = scopeDiscovery.packagesInScopes
+      .filter(pkg => pkg.path !== resolution.path)
+      .map(pkg => ({
+        scope: pkg.scope,
+        version: pkg.version,
+        path: pkg.path,
+        showCommand: pkg.showCommand
+      }));
+
+    if (otherScopes.length > 0) {
+      result.scopeHintInfo = {
+        packageName: name,
+        otherScopes
+      };
+      logger.debug('Scope hint info added to result', { 
+        packageName: name, 
+        otherScopesCount: otherScopes.length 
+      });
+    }
   }
 
   return result;

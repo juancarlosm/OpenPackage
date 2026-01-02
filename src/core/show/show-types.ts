@@ -63,3 +63,18 @@ export interface ShowResolutionInfo {
   /** Reason for selection */
   reason: 'only-source' | 'cwd-match' | 'workspace-override' | 'newer-version' | 'same-version-prefer-mutable';
 }
+
+/**
+ * Scope hint information for packages existing in multiple scopes
+ */
+export interface ScopeHintInfo {
+  /** The package name */
+  packageName: string;
+  /** Packages found in other scopes (excluding the currently displayed one) */
+  otherScopes: Array<{
+    scope: PackageSourceType | 'path' | 'git' | 'tarball';
+    version?: string;
+    path: string;
+    showCommand: string;
+  }>;
+}
