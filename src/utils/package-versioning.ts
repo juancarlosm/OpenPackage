@@ -80,43 +80,6 @@ export function transformPackageFilesForVersionChange(
 }
 
 /**
- * Transform package files metadata for name and version changes
- * Updates openpackage.yml only
- */
-export function transformPackageFilesMetadata(
-  files: PackageFile[],
-  sourceName: string,
-  newName: string,
-  newVersion: string | undefined
-): PackageFile[] {
-  return files.map((file) => {
-    // Update openpackage.yml
-    if (file.path === FILE_PATTERNS.OPENPACKAGE_YML) {
-      try {
-        const parsed = yaml.load(file.content) as PackageYml;
-        const updated: PackageYml = {
-          ...parsed,
-          name: newName,
-          ...(newVersion ? { version: newVersion } : { version: undefined })
-        };
-        const dumped = dumpYamlWithScopedQuoting(updated, { lineWidth: 120 });
-        return { ...file, content: dumped };
-      } catch {
-        // Fallback: minimal rewrite if parsing fails
-        const fallback: PackageYml = {
-          name: newName,
-          ...(newVersion ? { version: newVersion } : {})
-        };
-        const dumped = dumpYamlWithScopedQuoting(fallback, { lineWidth: 120 });
-        return { ...file, content: dumped };
-      }
-    }
-
-    return file;
-  });
-}
-
-/**
  * Check if a package version already exists
  */
 export async function packageVersionExists(packageName: string, version?: string): Promise<boolean> {

@@ -24,7 +24,6 @@ import { setupStatusCommand } from './commands/status.js';
 import { setupPushCommand } from './commands/push.js';
 import { setupPullCommand } from './commands/pull.js';
 import { setupConfigureCommand } from './commands/configure.js';
-import { setupDuplicateCommand } from './commands/duplicate.js';
 import { setupLoginCommand } from './commands/login.js';
 import { setupLogoutCommand } from './commands/logout.js';
 import { setupSetCommand } from './commands/set.js';
@@ -112,7 +111,7 @@ program
       // All commands section - ultra compact
       output += 'All commands:\n\n';
       output += '    new, add, remove, save, set, pack, apply, status,\n';
-      output += '    install, uninstall, list, show, duplicate, delete,\n';
+      output += '    install, uninstall, list, show, delete,\n';
       output += '    push, pull, configure, login, logout\n\n';
       
       // Version
@@ -140,7 +139,6 @@ setupStatusCommand(program);
 // === LOCAL REGISTRY OPERATIONS ===
 setupListCommand(program);
 setupShowCommand(program);
-setupDuplicateCommand(program);
 setupDeleteCommand(program);
 
 // === REMOTE REGISTRY OPERATIONS ===
