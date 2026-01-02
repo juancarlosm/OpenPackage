@@ -17,7 +17,6 @@ import { setupSaveCommand } from './commands/save.js';
 import { setupPackCommand } from './commands/pack.js';
 import { setupListCommand } from './commands/list.js';
 import { setupDeleteCommand } from './commands/delete.js';
-import { setupPruneCommand } from './commands/prune.js';
 import { setupShowCommand } from './commands/show.js';
 import { setupInstallCommand } from './commands/install.js';
 import { setupUninstallCommand } from './commands/uninstall.js';
@@ -67,7 +66,6 @@ setupListCommand(program);
 setupShowCommand(program);
 setupDuplicateCommand(program);
 setupDeleteCommand(program);
-setupPruneCommand(program);
 
 // === REMOTE REGISTRY OPERATIONS ===
 setupPushCommand(program);

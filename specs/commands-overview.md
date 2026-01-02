@@ -19,7 +19,7 @@ This file provides high-level semantics for core commands in the path-based mode
 | `uninstall` | Workspace | Remove package files/mappings | ✅ | ✅ |
 | `push` | Local → Remote | Upload (deferred details) | N/A | N/A |
 
-Other: `list`, `prune`, `login`/`logout` in subdocs or future.
+Other: `list`, `login`/`logout` in subdocs or future.
 
 ## Detailed Semantics
 

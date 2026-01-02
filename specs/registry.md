@@ -78,13 +78,10 @@ opkg apply <name>          # Syncs from inferred path
 - Updates index/yml.
 - See [Install](install/), [Apply](apply/).
 
-### Listing/Pruning
+### Listing
 ```bash
 opkg list <name>  # Versions from dir names
-opkg prune <name> --keep 3  # Remove old, keep recent
 ```
-
-- WIP scoped by workspace hash for cleanup.
 
 ### Git Clones in Registry
 Git deps cloned here → treated immutable (current behavior).
