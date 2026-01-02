@@ -11,6 +11,11 @@ import { logger } from '../../utils/logger.js';
 import { resolvePackageByName } from '../../utils/package-name-resolution.js';
 import { classifyPackageInput } from '../../utils/package-input.js';
 import { ValidationError } from '../../utils/errors.js';
+import { 
+  createPackResultInfo, 
+  displayPackSuccess, 
+  displayPackDryRun 
+} from './pack-output.js';
 
 interface ResolvedSource {
   name: string;
@@ -148,8 +153,21 @@ export async function runPackPipeline(
       ? path.resolve(cwd, options.output)
       : getPackageVersionPath(source.name, source.version);
 
+    const isCustomOutput = !!options.output;
+
+    // Create result info for output display
+    const resultInfo = createPackResultInfo(
+      source.name,
+      source.version,
+      source.packageRoot,
+      destination,
+      files.length,
+      source.manifest,
+      isCustomOutput
+    );
+
     if (options.dryRun) {
-      console.log(`(dry-run) Would write ${files.length} files to: ${destination}`);
+      displayPackDryRun(resultInfo, cwd);
       return {
         success: true,
         data: { destination, files: files.length }
@@ -167,6 +185,9 @@ export async function runPackPipeline(
     await writePackageFilesToDirectory(destination, files);
 
     logger.info(`Packed ${source.name}@${source.version} to ${destination}`);
+
+    // Display success output
+    displayPackSuccess(resultInfo, cwd);
 
     return {
       success: true,
