@@ -59,7 +59,7 @@ async function statusCommand(options: CommandOptions = {}): Promise<CommandResul
 export function setupStatusCommand(program: Command): void {
   program
     .command('status')
-    .description('Show package sync state based on .openpackage/openpackage.index.yml')
+    .description('Show package sync state')
     .option('--verbose', 'show file-level differences')
     .action(withErrorHandling(async (options: CommandOptions) => {
       await statusCommand(options);

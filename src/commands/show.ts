@@ -30,19 +30,7 @@ async function showPackageCommand(packageInput: string): Promise<void> {
 export function setupShowCommand(program: Command): void {
   program
     .command('show')
-    .description(
-      'Show details of a package from any source.\n' +
-      'Supports:\n' +
-      '  - Package names: show my-package, show my-package@1.0.0\n' +
-      '  - Paths: show ./path/to/package, show .openpackage/packages/my-pkg\n' +
-      '  - Git: show git:https://github.com/user/repo.git#ref\n' +
-      '  - Tarballs: show ./package.tgz\n\n' +
-      'Resolution priority for package names (like pack):\n' +
-      '  1. Current directory (if name matches)\n' +
-      '  2. Workspace packages (.openpackage/packages/)\n' +
-      '  3. Global packages (~/.openpackage/packages/)\n' +
-      '  4. Local registry (~/.openpackage/registry/)'
-    )
+    .description('Show package details')
     .argument('<package>', 'package name, path, git URL, or tarball')
     .action(withErrorHandling(async (packageInput: string) => {
       await showPackageCommand(packageInput);

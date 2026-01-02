@@ -15,7 +15,7 @@ async function pushPackageCommand(
 export function setupPushCommand(program: Command): void {
   program
     .command('push')
-    .description('Push a package to remote registry. Supports package@version syntax.')
+    .description('Push package to remote registry')
     .argument('<package-name>', 'name of the package to push. Supports package@version syntax.')
     .option('--profile <profile>', 'profile to use for authentication')
     .option('--api-key <key>', 'API key for authentication (overrides profile)')

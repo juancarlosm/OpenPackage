@@ -14,7 +14,7 @@ async function pullPackageCommand(
 export function setupPullCommand(program: Command): void {
   program
     .command('pull')
-    .description('Pull a package from remote registry. Supports package@version syntax.')
+    .description('Pull package from remote registry')
     .argument('<package-name>', 'name of the package to pull. Supports package@version syntax.')
     .option('--profile <profile>', 'profile to use for authentication')
     .option('--api-key <key>', 'API key for authentication (overrides profile)')

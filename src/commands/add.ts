@@ -10,21 +10,7 @@ export function setupAddCommand(program: Command): void {
     .command('add')
     .argument('<package-name>', 'package name')
     .argument('<path>', 'file or directory to add')
-    .description(
-      'Copy workspace files into a mutable package source (workspace or global packages).\n\n' +
-      'This command modifies the package source only. To sync changes to your workspace:\n' +
-      '  1. Install the package: opkg install <package-name>\n' +
-      '  2. Apply the changes: opkg apply <package-name>\n' +
-      'Or use --apply flag to do both (requires package to be installed in current workspace).\n\n' +
-      'Usage examples:\n' +
-      '  opkg add my-package .cursor/rules/example.md\n' +
-      '  opkg add my-package docs/guide.md\n' +
-      '  opkg add my-package .cursor/rules/example.md --apply\n\n' +
-      'The add command searches for mutable packages in:\n' +
-      '  - Workspace packages: ./.openpackage/packages/\n' +
-      '  - Global packages: ~/.openpackage/packages/\n\n' +
-      'Registry packages are immutable and cannot be modified via add.'
-    )
+    .description('Add files to a mutable package source')
     .option('--platform-specific', 'Save platform-specific variants for platform subdir inputs')
     .option('--apply', 'Apply changes to workspace immediately (requires package to be installed)')
     .action(

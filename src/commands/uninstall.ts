@@ -27,7 +27,7 @@ export function setupUninstallCommand(program: Command): void {
   program
     .command('uninstall')
     .alias('un')
-    .description('Remove package files tracked in .openpackage/openpackage.index.yml')
+    .description('Remove installed package files')
     .argument('<package-name>', 'name of the package to uninstall')
     .option('--dry-run', 'preview changes without applying them')
     .action(withErrorHandling(async (packageName: string, options: UninstallOptions) => {

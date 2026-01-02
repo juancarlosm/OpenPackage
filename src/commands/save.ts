@@ -39,12 +39,7 @@ export function setupSaveCommand(program: Command): void {
     .alias('s')
     .argument('[package-name]', 'package name (required when providing a path)')
     .argument('[path]', 'file or directory to add before saving')
-    .description(
-      'Sync workspace edits back to a mutable package source based on unified index mappings.\n' +
-      'Usage:\n' +
-      '  opkg save <package-name>\n' +
-      '  opkg save <package-name> <path>   # Add path to package (copy-to-root for non-platform paths), then save\n'
-    )
+    .description('Save workspace edits back to package source')
     .option('-f, --force', 'auto-select latest mtime when conflicts occur')
     .option('--platform-specific', 'Treat platform subdir inputs as platform-specific when adding before save')
     .option('--apply', 'Apply after add-before-save to sync platforms')

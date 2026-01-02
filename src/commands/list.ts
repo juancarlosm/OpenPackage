@@ -88,7 +88,7 @@ export function setupListCommand(program: Command): void {
   program
     .command('list [package-name]')
     .alias('ls')
-    .description('List local packages or show all versions of specific package if name provided')
+    .description('List local packages')
     .option('--format <format>', 'output format (table|json)', 'table')
     .option('--filter <pattern>', 'filter packages by name pattern')
     .option('--all', 'show all versions (default shows only latest)')

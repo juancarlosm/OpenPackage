@@ -18,7 +18,7 @@ type LoginOptions = {
 export function setupLoginCommand(program: Command): void {
 	program
 		.command('login')
-		.description('Authenticate with OpenPackage using the device authorization flow')
+               .description('Authenticate with OpenPackage')
 		.option('--profile <profile>', 'profile to use for authentication')
 		.action(
 			withErrorHandling(async (options: LoginOptions) => {

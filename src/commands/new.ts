@@ -26,21 +26,7 @@ export function setupNewCommand(program: Command): void {
   program
     .command('new')
     .argument('[package-name]', 'package name (optional - will prompt if not provided in interactive mode)')
-    .description(
-      'Create a new package with openpackage.yml manifest.\n\n' +
-      'Scopes:\n' +
-      '  root   - Create in current directory (./openpackage.yml)\n' +
-      '  local  - Create in workspace packages (./.openpackage/packages/<name>/)\n' +
-      '  global - Create in global packages (~/.openpackage/packages/<name>/)\n\n' +
-      'Usage:\n' +
-      '  opkg new                              # Interactive: prompt for scope and name\n' +
-      '  opkg new my-package                   # Interactive: prompt for scope\n' +
-      '  opkg new my-package --scope local     # Create local package (explicit)\n' +
-      '  opkg new my-package --scope global    # Create global package\n' +
-      '  opkg new --scope root                 # Create root package (prompt for name)\n' +
-      '  opkg new my-package --scope root      # Create root package with specified name\n' +
-      '  opkg new --non-interactive --scope local my-package  # CI/CD: requires --scope flag'
-    )
+    .description('Create a new package with manifest')
     .option('--scope <scope>', 'package scope: root, local, or global (required for non-interactive mode)')
     .option('-f, --force', 'overwrite existing package without confirmation')
     .option('--non-interactive', 'skip interactive prompts, use defaults')

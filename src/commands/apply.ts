@@ -7,7 +7,7 @@ import { runApplyPipeline, type ApplyPipelineOptions } from '../core/apply/apply
 export function setupApplyCommand(program: Command): void {
   program
     .command('apply')
-    .description('Apply/sync the current (or specified) package across detected platforms.')
+    .description('Apply/sync package across platforms')
     .argument('[package-name]', 'package name to apply (defaults to current/root package)')
     .option('-f, --force', 'overwrite existing files without prompting')
     .option('--dry-run', 'plan apply without writing files')

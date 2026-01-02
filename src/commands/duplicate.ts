@@ -77,7 +77,7 @@ async function duplicatePackageCommand(
 export function setupDuplicateCommand(program: Command): void {
   program
     .command('duplicate')
-    .description('Duplicate a package in the local registry to a new name and optional version')
+    .description('Duplicate package in local registry')
     .argument('<package>', 'source package name or package@version')
     .argument('<newName>', 'new package name or newName@version')
     .action(withErrorHandling(async (pkg: string, newName: string) => {

@@ -44,9 +44,85 @@ program
   .alias('opkg ')
   .description('OpenPackage - The Package Manager for AI Coding')
   .version(getVersion())
-  .option('--cwd <dir>', 'set the working directory (affects path resolution, package detection, and file ops; defaults to current dir)')
+  .option('--cwd <dir>', 'set working directory')
   .configureHelp({
     sortSubcommands: true,
+    // Customize help to be concise
+    formatHelp: (cmd, helper) => {
+      const termWidth = helper.padWidth(cmd, helper);
+      
+      // Only customize for root command - use default for subcommands
+      if (cmd.name() !== 'openpackage') {
+        // Build default help for subcommands
+        let output = '';
+        
+        output += `Usage: ${helper.commandUsage(cmd)}\n\n`;
+        
+        if (cmd.description()) {
+          output += `${cmd.description()}\n\n`;
+        }
+        
+        const args = helper.visibleArguments(cmd);
+        if (args.length > 0) {
+          output += 'Arguments:\n';
+          args.forEach((arg: any) => {
+            output += `  ${helper.argumentTerm(arg).padEnd(termWidth)}${helper.argumentDescription(arg)}\n`;
+          });
+          output += '\n';
+        }
+        
+        const options = helper.visibleOptions(cmd);
+        if (options.length > 0) {
+          output += 'Options:\n';
+          options.forEach((opt: any) => {
+            output += `  ${helper.optionTerm(opt).padEnd(termWidth)}${helper.optionDescription(opt)}\n`;
+          });
+          output += '\n';
+        }
+        
+        const commands = helper.visibleCommands(cmd);
+        if (commands.length > 0) {
+          output += 'Commands:\n';
+          commands.forEach((subCmd: any) => {
+            output += `  ${helper.subcommandTerm(subCmd).padEnd(termWidth)}${helper.subcommandDescription(subCmd)}\n`;
+          });
+          output += '\n';
+        }
+        
+        return output;
+      }
+      
+      // Build concise help sections
+      let output = '';
+      
+      // Title
+      output += `opkg|openpackage <command>\n\n`;
+      
+      // Usage section with common commands
+      output += 'Usage:\n\n';
+      output += 'opkg install           install packages from openpackage.yml\n';
+      output += 'opkg install <pkg>     install a specific package\n';
+      output += 'opkg new               create a new package\n';
+      output += 'opkg save <pkg>        save workspace edits back to package\n';
+      output += 'opkg pack              snapshot package to registry\n';
+      output += 'opkg list              list local packages\n';
+      output += 'opkg show <pkg>        show package details\n';
+      output += 'opkg <command> -h      help on <command>\n\n';
+      
+      // All commands section - ultra compact
+      output += 'All commands:\n\n';
+      output += '    new, add, remove, save, set, pack, apply, status,\n';
+      output += '    install, uninstall, list, show, duplicate, delete,\n';
+      output += '    push, pull, configure, login, logout\n\n';
+      
+      // Version
+      const version = cmd.version();
+      if (version) {
+        output += `opkg@${version}\n`;
+      }
+      
+      return output;
+    }
   });
 
 // === FORMULA APPLICATION COMMANDS ===

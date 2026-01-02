@@ -11,7 +11,7 @@ type LogoutOptions = {
 export function setupLogoutCommand(program: Command): void {
 	program
 		.command('logout')
-		.description('Remove stored API key for a profile')
+              .description('Remove stored credentials')
 		.option('--profile <profile>', 'profile to log out')
 		.action(
 			withErrorHandling(async (options: LogoutOptions) => {

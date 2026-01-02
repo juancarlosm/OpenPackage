@@ -180,7 +180,7 @@ export function setupDeleteCommand(program: Command): void {
   program
     .command('delete')
     .alias('del')
-    .description('Delete a package from local registry. Supports versioning with package@version syntax and prerelease version deletion.')
+    .description('Delete package from local registry')
     .argument('<package>', 'package name or package@version to delete. Use package@baseVersion to delete all prerelease versions of that base version.')
     .option('-f, --force', 'skip confirmation prompt')
     .option('-i, --interactive', 'interactively select version to delete')
