@@ -106,9 +106,9 @@ export async function promptCreatePackage(): Promise<boolean> {
 }
 
 /**
- * Prompt user to select package scope
+ * Prompt user to select package scope or custom path
  */
-export async function promptPackageScope(): Promise<PackageScope> {
+export async function promptPackageScope(): Promise<PackageScope | 'custom'> {
   const response = await safePrompts({
     type: 'select',
     name: 'scope',
@@ -128,13 +128,44 @@ export async function promptPackageScope(): Promise<PackageScope> {
         title: 'Global (cross-workspace)',
         description: 'Create in ~/.openpackage/packages/ - shared across all workspaces on this machine',
         value: 'global'
+      },
+      {
+        title: 'Custom (specify path)',
+        description: 'Create at a custom location you specify',
+        value: 'custom'
       }
     ],
     initial: 1, // Default to Local
     hint: 'Use arrow keys to navigate, Enter to select'
   });
 
-  return response.scope as PackageScope;
+  return response.scope as PackageScope | 'custom';
+}
+
+/**
+ * Prompt user to enter a custom path for package creation
+ * 
+ * @param packageName - Optional package name to suggest default path
+ * @returns Custom path entered by user
+ */
+export async function promptCustomPath(packageName?: string): Promise<string> {
+  const defaultPath = packageName ? `./${packageName}` : './';
+  
+  const response = await safePrompts({
+    type: 'text',
+    name: 'path',
+    message: 'Enter the directory path for the package:',
+    initial: defaultPath,
+    validate: (value: string) => {
+      if (!value || value.trim() === '') {
+        return 'Path is required';
+      }
+      // Basic validation - detailed validation happens in core logic
+      return true;
+    }
+  });
+
+  return response.path;
 }
 
 /**

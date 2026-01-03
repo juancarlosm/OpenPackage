@@ -62,10 +62,11 @@ npm install -g opkg
 ### Create a package
 
 ```bash title="Terminal"
-opkg new <package>                   # Interactive: prompt for scope (local/root/global)
+opkg new <package>                   # Interactive: prompt for scope (local/root/global/custom)
 opkg new <package> --scope local     # Create local package in .openpackage/packages/<package>/
 opkg new <package> --scope root      # Create package in current directory
 opkg new <package> --scope global    # Create global package in ~/.openpackage/packages/<package>/
+opkg new <package> --path <dir>      # Create package at custom directory path
 ```
 
 > [!NOTE]  

@@ -7,6 +7,11 @@ import {
   getScopeDisplayPath,
   getScopeDescription
 } from '../utils/scope-resolution.js';
+import {
+  resolveCustomPath,
+  validateCustomPath,
+  formatCustomPathForDisplay
+} from '../utils/custom-path-resolution.js';
 import { parsePackageYml, writePackageYml } from '../utils/package-yml.js';
 import { promptPackageDetails, promptPackageDetailsForNamed } from '../utils/prompts.js';
 import { logger } from '../utils/logger.js';
@@ -23,8 +28,11 @@ export interface CreatePackageOptions {
   /** Current working directory */
   cwd: string;
 
-  /** Package scope (root, local, or global) */
-  scope: PackageScope;
+  /** Package scope (root, local, or global) - optional when customPath is provided */
+  scope?: PackageScope;
+
+  /** Custom directory path for package - overrides scope-based resolution */
+  customPath?: string;
 
   /** Package name (optional for root scope, required for local/global) */
   packageName?: string;
@@ -72,12 +80,21 @@ export async function createPackage(
   const {
     cwd,
     scope,
+    customPath,
     packageName,
     force = false,
     interactive = true
   } = options;
 
   try {
+    // Validate that either scope or customPath is provided
+    if (!scope && !customPath) {
+      return {
+        success: false,
+        error: 'Either scope or customPath must be provided'
+      };
+    }
+
     // Step 1: Determine initial package name
     let normalizedName: string;
     let displayName: string;
@@ -85,7 +102,7 @@ export async function createPackage(
 
     if (!packageName) {
       // No name provided - will prompt or use default
-      if (!interactive && scope !== 'root') {
+      if (!interactive && scope && scope !== 'root' && !customPath) {
         return {
           success: false,
           error: `Package name is required for ${scope} scope in non-interactive mode.\nUsage: opkg new <package-name> --scope ${scope} --non-interactive`
@@ -103,11 +120,48 @@ export async function createPackage(
     }
 
     // Step 2: Resolve target paths
-    let packageDir = getScopePackageDir(cwd, scope, scope === 'root' ? undefined : normalizedName);
-    let packageYmlPath = getScopePackageYmlPath(cwd, scope, scope === 'root' ? undefined : normalizedName);
-    const displayPath = getScopeDisplayPath(scope, scope === 'root' ? undefined : normalizedName);
+    let packageDir: string;
+    let packageYmlPath: string;
+    let displayPath: string;
+    let isCustomPath = false;
 
-    logger.info(`Creating ${scope} package '${normalizedName}' at: ${packageDir}`);
+    if (customPath) {
+      // Custom path provided - resolve and validate
+      const resolved = resolveCustomPath(customPath, cwd);
+      
+      // Validate custom path
+      const validation = await validateCustomPath(resolved, force);
+      if (!validation.valid) {
+        return {
+          success: false,
+          error: validation.error
+        };
+      }
+      
+      // Log warning if present
+      if (validation.warning) {
+        logger.warn(validation.warning);
+      }
+      
+      packageDir = resolved.absolute;
+      packageYmlPath = resolved.packageYmlPath;
+      displayPath = formatCustomPathForDisplay(resolved, cwd);
+      isCustomPath = true;
+      
+      logger.info(`Creating package '${normalizedName}' at custom path: ${packageDir}`);
+    } else if (scope) {
+      // Scope-based path resolution (existing logic)
+      packageDir = getScopePackageDir(cwd, scope, scope === 'root' ? undefined : normalizedName);
+      packageYmlPath = getScopePackageYmlPath(cwd, scope, scope === 'root' ? undefined : normalizedName);
+      displayPath = getScopeDisplayPath(scope, scope === 'root' ? undefined : normalizedName);
+      
+      logger.info(`Creating ${scope} package '${normalizedName}' at: ${packageDir}`);
+    } else {
+      return {
+        success: false,
+        error: 'Either scope or customPath must be provided'
+      };
+    }
 
     // Step 3: Check for existing package
     const existingYml = await exists(packageYmlPath);
@@ -141,8 +195,14 @@ export async function createPackage(
     if (interactive && nameFromPrompt) {
       // Create a checker function that validates package doesn't already exist
       const existsChecker = async (name: string): Promise<boolean> => {
-        const testPackageDir = getScopePackageDir(cwd, scope, scope === 'root' ? undefined : name);
-        const testPackageYmlPath = getScopePackageYmlPath(cwd, scope, scope === 'root' ? undefined : name);
+        if (isCustomPath) {
+          // For custom paths, we can't pre-validate by name since path is fixed
+          // Validation already happened in Step 2
+          return false;
+        }
+        
+        const testPackageDir = getScopePackageDir(cwd, scope!, scope === 'root' ? undefined : name);
+        const testPackageYmlPath = getScopePackageYmlPath(cwd, scope!, scope === 'root' ? undefined : name);
         return await exists(testPackageYmlPath);
       };
 
@@ -151,8 +211,11 @@ export async function createPackage(
       normalizedName = normalizePackageName(packageConfig.name);
       
       // Update paths with the actual name from prompt (might be different from default)
-      packageDir = getScopePackageDir(cwd, scope, scope === 'root' ? undefined : normalizedName);
-      packageYmlPath = getScopePackageYmlPath(cwd, scope, scope === 'root' ? undefined : normalizedName);
+      // But only for scope-based paths, not custom paths
+      if (!isCustomPath && scope) {
+        packageDir = getScopePackageDir(cwd, scope, scope === 'root' ? undefined : normalizedName);
+        packageYmlPath = getScopePackageYmlPath(cwd, scope, scope === 'root' ? undefined : normalizedName);
+      }
     } else if (interactive) {
       // Prompt for details with pre-set name
       packageConfig = await promptPackageDetailsForNamed(normalizedName);
@@ -175,11 +238,16 @@ export async function createPackage(
     displayPackageConfig(packageConfig, packageYmlPath, false);
 
     // Step 8: Show scope info
-    console.log(`\n📍 Scope: ${getScopeDescription(scope)}`);
-    if (scope === 'global') {
-      console.log(`💡 This package can be used across all workspaces`);
-    } else if (scope === 'local') {
-      console.log(`💡 This package is local to the current workspace`);
+    if (isCustomPath) {
+      console.log(`\n📍 Location: Custom path (${displayPath})`);
+      console.log(`💡 This package is at a custom location you specified`);
+    } else if (scope) {
+      console.log(`\n📍 Scope: ${getScopeDescription(scope)}`);
+      if (scope === 'global') {
+        console.log(`💡 This package can be used across all workspaces`);
+      } else if (scope === 'local') {
+        console.log(`💡 This package is local to the current workspace`);
+      }
     }
 
     // Step 9: Return success with context
@@ -192,8 +260,8 @@ export async function createPackage(
         packageYmlPath,
         packageRootDir: packageDir,
         packageFilesDir: packageDir,
-        location: scope === 'root' ? 'root' : 'nested',
-        isCwdPackage: scope === 'root',
+        location: (isCustomPath || (scope && scope === 'root')) ? 'root' : 'nested',
+        isCwdPackage: !isCustomPath && scope === 'root',
         isNew: !existingYml
       },
       wasExisting: existingYml

@@ -17,13 +17,22 @@ export type PackageScope = 'root' | 'local' | 'global';
  * @param cwd - Current working directory
  * @param scope - Package scope
  * @param packageName - Package name (required for local/global, ignored for root)
+ * @param customPath - Optional custom path (overrides scope-based resolution)
  * @returns Absolute path to package directory
  */
 export function getScopePackageDir(
   cwd: string,
   scope: PackageScope,
-  packageName?: string
+  packageName?: string,
+  customPath?: string
 ): string {
+  // Custom path takes precedence over scope
+  if (customPath) {
+    // Note: This is a simple delegation - full validation happens elsewhere
+    // This function just returns the path for consistency with the API
+    return customPath;
+  }
+
   if (scope === 'root') {
     // Root scope: current directory is the package
     return cwd;
@@ -61,14 +70,16 @@ export function getScopePackageDir(
  * @param cwd - Current working directory
  * @param scope - Package scope
  * @param packageName - Package name (required for local/global, ignored for root)
+ * @param customPath - Optional custom path (overrides scope-based resolution)
  * @returns Absolute path to openpackage.yml
  */
 export function getScopePackageYmlPath(
   cwd: string,
   scope: PackageScope,
-  packageName?: string
+  packageName?: string,
+  customPath?: string
 ): string {
-  const packageDir = getScopePackageDir(cwd, scope, packageName);
+  const packageDir = getScopePackageDir(cwd, scope, packageName, customPath);
   return join(packageDir, 'openpackage.yml');
 }
 
@@ -134,9 +145,18 @@ export function getScopeDescription(scope: PackageScope): string {
  * 
  * @param scope - Package scope
  * @param packageName - Package name (optional)
+ * @param customPath - Optional custom path for display
  * @returns Display path string
  */
-export function getScopeDisplayPath(scope: PackageScope, packageName?: string): string {
+export function getScopeDisplayPath(
+  scope: PackageScope,
+  packageName?: string,
+  customPath?: string
+): string {
+  if (customPath) {
+    return customPath;
+  }
+
   if (scope === 'root') {
     return './openpackage.yml';
   }

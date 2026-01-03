@@ -8,10 +8,11 @@ The `opkg new` command creates new packages with explicit scope support. It repl
 opkg new [package-name] [options]
 ```
 
-Creates a new package with an `openpackage.yml` manifest in one of three scopes:
+Creates a new package with an `openpackage.yml` manifest in one of three predefined scopes or at a custom path:
 - **root**: Current directory as package
 - **local**: Workspace-scoped package (default)
 - **global**: User-scoped package shared across workspaces
+- **custom**: User-specified directory path
 
 ## Command Signature
 
@@ -22,14 +23,17 @@ Creates a new package with an `openpackage.yml` manifest in one of three scopes:
   - Validated against naming rules (lowercase, alphanumeric, hyphens, slashes for scopes)
 
 ### Options
-- `--scope <scope>` - Package scope: `root`, `local`, or `global` (prompts if not specified in interactive mode; required in non-interactive mode)
+- `--scope <scope>` - Package scope: `root`, `local`, or `global` (prompts if not specified in interactive mode)
+- `--path <path>` - Custom directory path for package (overrides `--scope`)
 - `-f, --force` - Overwrite existing package without prompting
 - `--non-interactive` - Skip interactive prompts, use defaults
 - `-h, --help` - Display help for command
 
+**Note:** Either `--scope` or `--path` is required in non-interactive mode. If both are provided, `--path` takes precedence and a warning is issued.
+
 ### Scope Selection
 
-When running interactively **without** the `--scope` flag, you'll be prompted to choose:
+When running interactively **without** the `--scope` or `--path` flag, you'll be prompted to choose:
 
 ```bash
 $ opkg new my-package
@@ -37,9 +41,16 @@ $ opkg new my-package
 ❯ Root (current directory) - Create openpackage.yml here - for standalone/distributable packages
   Local (workspace-scoped) - Create in .openpackage/packages/ - for project-specific packages
   Global (cross-workspace) - Create in ~/.openpackage/packages/ - shared across all workspaces on this machine
+  Custom (specify path) - Create at a custom location you specify
 ```
 
-This ensures you make an explicit choice about where your package lives. For CI/CD and automation, use the `--scope` flag to skip the prompt.
+If you select **Custom**, you'll be prompted to enter a directory path:
+
+```bash
+? Enter the directory path for the package: › ./my-custom-location
+```
+
+This ensures you make an explicit choice about where your package lives. For CI/CD and automation, use the `--scope` or `--path` flag to skip the prompt.
 
 ## Scopes
 
@@ -166,6 +177,109 @@ packages:
     path: ~/.openpackage/packages/shared-utils/
 ```
 
+### Custom Path
+
+**Location:** User-specified directory path
+
+```bash
+opkg new my-package --path ./custom-location
+opkg new my-package --path /opt/packages/my-package
+opkg new my-package --path ~/projects/my-package
+```
+
+**Use Cases:**
+- Monorepo structures with custom package organization
+- Shared team directories outside standard locations
+- Integration with existing project structures
+- Special organizational requirements
+
+**Behavior:**
+- Creates package at the exact path specified
+- Supports relative paths (resolved from cwd)
+- Supports absolute paths
+- Supports tilde expansion (`~` → home directory)
+- Validates parent directory exists before creation
+- Blocks dangerous system directories
+
+**Path Types:**
+
+| Type | Example | Description |
+|------|---------|-------------|
+| Relative | `./my-package` | Relative to current directory |
+| Relative Parent | `../shared/my-package` | Up and across directory tree |
+| Absolute | `/opt/packages/my-package` | Full path from root |
+| Tilde | `~/projects/my-package` | Relative to home directory |
+
+**Example Structure:**
+```
+/custom/location/
+└── my-package/
+    ├── openpackage.yml          # Package manifest
+    ├── .cursor/                 # Platform-specific content
+    │   ├── rules/
+    │   └── commands/
+    └── root/                    # Root files
+```
+
+**Safety Features:**
+- **Parent Validation**: Ensures parent directory exists before creating package
+- **System Directory Protection**: Blocks creation in `/usr`, `/bin`, `/etc`, etc.
+- **Existence Checking**: Detects existing packages and requires `--force` to overwrite
+- **Clear Errors**: Provides actionable error messages when validation fails
+
+**Installation:**
+Custom path packages can be installed by path:
+```bash
+opkg install --path ./custom-location/my-package
+# or
+opkg install /opt/packages/my-package
+```
+
+**Priority**: When using custom paths, the package is treated similarly to root-scoped packages. Installation and management are done via explicit path references.
+
+**Interactive Example:**
+```bash
+$ opkg new
+? Where should this package be created? › Custom (specify path)
+? Enter the directory path for the package: › ./my-custom-location
+? Package name: › my-package
+? Description: › My custom package
+✓ my-custom-location/openpackage.yml created
+
+📍 Location: Custom path (./my-custom-location)
+💡 This package is at a custom location you specified
+
+💡 Next steps:
+   1. Add files to your package at: ./my-custom-location
+   2. Install to workspace with path: opkg install --path ./my-custom-location
+```
+
+**Non-Interactive Example:**
+```bash
+$ opkg new my-package --path ./custom-location --non-interactive
+✓ custom-location/openpackage.yml created
+  - Name: my-package
+
+📍 Location: Custom path (./custom-location)
+💡 This package is at a custom location you specified
+```
+
+**Error Examples:**
+```bash
+# Parent directory doesn't exist
+$ opkg new test --path ./non-existent/package
+Error: Parent directory does not exist: /path/to/non-existent
+Please create it first or choose a different path.
+
+# System directory blocked
+$ opkg new test --path /usr/my-package
+Error: Cannot create package in system directory: /usr/my-package
+
+# Both flags provided (warning)
+$ opkg new test --scope local --path ./custom
+# Uses custom path, logs warning about --scope being ignored
+```
+
 ## Behavior Details
 
 ### Interactive Mode (Default)
@@ -244,11 +358,28 @@ This separation keeps package creation (scaffolding) distinct from package usage
 
 ### Error Handling
 
+#### Missing Scope or Path (Non-Interactive)
+```bash
+$ opkg new my-package --non-interactive
+Error: Either --scope or --path is required in non-interactive mode.
+
+Usage with scope:
+  opkg new [package-name] --scope <root|local|global> --non-interactive
+
+Usage with custom path:
+  opkg new [package-name] --path <directory> --non-interactive
+
+Available scopes:
+  root   - Create in current directory
+  local  - Create in .openpackage/packages/
+  global - Create in ~/.openpackage/packages/
+```
+
 #### Missing Package Name
 ```bash
-$ opkg new --scope local
-Error: Package name is required for local scope.
-Usage: opkg new <package-name> --scope local
+$ opkg new --scope local --non-interactive
+Error: Package name is required for local scope in non-interactive mode.
+Usage: opkg new <package-name> --scope local --non-interactive
 ```
 
 #### Invalid Scope
@@ -263,6 +394,32 @@ Valid scopes: root, local, global
 $ opkg new My-Package
 Error: Package name 'My-Package' is invalid.
 Package names must be lowercase...
+```
+
+#### Custom Path: Non-Existent Parent Directory
+```bash
+$ opkg new my-package --path ./non-existent/package
+Error: Parent directory does not exist: /path/to/non-existent
+Please create it first or choose a different path.
+```
+
+#### Custom Path: System Directory Blocked
+```bash
+$ opkg new my-package --path /usr/my-package
+Error: Cannot create package in system directory: /usr/my-package
+```
+
+#### Custom Path: Already Exists Without Force
+```bash
+$ opkg new my-package --path ./existing
+Error: Package already exists at: /path/to/existing
+Use --force to overwrite.
+```
+
+#### Custom Path: Empty Path
+```bash
+$ opkg new my-package --path ""
+Error: Path cannot be empty
 ```
 
 ## Output Format
@@ -400,6 +557,88 @@ $ opkg new @myorg/utils
 💡 This package is local to the current workspace
 ```
 
+### Create Package at Custom Path (Interactive)
+```bash
+$ opkg new my-package
+? Where should this package be created? › Custom (specify path)
+? Enter the directory path for the package: › ./custom-location
+? Package name: › my-package
+? Description: › Custom location package
+? Keywords (space-separated): › 
+? Private package? › No
+
+✓ custom-location/openpackage.yml created
+  - Name: my-package
+  - Description: Custom location package
+
+📍 Location: Custom path (./custom-location)
+💡 This package is at a custom location you specified
+
+💡 Next steps:
+   1. Add files to your package at: ./custom-location
+   2. Install to workspace with path: opkg install --path ./custom-location
+```
+
+### Create Package at Custom Path (Relative)
+```bash
+$ opkg new my-package --path ./custom-location --non-interactive
+✓ custom-location/openpackage.yml created
+  - Name: my-package
+
+📍 Location: Custom path (./custom-location)
+💡 This package is at a custom location you specified
+
+💡 Next steps:
+   1. Add files to your package at: ./custom-location
+   2. Install to workspace with path: opkg install --path ./custom-location
+```
+
+### Create Package at Custom Path (Absolute)
+```bash
+$ opkg new my-package --path /opt/packages/my-package --non-interactive
+✓ /opt/packages/my-package/openpackage.yml created
+  - Name: my-package
+
+📍 Location: Custom path (/opt/packages/my-package)
+💡 This package is at a custom location you specified
+
+💡 Next steps:
+   1. Add files to your package at: /opt/packages/my-package
+   2. Install to workspace with path: opkg install --path /opt/packages/my-package
+```
+
+### Create Package at Custom Path (Tilde)
+```bash
+$ opkg new my-package --path ~/projects/my-package --non-interactive
+✓ /Users/user/projects/my-package/openpackage.yml created
+  - Name: my-package
+
+📍 Location: Custom path (~/projects/my-package)
+💡 This package is at a custom location you specified
+
+💡 Next steps:
+   1. Add files to your package at: ~/projects/my-package
+   2. Install to workspace with path: opkg install --path ~/projects/my-package
+```
+
+### Custom Path with Monorepo Structure
+```bash
+# Create package in monorepo packages directory
+$ opkg new shared-components --path ../packages/shared-components --non-interactive
+✓ ../packages/shared-components/openpackage.yml created
+  - Name: shared-components
+
+📍 Location: Custom path (../packages/shared-components)
+💡 This package is at a custom location you specified
+
+# Resulting structure:
+# project-root/
+# ├── workspace-a/        (current directory)
+# └── packages/
+#     └── shared-components/
+#         └── openpackage.yml
+```
+
 ## Integration with Other Commands
 
 ### After `opkg new`
@@ -437,6 +676,18 @@ opkg pack                         # Pack to registry
 opkg push my-package              # Share to remote registry
 ```
 
+**Custom Path Package Workflow:**
+```bash
+opkg new my-package --path ./custom-location  # Create at custom path
+cd custom-location/
+# Add files (rules, commands, etc.)
+opkg save --path ./custom-location           # Save changes (if applicable)
+opkg pack --path ./custom-location           # Create stable release
+
+# In any workspace:
+opkg install --path /path/to/custom-location  # Install by path
+```
+
 ### Auto-Creation by Other Commands
 
 The `opkg add` command may auto-create a root package if needed:
@@ -460,8 +711,9 @@ $ opkg add ./rules/example.md
 | **Root Package** | `opkg init` | `opkg new --scope root` |
 | **Local Package** | `opkg init <name>` | `opkg new <name>` |
 | **Global Package** | ❌ Not supported | `opkg new <name> --scope global` |
+| **Custom Path** | ❌ Not supported | `opkg new <name> --path <dir>` |
 | **Workspace Init** | Manual required | Auto-created when needed |
-| **Scope Clarity** | Implicit | Explicit with `--scope` |
+| **Scope Clarity** | Implicit | Explicit with `--scope` or `--path` |
 | **Overwrite** | `--force` | `--force` (same) |
 | **Interactive** | Yes (default) | Yes (default) |
 
@@ -470,20 +722,43 @@ $ opkg add ./rules/example.md
 ### Core Logic
 - Implemented in `src/commands/new.ts` (CLI interface)
 - Core logic in `src/core/package-creation.ts` (business logic)
-- Path resolution in `src/utils/scope-resolution.ts` (pure functions)
+- Scope-based path resolution in `src/utils/scope-resolution.ts` (pure functions)
+- Custom path resolution in `src/utils/custom-path-resolution.ts` (pure functions)
 
 ### Design Patterns
 - **Separation of Concerns**: CLI, business logic, and utilities separated
 - **Single Responsibility**: Each module has one clear purpose
 - **Reusability**: `createPackage()` used by both `new` command and `add` pipeline
 - **Testability**: Pure functions for path resolution, testable business logic
+- **Modularity**: Custom path logic isolated in dedicated utility module
+
+### Custom Path Implementation
+The custom path feature follows these principles:
+1. **Validation First**: Validate path before any file operations
+2. **Clear Errors**: Provide actionable error messages with context
+3. **Safety Checks**: Block dangerous system directories
+4. **Path Types**: Support relative, absolute, and tilde paths
+5. **Precedence**: `--path` takes precedence over `--scope` when both provided
+
+**Key Functions** (`src/utils/custom-path-resolution.ts`):
+- `resolveCustomPath()` - Resolves any path type to absolute path
+- `validateCustomPath()` - Validates path safety and existence
+- `formatCustomPathForDisplay()` - Formats paths for user output
 
 ### Extensibility
-Adding a new scope (e.g., "team"):
+
+#### Adding a New Predefined Scope (e.g., "team")
 1. Add to `PackageScope` type in `scope-resolution.ts`
 2. Add path resolution in `getScopePackageDir()`
 3. Add description in `getScopeDescription()`
 4. Update command help text
+5. Add to interactive prompt choices
+
+#### Adding Custom Path Validation Rules
+1. Extend `validateCustomPath()` in `custom-path-resolution.ts`
+2. Add new validation checks as needed
+3. Return structured error messages
+4. Update tests to cover new rules
 
 ## See Also
 
