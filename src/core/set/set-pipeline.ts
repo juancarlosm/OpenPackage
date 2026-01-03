@@ -13,7 +13,7 @@ import { parsePackageYml, writePackageYml } from '../../utils/package-yml.js';
 import { exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { normalizePackageName, validatePackageName } from '../../utils/package-name.js';
-import { ValidationError } from '../../utils/errors.js';
+import { ValidationError, UserCancellationError } from '../../utils/errors.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
 import { promptConfirmation, safePrompts } from '../../utils/prompts.js';
 import { 
@@ -406,10 +406,7 @@ export async function runSetPipeline(
     if (!options.force && isInteractive) {
       const confirmed = await promptConfirmation('Apply these changes?', true);
       if (!confirmed) {
-        return {
-          success: false,
-          error: 'Operation cancelled by user'
-        };
+        throw new UserCancellationError();
       }
     }
     
@@ -441,6 +438,10 @@ export async function runSetPipeline(
     };
     
   } catch (error) {
+    if (error instanceof UserCancellationError) {
+      throw error;
+    }
+    
     const message = error instanceof Error ? error.message : String(error);
     logger.error('Set pipeline failed', { error: message });
     

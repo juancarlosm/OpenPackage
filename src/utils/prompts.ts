@@ -130,7 +130,7 @@ export async function promptPackageScope(): Promise<PackageScope> {
         value: 'global'
       }
     ],
-    initial: 0, // Default to root (first option)
+    initial: 1, // Default to Local
     hint: 'Use arrow keys to navigate, Enter to select'
   });
 

@@ -9,6 +9,7 @@ import { collectRemovalEntries, type RemovalEntry } from './removal-collector.js
 import { confirmRemoval } from './removal-confirmation.js';
 import { exists, remove } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
+import { UserCancellationError } from '../../utils/errors.js';
 
 export interface RemoveFromSourceOptions {
   apply?: boolean;
@@ -79,6 +80,9 @@ export async function runRemoveFromSourcePipeline(
   try {
     await confirmRemoval(source.packageName, entries, options);
   } catch (error) {
+    if (error instanceof UserCancellationError) {
+      throw error;
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Removal cancelled by user.'
