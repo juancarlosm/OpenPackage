@@ -132,7 +132,6 @@ export async function runPathInstallPipeline(
         mode: resolutionMode,
         profile: options.profile,
         apiKey: options.apiKey,
-        preferStable: options.stable ?? false,
         onWarning: (message: string) => {
           warnings.push(message);
           console.log(`⚠️  ${message}`);

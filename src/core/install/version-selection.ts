@@ -180,7 +180,7 @@ export async function gatherVersionSourcesForInstall(args: GatherVersionSourcesA
 export async function selectVersionForInstall(args: InstallVersionSelectionArgs): Promise<InstallVersionSelectionResult> {
   const sources = await gatherVersionSourcesForInstall(args);
   
-  // Merge preferStable from selectionOptions if provided
+  // Merge selection options with explicit prerelease intent if provided
   const selectionOptions: VersionSelectionOptions = {
     ...(args.selectionOptions ?? {}),
     ...(args.explicitPrereleaseIntent ? { explicitPrereleaseIntent: true } : {})

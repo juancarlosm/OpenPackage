@@ -17,7 +17,6 @@ export interface ResolveRegistryVersionOptions {
   mode?: InstallResolutionMode;
   profile?: string;
   apiKey?: string;
-  preferStable?: boolean;
   explicitPrereleaseIntent?: boolean;
 }
 
@@ -45,7 +44,6 @@ export async function resolveRegistryVersion(
     packageName: normalizedName,
     constraint,
     mode,
-    selectionOptions: options.preferStable ? { preferStable: true } : undefined,
     explicitPrereleaseIntent: options.explicitPrereleaseIntent,
     profile: options.profile,
     apiKey: options.apiKey

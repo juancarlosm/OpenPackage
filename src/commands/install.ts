@@ -198,7 +198,6 @@ export function setupInstallCommand(program: Command): void {
     .option('--platforms <platforms...>', 'prepare specific platforms (e.g., cursor claudecode opencode)')
     .option('--remote', 'pull and install from remote registry, ignoring local versions')
     .option('--local', 'resolve and install using only local registry versions, skipping remote metadata and pulls')
-    .option('--stable', 'prefer the latest stable version when resolving; ignore newer prerelease/WIP versions if a satisfying stable exists')
     .option('--profile <profile>', 'profile to use for authentication')
     .option('--api-key <key>', 'API key for authentication (overrides profile)')
     .action(withErrorHandling(async (packageName: string | undefined, options: InstallOptions) => {

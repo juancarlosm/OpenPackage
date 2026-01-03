@@ -271,11 +271,6 @@ export function classifyVersions(versions: string[]): VersionClassification {
 
 export interface VersionSelectionOptions {
   explicitPrereleaseIntent?: boolean;
-  /**
-   * When true, prefer stable versions over prerelease/WIP where possible (stable-preferred policy).
-   * When false or undefined (default), select the highest semver version regardless of stable vs prerelease (latest-wins policy).
-   */
-  preferStable?: boolean;
 }
 
 export interface VersionSelectionResult {
@@ -374,45 +369,7 @@ export function selectVersionWithWipPolicy(
     ...filterSatisfying(availablePrerelease, normalizedRange, true)
   );
 
-  // Stable-preferred policy (used with --stable flag)
-  if (options?.preferStable) {
-    if (parsedRange.type === 'wildcard') {
-      result.reason = 'wildcard';
-      if (satisfyingStable.length > 0) {
-        result.version = satisfyingStable[0];
-        return finish();
-      }
-      if (satisfyingPrerelease.length > 0) {
-        result.version = satisfyingPrerelease[0];
-        result.isPrerelease = true;
-      }
-      return finish();
-    }
-
-    result.reason = 'range';
-    if (satisfyingStable.length > 0) {
-      result.version = satisfyingStable[0];
-      return finish();
-    }
-
-    if (satisfyingPrerelease.length === 0) {
-      return finish();
-    }
-
-    const explicitIntent =
-      options?.explicitPrereleaseIntent ??
-      hasExplicitPrereleaseIntent(parsedRange.original);
-    const stableExistsAnywhere = availableStable.length > 0;
-
-    if (explicitIntent || !stableExistsAnywhere) {
-      result.version = satisfyingPrerelease[0];
-      result.isPrerelease = true;
-    }
-
-    return finish();
-  }
-
-  // Default policy: Latest wins (stable and WIP treated uniformly)
+  // Latest wins policy: stable and WIP treated uniformly
   const allSatisfying = sortVersionsDesc([
     ...satisfyingStable,
     ...satisfyingPrerelease

@@ -102,20 +102,15 @@ Given `available: string[]` and a parsed constraint:
   - Otherwise:
     - Fail with **"version not found"** and list the nearest available versions (see error UX section).
 
-- **If constraint is `wildcard` / `latest`** (default behavior):
+- **If constraint is `wildcard` / `latest`**:
   - Use `semver.maxSatisfying(available, '*', { includePrerelease: true })` to find the **highest semver version**.
   - **Select the single highest semver version**, stable or pre-release (if only `0.0.0` exists, it is selected).
   - If the selected version is a pre-release, the CLI should make that explicit in its output.
 
-- **If constraint is `caret`, `tilde`, or `comparison`** (default behavior):
+- **If constraint is `caret`, `tilde`, or `comparison`**:
   - Use `semver.maxSatisfying(available, range, { includePrerelease: true })` to find the **highest satisfying version**.
   - **Select that version** (stable or pre-release). `0.0.0` satisfies ranges according to standard semver rules.
   - No additional "downgrade pre-release to stable" heuristic is applied; pre-release versions are first-class semver versions for resolution purposes.
-
-- **With `--stable` flag**:
-  - The selection follows the **stable-preferred policy** described in §5.2.
-  - For wildcard/ranges: if any satisfying stable version exists, pick the **latest satisfying stable**.
-  - Only pick a pre-release when **no satisfying stable exists at all**.
 
 If no version satisfies the constraint:
 
@@ -137,7 +132,7 @@ If no version satisfies the constraint:
 - Let **`P(S)`** be the set of pre-release versions derived from `S`, e.g.:
   - `1.2.3-beta.1`.
 
-### 5.2 Default policy: Latest wins (stable and pre-release treated uniformly)
+### 5.2 Latest wins policy (stable and pre-release treated uniformly)
 
 - **Latest-in-range selection**:
   - Among all versions that satisfy the constraint, **choose the highest semver version** according to normal semver ordering (with pre-releases ordered per semver).
@@ -147,26 +142,6 @@ If no version satisfies the constraint:
 - **Pre-release transparency**:
   - When the chosen version is a pre-release, the CLI **surfaces that fact** in messages and summaries, but does not alter the chosen version.
   - This helps users understand when they're working with pre-release code.
-
-### 5.3 Stable-preferred policy (used with `--stable` flag)
-
-- **Stable dominates pre-release for the same base line**:
-  - If both:
-    - A stable `S`, and
-    - One or more pre-releases in `P(S)`
-    **satisfy the constraint**, then:
-    - **Select `S`**, even if some pre-releases have a higher pre-release ordering.
-  - Rationale:
-    - Matches the mental model that **packed stable** is the canonical release.
-    - Useful for CI/production scenarios where stability is preferred.
-
-- **Pre-release only when stable is not an option**:
-  - If:
-    - No stable versions exist in `available` that satisfy the constraint, but
-    - One or more pre-release versions do:
-    - The resolver picks the **latest pre-release** that satisfies the constraint.
-  - For implicit "latest" / wildcard constraints:
-    - If **any stable versions** exist at all for that package (even if outside the requested range), prefer telling the user to **widen the range** rather than silently pulling a pre-release.
 
 ---
 
@@ -191,41 +166,22 @@ If no version satisfies the constraint:
         - When remote metadata is available, expand `available` to **`dedup(local ∪ remote)`** and retry selection.
         - Only if **no satisfying version exists in either local or remote**, or remote lookup fails, does the operation error.
 
-- **Default behavior (given an `available` set)**:
+- **Behavior (given an `available` set)**:
   - Use `semver.maxSatisfying(available, '*', { includePrerelease: true })` to find the **highest semver version**.
   - Select that version (stable or pre-release).
   - If the selected version is a pre-release, the CLI output should make that explicit.
 
-- **With `--stable` flag**:
-  - If **stable versions exist** in `available`, select the **latest stable**.
-  - If **no stable versions exist**:
-    - Select the **latest pre-release**.
-    - The summary should make it explicit that a **pre-release** was chosen.
-
 ### 6.3 Caret / tilde (`^`, `~`)
 
-- **Default behavior**:
+- **Behavior**:
   - Use `maxSatisfying` with `{ includePrerelease: true }` to find the **highest satisfying version**.
   - Select that version directly (stable or pre-release), using the `available` pool determined by the mode and scenario in §2–§3 (including local-first-with-fallback for fresh dependencies).
-
-- **With `--stable` flag**:
-  - Use `maxSatisfying` with `{ includePrerelease: true }` to find the **highest satisfying version**.
-  - Then:
-    - If that best version is **stable**, use it.
-    - If it is a **pre-release**:
-      - Check whether the **base stable line** of that pre-release (`S`) also has a stable version in `available` satisfying the range.
-      - If yes, **pick `S` instead**.
-      - If no, accept the pre-release version.
 
 ### 6.4 Comparison ranges
 
-- **Default behavior**:
+- **Behavior**:
   - Use `semver.maxSatisfying(available, range, { includePrerelease: true })` to find the **highest satisfying version**.
   - Select that version directly (stable or pre-release), using the `available` pool determined by the mode and scenario in §2–§3 (including local-first-with-fallback for fresh dependencies).
-
-- **With `--stable` flag**:
-  - Same as caret/tilde with `--stable`, but using the exact comparison string.
-  - The stable-preferred rules from §5.3 apply.
 
 ---
 
@@ -257,21 +213,19 @@ These examples assume remote is reachable.
   - Remote: `1.3.1`
   - Selected: **`1.3.1`**.
 
-- **Example 2 – Pre-release and stable (default behavior)**:
+- **Example 2 – Pre-release and stable**:
   - `openpackage.yml`: `foo: ^1.2.0`
   - Local: `1.2.3-beta.1`, `1.2.3`, `1.3.0-beta.2`
   - Remote: `1.3.0`
   - Satisfying: `1.2.3`, `1.3.0-beta.2`, `1.3.0`
   - Selected: **`1.3.0`** (highest semver version).
-  - With `--stable`: **`1.3.0`** (same result, stable preferred).
 
 - **Example 2b – Pre-release and stable (pre-release is newer)**:
   - `openpackage.yml`: `foo: ^1.2.0`
   - Local: `1.2.3`, `1.3.0-beta.2`
   - Remote: `1.3.0`
   - Satisfying: `1.2.3`, `1.3.0-beta.2`, `1.3.0`
-  - Selected (default): **`1.3.0-beta.2`** (highest semver, even though pre-release).
-  - With `--stable`: **`1.3.0`** (stable preferred over pre-release).
+  - Selected: **`1.3.0-beta.2`** (highest semver, even though pre-release).
 
 - **Example 3 – No stable exists**:
   - `openpackage.yml`: `foo: ^1.0.0-0` (or explicit pre-release).

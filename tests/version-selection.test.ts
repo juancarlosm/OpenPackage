@@ -35,23 +35,6 @@ expectEqual(
   'latest WIP selection prerelease flag'
 );
 
-// Test: --stable behavior (prefer stable) - should prefer stable even if WIP is newer
-const stablePreferredSelection = selectVersionWithWipPolicy(
-  ['1.0.0', '1.0.1-000fz8.a3k'],
-  '*',
-  { preferStable: true }
-);
-expectEqual(
-  stablePreferredSelection.version,
-  '1.0.0',
-  '--stable prefers stable over newer WIP'
-);
-expectEqual(
-  stablePreferredSelection.isPrerelease,
-  false,
-  'stable preferred selection prerelease flag'
-);
-
 // Test: Wildcard with only WIP available (default behavior)
 const wildcardSelection = selectVersionWithWipPolicy(
   ['0.1.0-wip.local'],

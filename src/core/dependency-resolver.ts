@@ -69,7 +69,6 @@ interface DependencyResolverOptions {
   profile?: string;
   apiKey?: string;
   onWarning?: (message: string) => void;
-  preferStable?: boolean;
 }
 
 export interface ResolveDependenciesResult {
@@ -403,7 +402,6 @@ export async function resolveDependencies(
       packageName,
       constraint: '*',
       mode: resolutionMode,
-      selectionOptions: resolverOptions.preferStable ? { preferStable: true } : undefined,
       explicitPrereleaseIntent,
       profile: resolverOptions.profile,
       apiKey: resolverOptions.apiKey,

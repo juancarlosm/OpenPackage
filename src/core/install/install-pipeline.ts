@@ -202,12 +202,10 @@ export async function runInstallPipeline(
     }
   }
 
-  const selectionOptions = options.stable ? { preferStable: true } : undefined;
   const preselection = await selectInstallVersionUnified({
     packageName: options.packageName,
     constraint: canonicalPlan.effectiveRange,
     mode: resolutionMode,
-    selectionOptions,
     profile: options.profile,
     apiKey: options.apiKey,
     localVersions: localSources.localVersions

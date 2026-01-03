@@ -158,7 +158,7 @@ packages:
   - **Meaning**: Shorthand for GitHub git installs. Equivalent to:
     - `opkg install git:https://github.com/<owner>/<repo>.git[#ref]`
 
-Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, conflicts) keep their existing semantics unless overridden below.
+Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, conflicts) keep their existing semantics unless overridden below.
 
 ---
 
@@ -195,11 +195,10 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
 - **Behavior**:
   - **Case A – `opkg install <name>` (no version spec)**:
     - Compute **available versions** from the **local registry only** for the first resolution attempt (no remote metadata is consulted initially).
-    - **Default behavior**: Select the **latest semver version** from this local set that satisfies the internal wildcard range (`*`), including pre-releases when applicable. If the selected version is a pre-release, the CLI should state that explicitly.
-    - **With `--stable` flag**: From the local set, select the **latest stable** version `S` if any exist. If only pre-releases exist locally, select the latest pre-release.
+    - Select the **latest semver version** from this local set that satisfies the internal wildcard range (`*`), including pre-releases when applicable. If the selected version is a pre-release, the CLI should state that explicitly.
     - If **no local versions exist** or **no local version satisfies the implicit range**:
       - In **default mode** (no `--local`), `install` MUST:
-        - Attempt resolution again including **remote versions**, following the rules in `version-resolution.md` (local+remote union and stable/pre-release policies).
+        - Attempt resolution again including **remote versions**, following the rules in `version-resolution.md` (local+remote union).
         - Only fail if **neither local nor remote** provide a satisfying version, or remote metadata is unavailable.
       - In **`--local` mode**, this remote fallback is **disabled** and the command fails with a clear “not available locally” style error that may suggest re-running without `--local` or using `save` / `pack`.
     - **Install `<name>@<selectedVersion>`**.
@@ -341,17 +340,9 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, `--stable`, confli
 
 High-level rules (details in `version-resolution.md`):
 
-- **Default behavior: Latest-in-range, including pre-releases**:
+- **Latest-in-range, including pre-releases**:
   - For any non-exact constraint (wildcard or range), the resolver chooses the **highest semver version** that satisfies the range, including pre-releases when allowed by semver range rules.
   - When a pre-release is selected, `opkg install` output should clearly indicate that the installed version is a pre-release.
-
-- **With `--stable` flag: Stable-preferred policy**:
-  - For a given base stable `S`, if both:
-    - Stable `S`, and
-    - Pre-releases derived from `S`
-    exist and satisfy the range, **prefer `S`**.
-  - Pre-releases are only selected when **no stable versions** exist that satisfy the range.
-  - This is useful for CI/production scenarios where stability is preferred over the absolute latest version.
 
 ---
 
