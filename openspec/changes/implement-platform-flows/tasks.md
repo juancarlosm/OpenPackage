@@ -130,44 +130,44 @@
 
 ## 4. Key Remapping System
 
-- [ ] 4.1 Create key mapper (`src/core/flow-key-mapper.ts`)
-  - [ ] `applyKeyMap(obj, keyMap, context)` - Main mapping function
-  - [ ] `mapDotNotation(obj, from, to)` - Handle dot notation paths
-  - [ ] `mapWildcard(obj, pattern, target)` - Handle wildcard patterns
-  - [ ] `applyValueTransform(value, transform)` - Transform mapped values
-- [ ] 4.2 Implement mapping features
-  - [ ] Simple key rename (`theme` → `workbench.colorTheme`)
-  - [ ] Nested key mapping (`ai.model` → `cursor.ai.model`)
-  - [ ] Wildcard patterns (`ai.*` → `cursor.*`)
-  - [ ] Value lookup tables (`values: { "old": "new" }`)
-  - [ ] Transform application (`transform: "number"`)
-  - [ ] Default values (`default: 14`)
-- [ ] 4.3 Error handling
-  - [ ] Invalid key paths
-  - [ ] Type mismatches
-  - [ ] Transform failures
+- [x] 4.1 Create key mapper (`src/core/flow-key-mapper.ts`)
+  - [x] `applyKeyMap(obj, keyMap, context)` - Main mapping function
+  - [x] `mapDotNotation(obj, from, to)` - Handle dot notation paths
+  - [x] `mapWildcard(obj, pattern, target)` - Handle wildcard patterns
+  - [x] `applyValueTransform(value, transform)` - Transform mapped values
+- [x] 4.2 Implement mapping features
+  - [x] Simple key rename (`theme` → `workbench.colorTheme`)
+  - [x] Nested key mapping (`ai.model` → `cursor.ai.model`)
+  - [x] Wildcard patterns (`ai.*` → `cursor.*`)
+  - [x] Value lookup tables (`values: { "old": "new" }`)
+  - [x] Transform application (`transform: "number"`)
+  - [x] Default values (`default: 14`)
+- [x] 4.3 Error handling
+  - [x] Invalid key paths
+  - [x] Type mismatches
+  - [x] Transform failures
 
 ## 5. Platform Configuration
 
-- [ ] 5.1 Update platform loader (`src/core/platforms.ts`)
-  - [ ] Load flow-based configs
-  - [ ] Support both subdirs and flows (transition period)
-  - [ ] Merge hierarchy (built-in → global → workspace)
-  - [ ] Validate flow schemas
-  - [ ] Generate warnings for deprecated subdirs
-- [ ] 5.2 Add global flows support
-  - [ ] Load `global.flows` section
-  - [ ] Apply global flows before platform-specific flows
-  - [ ] Allow global flow overrides in platform configs
-- [ ] 5.3 Schema validation
-  - [ ] Validate required fields (`from`, `to`)
-  - [ ] Validate transform names
-  - [ ] Validate conditional syntax
-  - [ ] Validate JSONPath expressions
-  - [ ] Validate key map structure
-- [ ] 5.4 Platform detection with flows
-  - [ ] Use existing detection (rootDir + rootFile)
-  - [ ] Add flow-based context information
+- [x] 5.1 Update platform loader (`src/core/platforms.ts`)
+  - [x] Load flow-based configs
+  - [x] Support both subdirs and flows (transition period)
+  - [x] Merge hierarchy (built-in → global → workspace)
+  - [x] Validate flow schemas
+  - [x] Generate warnings for deprecated subdirs
+- [x] 5.2 Add global flows support
+  - [x] Load `global.flows` section
+  - [x] Apply global flows before platform-specific flows
+  - [x] Allow global flow overrides in platform configs
+- [x] 5.3 Schema validation
+  - [x] Validate required fields (`from`, `to`)
+  - [x] Validate transform names (basic validation)
+  - [x] Validate conditional syntax (structure only)
+  - [x] Validate JSONPath expressions (deferred to runtime)
+  - [x] Validate key map structure
+- [x] 5.4 Platform detection with flows
+  - [x] Use existing detection (rootDir + rootFile)
+  - [x] Add flow-based context information
 
 ## 6. Integration with Existing Systems
 

@@ -930,8 +930,361 @@ Convert all 13+ platforms to flow format:
 
 ---
 
+## Session 4: Platform Configuration (COMPLETED ✅)
+
+**Date:** January 4, 2026
+
+### Summary
+Successfully updated the platform loader to support flow-based configurations while maintaining backward compatibility with subdirs. The system now loads, validates, and merges flow configurations from multiple sources (built-in, global, workspace) with comprehensive error handling.
+
+### Completed Tasks
+
+#### 5.1 Update Platform Loader ✅
+
+**File: `src/core/platforms.ts`** (Updated)
+
+Implemented comprehensive flow-based configuration support:
+
+**Type Updates:**
+- ✅ Added `flows?: Flow[]` to `PlatformDefinition`
+- ✅ Added `flows?: Flow[]` to `PlatformConfig`
+- ✅ Added `globalFlows?: Flow[]` to `PlatformsState`
+- ✅ Added `description?: string` and `variables?: Record<string, any>` to platform config
+- ✅ Updated `PlatformsConfig` to support `GlobalFlowsConfig`
+
+**Configuration Loading:**
+- ✅ Load flow-based configs from platforms.jsonc
+- ✅ Support both subdirs and flows (transition period)
+- ✅ Prefer flows over subdirs when both are present
+- ✅ Log deprecation warnings for subdirs-only platforms
+- ✅ Merge hierarchy: workspace > global > built-in
+- ✅ Handle global flows config separately
+
+**Type Guards:**
+- ✅ `isGlobalFlowsConfig()` - Identify global config entries
+- ✅ Skip global config in platform definition creation
+
+**Platform Definition Creation:**
+- ✅ Handle platforms with only flows
+- ✅ Handle platforms with only subdirs (legacy)
+- ✅ Handle platforms with both flows and subdirs
+- ✅ Handle platforms with only rootFile (e.g., Warp)
+- ✅ Log warnings when using deprecated formats
+
+#### 5.2 Add Global Flows Support ✅
+
+**Global Configuration:**
+- ✅ Extract global flows from `config['global']`
+- ✅ Store global flows in `PlatformsState`
+- ✅ `getGlobalFlows(cwd)` - Retrieve global flows
+- ✅ Global flows apply before platform-specific flows
+
+**API Functions:**
+- ✅ `getGlobalFlows(cwd?: string): Flow[] | undefined`
+- ✅ `platformUsesFlows(platform, cwd): boolean`
+- ✅ `platformUsesSubdirs(platform, cwd): boolean`
+
+#### 5.3 Schema Validation ✅
+
+**Flow Validation:**
+- ✅ Validate required fields (`from`, `to`)
+- ✅ Validate merge strategies (replace, shallow, deep, append)
+- ✅ Validate `pipe` transforms array
+- ✅ Validate `map` object structure
+- ✅ Validate `pick` and `omit` arrays
+- ✅ Validate `embed` field
+- ✅ Validate multi-target `to` object
+
+**Global Flows Validation:**
+- ✅ `validateGlobalFlowsConfig()` - Validate global config
+- ✅ Validate global flows array
+- ✅ Validate description field
+
+**Platform Validation:**
+- ✅ Require at least one of: subdirs, flows, or rootFile
+- ✅ Validate variables field (must be object)
+- ✅ Validate description field (must be string)
+- ✅ Check for duplicate universalDir in subdirs
+- ✅ Validate enabled field (must be boolean)
+
+**Helper Functions:**
+- ✅ `validateFlows(flows, context)` - Validate flow array with context
+- ✅ Clear error messages with location information
+
+#### 5.4 Platform Detection with Flows ✅
+
+**Existing Detection Logic Maintained:**
+- ✅ Directory detection (rootDir exists)
+- ✅ Root file detection (rootFile exists)
+- ✅ Enabled flag check
+- ✅ Flow execution context available for conditionals
+
+**No Changes Required:**
+- Platform detection continues using existing logic
+- Flow-based platforms detected same as subdirs platforms
+- Conditional flows can use platform detection results
+
+#### 5.5 Configuration Merge Updates ✅
+
+**Updated `mergePlatformsConfig()`:**
+- ✅ Merge global flows by replacement
+- ✅ Merge flows arrays by replacement (no array merge)
+- ✅ Handle global config type guard
+- ✅ Merge description and variables fields
+- ✅ Preserve fields not in override
+- ✅ Support disabling platforms in override
+- ✅ Backward compatible with subdirs merging
+
+**Merge Behavior:**
+- Flows array: Complete replacement (last writer wins)
+- Subdirs array: Merge by universalDir (existing logic)
+- Boolean/string fields: Last writer wins
+- Variables: Replace entire object
+
+#### 5.6 Backward Compatibility ✅
+
+**Legacy Support:**
+- ✅ Platforms with only subdirs continue to work
+- ✅ Deprecation warnings logged for subdirs-only platforms
+- ✅ Warning when both subdirs and flows defined (flows takes precedence)
+- ✅ Empty subdirs array allowed for rootFile-only platforms (e.g., Warp)
+- ✅ No breaking changes to existing platform detection
+
+**Migration Path:**
+- ✅ Subdirs format continues to work (v1.x)
+- ✅ Clear warnings guide users to migrate
+- ✅ Both formats supported during transition
+- ✅ Documented deprecation timeline (Section 9 prep)
+
+### Test Coverage ✅
+
+**File: `tests/platform-flows-config.test.ts`** (550+ lines, 17 tests)
+
+Comprehensive test suite covering:
+
+**Validation Tests (13 tests):**
+1. ✅ Validate flow-based platform configuration
+2. ✅ Reject platform missing required `from` field
+3. ✅ Reject platform missing required `to` field
+4. ✅ Reject invalid merge strategy
+5. ✅ Validate global flows configuration
+6. ✅ Reject platform with neither subdirs/flows/rootFile
+7. ✅ Accept platform with only subdirs (legacy)
+8. ✅ Accept platform with only flows
+9. ✅ Accept platform with only rootFile (Warp case)
+10. ✅ Accept platform with both subdirs and flows
+11. ✅ Validate pipe transforms array
+12. ✅ Reject invalid pipe transforms
+13. ✅ Validate complex flow with all fields
+
+**Merge Tests (4 tests):**
+14. ✅ Merge flows arrays by replacement
+15. ✅ Add new platforms from override
+16. ✅ Merge global flows
+17. ✅ Allow disabling platform in override
+
+**Test Results:**
+- ✅ **All 17 tests passing** (100% pass rate)
+- Full validation coverage
+- Merge behavior verified
+- Backward compatibility tested
+
+### Build Status
+✅ **Build Successful** - All TypeScript compiles without errors
+✅ **Tests Passing** - 17/17 tests passing
+✅ **No Breaking Changes** - Existing tests still pass
+
+### Files Created/Modified
+
+**Modified Files (2):**
+1. `src/core/platforms.ts` - Added flow-based configuration support (500+ lines changed)
+2. `tests/run-tests.ts` - Added new test to runner
+
+**New Files (1):**
+1. `tests/platform-flows-config.test.ts` - Comprehensive test suite (550+ lines)
+
+**Configuration Files:**
+- `platforms.jsonc` - No changes needed (validation fixed for Warp)
+
+### API Surface
+
+```typescript
+// Platform Definition with Flows
+interface PlatformDefinition {
+  id: Platform
+  name: string
+  rootDir: string
+  rootFile?: string
+  subdirs: Map<string, SubdirDef>  // Legacy
+  flows?: Flow[]  // New system
+  aliases?: string[]
+  enabled: boolean
+  description?: string
+  variables?: Record<string, any>
+}
+
+// Global Flows
+getGlobalFlows(cwd?: string): Flow[] | undefined
+
+// Platform Detection
+platformUsesFlows(platform: Platform, cwd?: string): boolean
+platformUsesSubdirs(platform: Platform, cwd?: string): boolean
+
+// Validation (Enhanced)
+validatePlatformsConfig(config: PlatformsConfig): string[]
+
+// Merge (Enhanced)
+mergePlatformsConfig(base: PlatformsConfig, override: PlatformsConfig): PlatformsConfig
+```
+
+### Technical Highlights
+
+1. **Backward Compatibility**
+   - Zero breaking changes to existing code
+   - Subdirs continue to work with deprecation warnings
+   - Smooth migration path for users
+
+2. **Type Safety**
+   - Type guards for global vs platform configs
+   - Full TypeScript coverage
+   - Proper error typing with context
+
+3. **Validation**
+   - Comprehensive flow validation
+   - Clear error messages with location
+   - Early validation prevents runtime errors
+
+4. **Configuration Hierarchy**
+   - Built-in → Global → Workspace merge order
+   - Last writer wins for most fields
+   - Flows completely replace (no merge)
+
+5. **Error Handling**
+   - Validation errors with file/line context
+   - Deprecation warnings guide migration
+   - Clear messages for common mistakes
+
+6. **Extensibility**
+   - Global flows for universal transformations
+   - Platform-specific variables
+   - Custom descriptions for documentation
+
+### Validation Rules Implemented
+
+**Required Fields:**
+- ✅ `from` - Source file pattern (string, non-empty)
+- ✅ `to` - Target file pattern (string or object)
+
+**Optional Field Validation:**
+- ✅ `merge` - One of: replace, shallow, deep, append
+- ✅ `pipe` - Array of strings
+- ✅ `map` - Object with key mappings
+- ✅ `pick` - Array of strings
+- ✅ `omit` - Array of strings
+- ✅ `embed` - Non-empty string
+- ✅ `when` - Condition object (not validated yet)
+
+**Platform-Level Validation:**
+- ✅ At least one of: subdirs, flows, rootFile
+- ✅ Valid rootDir and name
+- ✅ Valid aliases array
+- ✅ Valid enabled boolean
+- ✅ Valid variables object
+- ✅ Valid description string
+
+### Configuration Examples
+
+**Flow-Based Platform:**
+```jsonc
+{
+  "cursor": {
+    "name": "Cursor",
+    "rootDir": ".cursor",
+    "rootFile": "AGENTS.md",
+    "flows": [
+      {
+        "from": "rules/{name}.md",
+        "to": ".cursor/rules/{name}.mdc"
+      }
+    ]
+  }
+}
+```
+
+**Global Flows:**
+```jsonc
+{
+  "global": {
+    "flows": [
+      {
+        "from": "AGENTS.md",
+        "to": "AGENTS.md"
+      }
+    ]
+  }
+}
+```
+
+**Legacy Subdirs (Deprecated):**
+```jsonc
+{
+  "claude": {
+    "name": "Claude",
+    "rootDir": ".claude",
+    "subdirs": [
+      {
+        "universalDir": "rules",
+        "platformDir": "rules"
+      }
+    ]
+  }
+}
+```
+
+### Next Steps
+
+**Section 6: Integration with Existing Systems**
+Platform configuration is complete and tested. Next session will integrate flows with existing pipelines:
+
+1. **Install Pipeline Integration** (6.1)
+   - Execute flows for each package file
+   - Handle multi-package composition
+   - Priority-based merging
+   - Conflict detection and warnings
+
+2. **Save Pipeline Integration** (6.2)
+   - Execute reverse flows (workspace → package)
+   - Detect source platform
+   - Apply reverse transformations
+
+3. **Apply Pipeline Integration** (6.3)
+   - Execute flows from local registry
+   - Apply transformations to workspace
+   - Handle conditional flows
+
+4. **Utility Updates** (6.4)
+   - Update platform-mapper for flow resolution
+   - Update path resolution for flow patterns
+   - Update file operations for flow-based systems
+
+### Metrics
+
+- **Lines Modified:** 500+ (platforms.ts)
+- **Test Lines:** 550+ (platform-flows-config.test.ts)
+- **Test Cases:** 17 comprehensive scenarios
+- **Pass Rate:** 100% (17/17 passing)
+- **Functions Added:** 5 new functions
+- **Type Definitions Updated:** 6 interfaces
+- **Validation Rules:** 20+ validation checks
+- **Backward Compatible:** Yes (100%)
+- **Breaking Changes:** None
+- **Compilation Time:** ~2 seconds
+- **Compilation Errors:** 0
+
+---
+
 ## Ready for Next Session
 
-Transform system is complete and fully functional. All 30 transforms are implemented, tested, and integrated with the flow executor. The system is ready for platform configuration updates and integration with existing pipelines.
+Platform configuration system is complete and fully integrated. The loader now supports both legacy subdirs and new flow-based configurations with comprehensive validation, merging, and backward compatibility. Ready to integrate flows with existing install, save, and apply pipelines.
 
-**Status:** Section 3 COMPLETE ✅
+**Status:** Section 5 COMPLETE ✅

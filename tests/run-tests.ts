@@ -14,6 +14,7 @@ const testFiles: string[] = [
   'tests/push-stable-selection.test.ts',
   'tests/workspace-paths.test.ts',
   'tests/platform-extension-filter.test.ts',
+  'tests/platform-flows-config.test.ts',
   'tests/pull-partial.test.ts',
   'tests/paths-option.test.ts',
   'tests/push-partial-tarball.test.ts',

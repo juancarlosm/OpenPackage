@@ -37,6 +37,13 @@ import {
   frontmatterTransform,
   bodyTransform
 } from './flow-transforms.js';
+import { 
+  applyKeyMap,
+  getNestedValue,
+  setNestedValue,
+  deleteNestedValue,
+  validateKeyMap
+} from './flow-key-mapper.js';
 
 /**
  * Default flow executor implementation
@@ -265,6 +272,19 @@ export class DefaultFlowExecutor implements FlowExecutor {
           message: `Invalid JSONPath expression: ${flow.path}`,
           code: 'INVALID_JSONPATH',
         });
+      }
+    }
+
+    // Validate key map
+    if (flow.map) {
+      const keyMapValidation = validateKeyMap(flow.map);
+      if (!keyMapValidation.valid) {
+        for (const error of keyMapValidation.errors) {
+          errors.push({
+            message: error,
+            code: 'INVALID_KEY_MAP',
+          });
+        }
       }
     }
 
@@ -561,118 +581,10 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
   /**
    * Map keys according to configuration
+   * Delegates to the dedicated key mapper module
    */
   private mapKeys(data: any, keyMap: any, context: FlowContext): any {
-    if (typeof data !== 'object' || data === null) {
-      return data;
-    }
-
-    const result: any = Array.isArray(data) ? [] : {};
-
-    // Process each mapping
-    for (const [sourceKey, targetConfig] of Object.entries(keyMap)) {
-      const target = typeof targetConfig === 'string' ? targetConfig : (targetConfig as any).to;
-      
-      if (sourceKey.includes('*')) {
-        // Handle wildcard patterns
-        this.mapWildcardKeys(data, sourceKey, targetConfig, result, context);
-      } else {
-        // Simple key mapping
-        const value = this.getNestedValue(data, sourceKey);
-        if (value !== undefined) {
-          let transformedValue = value;
-
-          // Apply value transforms if specified
-          if (typeof targetConfig === 'object' && targetConfig !== null) {
-            const config = targetConfig as any;
-            
-            if (config.transform) {
-              transformedValue = this.applyValueTransform(transformedValue, config.transform);
-            }
-
-            if (config.values && transformedValue in config.values) {
-              transformedValue = config.values[transformedValue];
-            }
-
-            if (transformedValue === undefined && config.default !== undefined) {
-              transformedValue = config.default;
-            }
-          }
-
-          this.setNestedValue(result, target, transformedValue);
-        }
-      }
-    }
-
-    // Copy unmapped keys
-    for (const key of Object.keys(data)) {
-      if (!(key in keyMap) && !(key in result)) {
-        result[key] = data[key];
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Map keys using wildcard patterns
-   */
-  private mapWildcardKeys(data: any, pattern: string, targetConfig: any, result: any, context: FlowContext): void {
-    const prefix = pattern.replace('.*', '');
-    const targetPrefix = typeof targetConfig === 'string' 
-      ? targetConfig.replace('.*', '') 
-      : (targetConfig as any).to.replace('.*', '');
-
-    for (const key of Object.keys(data)) {
-      if (key.startsWith(prefix)) {
-        const suffix = key.substring(prefix.length);
-        const targetKey = targetPrefix + suffix;
-        let value = data[key];
-
-        // Apply transforms
-        if (typeof targetConfig === 'object' && targetConfig !== null) {
-          const config = targetConfig as any;
-          if (config.transform) {
-            value = this.applyValueTransform(value, config.transform);
-          }
-        }
-
-        this.setNestedValue(result, targetKey, value);
-      }
-    }
-  }
-
-  /**
-   * Apply value transform
-   */
-  private applyValueTransform(value: any, transform: string | string[]): any {
-    const transforms = Array.isArray(transform) ? transform : [transform];
-
-    let result = value;
-    for (const t of transforms) {
-      result = this.applySingleTransform(result, t);
-    }
-
-    return result;
-  }
-
-  /**
-   * Apply a single transform to a value
-   */
-  private applySingleTransform(value: any, transform: string): any {
-    try {
-      // Use transform registry for all transforms
-      if (this.transformRegistry.has(transform)) {
-        return this.transformRegistry.execute(transform, value);
-      }
-      
-      // Fallback for backward compatibility
-      logger.warn(`Unknown transform: ${transform}`);
-      return value;
-    } catch (error) {
-      logger.warn(`Transform '${transform}' failed: ${error instanceof Error ? error.message : String(error)}`);
-      return value;
-    }
+    return applyKeyMap(data, keyMap, context);
   }
 
   /**
@@ -980,57 +892,24 @@ export class DefaultFlowExecutor implements FlowExecutor {
   }
 
   /**
-   * Get nested value using dot notation
+   * Get nested value using dot notation (delegates to key mapper)
    */
   private getNestedValue(obj: any, path: string): any {
-    const keys = path.split('.');
-    let current = obj;
-
-    for (const key of keys) {
-      if (current && typeof current === 'object' && key in current) {
-        current = current[key];
-      } else {
-        return undefined;
-      }
-    }
-
-    return current;
+    return getNestedValue(obj, path);
   }
 
   /**
-   * Set nested value using dot notation
+   * Set nested value using dot notation (delegates to key mapper)
    */
   private setNestedValue(obj: any, path: string, value: any): void {
-    const keys = path.split('.');
-    let current = obj;
-
-    for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (!(key in current)) {
-        current[key] = {};
-      }
-      current = current[key];
-    }
-
-    current[keys[keys.length - 1]] = value;
+    setNestedValue(obj, path, value);
   }
 
   /**
-   * Delete nested value using dot notation
+   * Delete nested value using dot notation (delegates to key mapper)
    */
   private deleteNestedValue(obj: any, path: string): void {
-    const keys = path.split('.');
-    let current = obj;
-
-    for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (!(key in current)) {
-        return;
-      }
-      current = current[key];
-    }
-
-    delete current[keys[keys.length - 1]];
+    deleteNestedValue(obj, path);
   }
 }
 
