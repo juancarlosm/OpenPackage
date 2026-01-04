@@ -235,9 +235,81 @@ tabSize: 2
 }
 ```
 
+
+### Pattern 6: Composite Merge for Root Files
+
+**Setup:**
+```jsonc
+{
+  "global": {
+    "flows": [
+      {
+        "from": "AGENTS.md",
+        "to": "AGENTS.md",
+        "when": { "exists": "AGENTS.md" },
+        "merge": "composite"
+      }
+    ]
+  }
+}
+```
+
+**Package A (@user/db-tools): AGENTS.md**
+```markdown
+# Database Tools
+
+Use these tools for database management.
+```
+
+**Package B (@user/api-tools): AGENTS.md**
+```markdown
+# API Tools
+
+Use these tools for API development.
+```
+
+**Result: AGENTS.md**
+```markdown
+<!-- package: @user/db-tools -->
+# Database Tools
+
+Use these tools for database management.
+<!-- -->
+
+<!-- package: @user/api-tools -->
+# API Tools
+
+Use these tools for API development.
+<!-- -->
+```
+
+**Update Package A:**
+```markdown
+# Database Tools - Updated
+
+Enhanced database management tools with new features.
+```
+
+**Result after update: AGENTS.md**
+```markdown
+<!-- package: @user/db-tools -->
+# Database Tools - Updated
+
+Enhanced database management tools with new features.
+<!-- -->
+
+<!-- package: @user/api-tools -->
+# API Tools
+
+Use these tools for API development.
+<!-- -->
+```
+
+**Key benefit:** Each package maintains its own section. Updates don't overwrite other packages.
+
 ## Advanced Transformations
 
-### Pattern 6: Markdown Frontmatter Transform
+### Pattern 7: Markdown Frontmatter Transform
 
 ```jsonc
 {
@@ -287,7 +359,7 @@ Help review code for quality and security.
 
 **Note:** Body unchanged, only frontmatter transformed.
 
-### Pattern 7: Content Embedding
+### Pattern 8: Content Embedding
 
 ```jsonc
 {
@@ -334,7 +406,7 @@ Help review code for quality and security.
 }
 ```
 
-### Pattern 8: TOML Sections
+### Pattern 9: TOML Sections
 
 ```jsonc
 {
@@ -374,7 +446,7 @@ command = "mcp-db"
 args = ["--port", "5432"]
 ```
 
-### Pattern 9: Multi-Target with Different Formats
+### Pattern 10: Multi-Target with Different Formats
 
 ```jsonc
 {
@@ -401,7 +473,7 @@ args = ["--port", "5432"]
 
 ## Conditional Flows
 
-### Pattern 10: Platform-Specific Flow
+### Pattern 11: Platform-Specific Flow
 
 ```jsonc
 {
@@ -419,7 +491,7 @@ args = ["--port", "5432"]
 
 Executes only when Cursor is detected.
 
-### Pattern 11: Development vs Production
+### Pattern 12: Development vs Production
 
 ```jsonc
 {
@@ -446,7 +518,7 @@ Executes only when Cursor is detected.
 }
 ```
 
-### Pattern 12: Multi-Platform Conditional
+### Pattern 13: Multi-Platform Conditional
 
 ```jsonc
 {

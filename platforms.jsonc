@@ -3,12 +3,12 @@
 
   // Global flows that apply to all platforms
   "global": {
-    "description": "Universal flows applied across all platforms",
     "flows": [
       {
         "from": "AGENTS.md",
         "to": "AGENTS.md",
-        "when": { "exists": "AGENTS.md" }
+        "when": { "exists": "AGENTS.md" },
+        "merge": "composite"
       }
     ]
   },
@@ -19,7 +19,6 @@
   "antigravity": {
     "name": "Google Antigravity",
     "rootDir": ".agent",
-    "description": "Google's AI coding agent platform",
     "flows": [
       {
         "from": "rules/*.md",
@@ -35,7 +34,6 @@
   "augment": {
     "name": "Augment Code",
     "rootDir": ".augment",
-    "description": "Augment AI code assistant",
     "flows": [
       {
         "from": "rules/*.md",
@@ -53,11 +51,11 @@
     "rootDir": ".claude",
     "rootFile": "CLAUDE.md",
     "aliases": ["claudecode"],
-    "description": "Anthropic Claude coding assistant with agents and skills",
     "flows": [
       {
         "from": "AGENTS.md",
-        "to": "CLAUDE.md"
+        "to": "CLAUDE.md",
+        "merge": "composite"
       },
       {
         "from": "rules/*.md",
@@ -83,7 +81,6 @@
     "rootDir": ".codex",
     "rootFile": "AGENTS.md",
     "aliases": ["codexcli"],
-    "description": "Codex command-line AI assistant",
     "flows": [
       {
         "from": "commands/*.md",
@@ -96,7 +93,6 @@
     "name": "Cursor",
     "rootDir": ".cursor",
     "rootFile": "AGENTS.md",
-    "description": "Cursor AI code editor with rules, commands, and MCP support",
     "flows": [
       {
         "from": "rules/*.md",
@@ -124,7 +120,6 @@
     "name": "Factory AI",
     "rootDir": ".factory",
     "rootFile": "AGENTS.md",
-    "description": "Factory AI with commands and droids (agents)",
     "flows": [
       {
         "from": "commands/*.md",
@@ -142,7 +137,6 @@
     "rootDir": ".kilocode",
     "rootFile": "AGENTS.md",
     "aliases": ["kilocode"],
-    "description": "Kilo coding assistant with rules and workflows",
     "flows": [
       {
         "from": "rules/*.md",
@@ -158,7 +152,6 @@
   "kiro": {
     "name": "Kiro",
     "rootDir": ".kiro",
-    "description": "Kiro AI assistant with steering files",
     "flows": [
       {
         "from": "rules/*.md",
@@ -171,7 +164,6 @@
     "name": "OpenCode",
     "rootDir": ".opencode",
     "rootFile": "AGENTS.md",
-    "description": "OpenCode AI assistant with commands and agents",
     "flows": [
       {
         "from": "commands/*.md",
@@ -195,11 +187,11 @@
     "rootDir": ".qwen",
     "rootFile": "QWEN.md",
     "aliases": ["qwencode"],
-    "description": "Qwen AI coding assistant with agent support",
     "flows": [
       {
         "from": "AGENTS.md",
-        "to": "QWEN.md"
+        "to": "QWEN.md",
+        "merge": "composite"
       },
       {
         "from": "agents/*.md",
@@ -212,7 +204,6 @@
     "name": "Roo Code",
     "rootDir": ".roo",
     "rootFile": "AGENTS.md",
-    "description": "Roo AI assistant with command support",
     "flows": [
       {
         "from": "commands/*.md",
@@ -225,11 +216,11 @@
     "name": "Warp",
     "rootDir": ".warp",
     "rootFile": "WARP.md",
-    "description": "Warp terminal with AI features",
     "flows": [
       {
         "from": "AGENTS.md",
-        "to": "WARP.md"
+        "to": "WARP.md",
+        "merge": "composite"
       }
     ]
   },
@@ -237,7 +228,6 @@
   "windsurf": {
     "name": "Windsurf",
     "rootDir": ".windsurf",
-    "description": "Windsurf AI assistant with rules",
     "flows": [
       {
         "from": "rules/*.md",

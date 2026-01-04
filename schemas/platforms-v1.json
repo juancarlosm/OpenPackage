@@ -141,7 +141,7 @@
         },
         "merge": {
           "type": "string",
-          "enum": ["deep", "shallow", "replace", "append"],
+          "enum": ["deep", "shallow", "replace", "composite"],
           "description": "Merge strategy when target exists (default: 'replace')",
           "default": "replace"
         },
@@ -213,7 +213,7 @@
         },
         "merge": {
           "type": "string",
-          "enum": ["deep", "shallow", "replace", "append"]
+          "enum": ["deep", "shallow", "replace", "composite"]
         },
         "description": {
           "type": "string"

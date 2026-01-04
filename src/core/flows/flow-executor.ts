@@ -20,6 +20,7 @@ import * as TOML from '@iarna/toml';
 import { JSONPath } from 'jsonpath-plus';
 import { minimatch } from 'minimatch';
 import * as fsUtils from '../../utils/fs.js';
+import { mergePackageContentIntoRootFile } from '../../utils/root-file-merger.js';
 import type {
   Flow,
   FlowContext,
@@ -273,9 +274,9 @@ export class DefaultFlowExecutor implements FlowExecutor {
     }
 
     // Validate merge strategy
-    if (flow.merge && !['deep', 'shallow', 'replace', 'append'].includes(flow.merge)) {
+    if (flow.merge && !['deep', 'shallow', 'replace', 'composite'].includes(flow.merge)) {
       errors.push({
-        message: `Invalid merge strategy: ${flow.merge}. Must be one of: deep, shallow, replace, append`,
+        message: `Invalid merge strategy: ${flow.merge}. Must be one of: deep, shallow, replace, composite`,
         code: 'INVALID_MERGE',
       });
     }
@@ -380,16 +381,27 @@ export class DefaultFlowExecutor implements FlowExecutor {
       // Step 7: Merge with existing target (if needed)
       if (await fsUtils.exists(targetPath)) {
         const targetContent = await this.loadSourceFile(targetPath);
-        const mergeResult = this.mergeContent(
-          data,
-          targetContent.data,
-          flow.merge || 'replace',
-          context
-        );
-        data = mergeResult.data;
-        conflicts.push(...mergeResult.conflicts);
-        if (mergeResult.conflicts.length > 0) {
+        
+        // Special handling for composite merge - works with raw text
+        if (flow.merge === 'composite') {
+          // Use raw content for composite merge
+          const sourceRaw = sourceContent.raw;
+          const targetRaw = targetContent.raw;
+          data = mergePackageContentIntoRootFile(targetRaw, context.packageName, sourceRaw);
           transformed = true;
+        } else {
+          // Normal merge for other strategies
+          const mergeResult = this.mergeContent(
+            data,
+            targetContent.data,
+            flow.merge || 'replace',
+            context
+          );
+          data = mergeResult.data;
+          conflicts.push(...mergeResult.conflicts);
+          if (mergeResult.conflicts.length > 0) {
+            transformed = true;
+          }
         }
       }
 
@@ -701,12 +713,10 @@ export class DefaultFlowExecutor implements FlowExecutor {
         merged = this.deepMerge(target, source, conflicts, context);
         break;
 
-      case 'append':
-        if (Array.isArray(target) && Array.isArray(source)) {
-          merged = [...target, ...source];
-        } else {
-          merged = this.deepMerge(target, source, conflicts, context);
-        }
+      case 'composite':
+        // Composite merge is handled earlier in the pipeline (Step 7)
+        // This case should not be reached
+        merged = source;
         break;
 
       default:
@@ -760,6 +770,10 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
   /**
    * Evaluate condition
+   */
+  /**
+   * Composite merge using comment delimiters to preserve multiple package contributions
+   * Each package's content is wrapped in HTML comment markers with package name
    */
   private evaluateCondition(condition: any, context: FlowContext): boolean {
     if (condition.and) {

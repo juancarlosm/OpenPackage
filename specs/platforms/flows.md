@@ -493,6 +493,86 @@ Completely overwrite target:
 { "new": "config" }
 ```
 
+
+### Composite
+
+Compose multiple package contributions using delimiters:
+
+```jsonc
+{ "merge": "composite" }
+```
+
+**Use when:**
+- Multiple packages contribute to same text file
+- Each package needs its own section
+- Sections should be independently updatable
+- Content outside package sections must be preserved
+
+**Supported formats:**
+- Markdown files with HTML comment delimiters
+- Any text-based format with comment support
+
+**Example:**
+```markdown
+// Target (existing)
+# Instructions
+
+<!-- package: @user/package-a -->
+Instructions from Package A
+<!-- -->
+
+// Source (new package @user/package-b)
+Instructions from Package B
+
+// Result
+# Instructions
+
+<!-- package: @user/package-a -->
+Instructions from Package A
+<!-- -->
+
+<!-- package: @user/package-b -->
+Instructions from Package B
+<!-- -->
+```
+
+**Update behavior:**
+```markdown
+// Target (existing)
+<!-- package: @user/package-a -->
+Old instructions from Package A
+<!-- -->
+
+<!-- package: @user/package-b -->
+Instructions from Package B
+<!-- -->
+
+// Source (updated package @user/package-a)
+New instructions from Package A
+
+// Result
+<!-- package: @user/package-a -->
+New instructions from Package A
+<!-- -->
+
+<!-- package: @user/package-b -->
+Instructions from Package B
+<!-- -->
+```
+
+**Key features:**
+- Each package's content wrapped in `<!-- package: name -->` ... `<!-- -->` markers
+- Updates replace only that package's section
+- Other packages' sections preserved
+- Manual edits outside markers preserved
+- Uninstalling removes only that package's section
+
+**Common use cases:**
+- Root files (AGENTS.md, CLAUDE.md, QWEN.md, WARP.md)
+- Shared instruction files
+- Multi-package documentation
+- Composable configuration narratives
+
 ### Priority-Based Merging
 
 When multiple packages write to same file:

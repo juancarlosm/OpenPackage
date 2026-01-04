@@ -206,6 +206,7 @@ The system SHALL support multiple merge strategies:
 - **Deep merge** (`merge: "deep"`): Recursively merge nested objects and arrays
 - **Shallow merge** (`merge: "shallow"`): Merge only top-level keys
 - **Replace** (default): Completely replace target content with source
+- **Composite** (`merge: "composite"`): Compose multiple package contributions using delimiters
 - **Priority-based**: Workspace > direct deps > nested deps (shallower = higher priority)
 
 #### Scenario: Deep merge of nested objects
@@ -222,6 +223,27 @@ The system SHALL support multiple merge strategies:
 
 - **WHEN** no merge strategy is specified
 - **THEN** target file is completely replaced with source content
+
+#### Scenario: Composite merge with multiple packages
+
+- **WHEN** multiple packages define flows to same target with `merge: "composite"`
+- **THEN** each package's content is wrapped in HTML comment delimiters with package name
+- **AND** updates replace only that package's section
+- **AND** all other packages' sections are preserved
+
+#### Scenario: Composite merge preserves manual edits
+
+- **WHEN** target file has manual edits outside package markers
+- **AND** package content is merged with `merge: "composite"`
+- **THEN** manual edits are preserved
+- **AND** only the package's marked section is updated
+
+#### Scenario: Composite merge format
+
+- **WHEN** composite merge is used
+- **THEN** content is wrapped in markers: `<!-- package: @scope/name -->` content `<!-- -->`
+- **AND** each package gets its own section
+- **AND** sections can be independently updated or removed
 
 #### Scenario: Priority-based merge with multiple packages
 

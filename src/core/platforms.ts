@@ -281,7 +281,7 @@ function validateFlows(flows: Flow[], context: string): string[] {
     
     // Validate merge strategy
     if (flow.merge !== undefined) {
-      const validMerges = ['replace', 'shallow', 'deep', 'append']
+      const validMerges = ['replace', 'shallow', 'deep', 'composite']
       if (!validMerges.includes(flow.merge)) {
         errors.push(`${context}, flows[${i}]: Invalid merge strategy '${flow.merge}'. Must be one of: ${validMerges.join(', ')}`)
       }

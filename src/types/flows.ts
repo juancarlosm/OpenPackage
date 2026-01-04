@@ -72,7 +72,7 @@ export type MergeStrategy =
   | "deep"          // Deep merge preserving nested structures
   | "shallow"       // Shallow merge (top-level only)
   | "replace"       // Complete replacement
-  | "append";       // Append to arrays, merge objects
+  | "composite";    // Compose multiple package contributions with delimiters
 
 // ============================================================================
 // Key Mapping Types

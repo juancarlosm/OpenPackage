@@ -19,7 +19,7 @@ interface Flow {
   embed?: string
   section?: string
   when?: Condition
-  merge?: "deep" | "shallow" | "replace"
+  merge?: "deep" | "shallow" | "replace" | "composite"
   namespace?: boolean | string
   handler?: string
 }
@@ -525,6 +525,7 @@ Merge strategy when target file exists.
 - `"deep"` - Recursive merge (default for objects)
 - `"shallow"` - Top-level merge only
 - `"replace"` - Overwrite entirely (default for primitives/arrays)
+- `"composite"` - Compose multiple packages using delimiters
 
 **Deep merge:**
 ```jsonc
