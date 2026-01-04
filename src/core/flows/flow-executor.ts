@@ -832,7 +832,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
       return [path.join(baseDir, pattern)];
     }
     
-    // Build directory path up to glob
+    // Build directory path up to first glob
     const dirPath = path.join(baseDir, ...parts.slice(0, globPart));
     const filePattern = parts.slice(globPart).join('/');
     
@@ -849,6 +849,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
   /**
    * Recursively find files matching glob pattern
+   * Supports ** for recursive directory matching
    */
   private async findMatchingFiles(
     dir: string,
@@ -864,13 +865,16 @@ export class DefaultFlowExecutor implements FlowExecutor {
         const relativePath = path.relative(baseDir, fullPath);
         
         if (entry.isDirectory()) {
-          // Check if pattern includes subdirectories
-          if (pattern.includes('/') || pattern.startsWith('**')) {
+          // Always recurse for ** patterns
+          if (pattern.startsWith('**') || pattern.includes('/**/')) {
+            await this.findMatchingFiles(fullPath, pattern, baseDir, matches);
+          } else if (pattern.includes('/')) {
+            // For patterns with subdirs, continue searching
             await this.findMatchingFiles(fullPath, pattern, baseDir, matches);
           }
         } else if (entry.isFile()) {
-          // Test against pattern
-          if (minimatch(relativePath, pattern) || minimatch(entry.name, pattern.split('/').pop() || pattern)) {
+          // Test file against pattern
+          if (minimatch(relativePath, pattern, { dot: false })) {
             matches.push(fullPath);
           }
         }
@@ -882,22 +886,58 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
   /**
    * Resolve target path from source path and patterns
+   * Handles single-level (*) and recursive (**) globs
    */
   private resolveTargetFromGlob(sourcePath: string, fromPattern: string, toPattern: string, context: FlowContext): string {
-    // Get the source filename
-    const sourceFileName = path.basename(sourcePath);
-    const sourceExt = path.extname(sourcePath);
-    const sourceBase = path.basename(sourcePath, sourceExt);
+    // Get relative path from package root
+    const relativePath = path.relative(context.packageRoot, sourcePath);
     
-    // If 'to' pattern has glob, replace with matched filename
+    // If 'to' pattern has glob, map the structure
     if (toPattern.includes('*')) {
-      // Parse the target pattern to extract directory and extension
-      const toParts = toPattern.split('*');
-      const toPrefix = toParts[0]; // e.g., ".cursor/rules/"
-      const toSuffix = toParts[1] || ''; // e.g., ".mdc"
+      // Handle ** recursive patterns
+      if (fromPattern.includes('**') && toPattern.includes('**')) {
+        // Extract the base directories before **
+        const fromParts = fromPattern.split('**');
+        const toParts = toPattern.split('**');
+        const fromBase = fromParts[0].replace(/\/$/, '');
+        const toBase = toParts[0].replace(/\/$/, '');
+        
+        // Get the file pattern after **
+        const fromSuffix = fromParts[1] || '';
+        const toSuffix = toParts[1] || '';
+        
+        // Extract the relative path after the base directory
+        let relativeSubpath = relativePath;
+        if (fromBase) {
+          relativeSubpath = relativePath.startsWith(fromBase + '/') 
+            ? relativePath.slice(fromBase.length + 1)
+            : relativePath;
+        }
+        
+        // Handle extension mapping if suffixes specify extensions
+        // e.g., /**/*.md -> /**/*.mdc
+        if (fromSuffix && toSuffix) {
+          const fromExt = fromSuffix.replace(/^\/?\*+/, '');
+          const toExt = toSuffix.replace(/^\/?\*+/, '');
+          if (fromExt && toExt && fromExt !== toExt) {
+            relativeSubpath = relativeSubpath.replace(new RegExp(fromExt.replace('.', '\\.') + '$'), toExt);
+          }
+        }
+        
+        // Build target path
+        const targetPath = toBase ? path.join(toBase, relativeSubpath) : relativeSubpath;
+        return path.join(context.workspaceRoot, targetPath);
+      }
       
-      // Build target filename
-      // If toSuffix has an extension, use it; otherwise keep source extension
+      // Handle single-level * patterns
+      const sourceFileName = path.basename(sourcePath);
+      const sourceExt = path.extname(sourcePath);
+      const sourceBase = path.basename(sourcePath, sourceExt);
+      
+      const toParts = toPattern.split('*');
+      const toPrefix = toParts[0];
+      const toSuffix = toParts[1] || '';
+      
       const targetExt = toSuffix.startsWith('.') ? toSuffix : (sourceExt + toSuffix);
       const targetFileName = sourceBase + targetExt;
       

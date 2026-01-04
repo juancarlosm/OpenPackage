@@ -23,15 +23,15 @@ opkg install @username/cursor-rules
 
 ## Simple Patterns
 
-### Pattern 1: File Copy with Extension Change
+### Pattern 1: File Copy with Extension Change (Recursive)
 
 ```jsonc
 {
   "cursor": {
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".cursor/rules/*.mdc"
+        "from": "rules/**/*.md",
+        "to": ".cursor/rules/**/*.mdc"
       }
     ]
   }
@@ -42,15 +42,28 @@ opkg install @username/cursor-rules
 ```
 rules/
 ├── typescript.md
-└── python.md
+├── python.md
+└── advanced/
+    ├── generics.md
+    └── types/
+        └── unions.md
 ```
 
 **Result in workspace:**
 ```
 .cursor/rules/
 ├── typescript.mdc
-└── python.mdc
+├── python.mdc
+└── advanced/
+    ├── generics.mdc
+    └── types/
+        └── unions.mdc
 ```
+
+**Key features:**
+- `**` recursively matches all subdirectories
+- Directory structure is preserved
+- Extension mapping applies to all files
 
 ### Pattern 2: Format Conversion
 
@@ -83,7 +96,55 @@ tabSize: 2
 }
 ```
 
-### Pattern 3: Simple Key Remapping
+### Pattern 3: Copy All Files Recursively (Mixed Types)
+
+```jsonc
+{
+  "claude": {
+    "flows": [
+      {
+        "from": "skills/**/*",
+        "to": ".claude/skills/**/*"
+      }
+    ]
+  }
+}
+```
+
+**Package content:**
+```
+skills/
+├── code-review/
+│   ├── analyze.md
+│   ├── config.json
+│   └── helpers/
+│       ├── utils.ts
+│       └── types.d.ts
+└── testing/
+    ├── test-gen.md
+    └── coverage.json
+```
+
+**Result in workspace:**
+```
+.claude/skills/
+├── code-review/
+│   ├── analyze.md
+│   ├── config.json
+│   └── helpers/
+│       ├── utils.ts
+│       └── types.d.ts
+└── testing/
+    ├── test-gen.md
+    └── coverage.json
+```
+
+**Key features:**
+- `**/*` matches all file types
+- Complete directory structure preserved
+- No extension mapping (copies as-is)
+
+### Pattern 4: Simple Key Remapping
 
 ```jsonc
 {
@@ -124,7 +185,7 @@ tabSize: 2
 
 ## Multi-Package Composition
 
-### Pattern 4: Merge Multiple Packages
+### Pattern 5: Merge Multiple Packages
 
 **Setup:**
 ```jsonc
@@ -181,7 +242,7 @@ tabSize: 2
 }
 ```
 
-### Pattern 5: Namespace Isolation
+### Pattern 6: Namespace Isolation
 
 **Setup:**
 ```jsonc
@@ -236,7 +297,7 @@ tabSize: 2
 ```
 
 
-### Pattern 6: Composite Merge for Root Files
+### Pattern 7: Composite Merge for Root Files
 
 **Setup:**
 ```jsonc
@@ -309,7 +370,7 @@ Use these tools for API development.
 
 ## Advanced Transformations
 
-### Pattern 7: Markdown Frontmatter Transform
+### Pattern 8: Markdown Frontmatter Transform
 
 ```jsonc
 {
@@ -359,7 +420,7 @@ Help review code for quality and security.
 
 **Note:** Body unchanged, only frontmatter transformed.
 
-### Pattern 8: Content Embedding
+### Pattern 9: Content Embedding
 
 ```jsonc
 {
@@ -406,7 +467,7 @@ Help review code for quality and security.
 }
 ```
 
-### Pattern 9: TOML Sections
+### Pattern 10: TOML Sections
 
 ```jsonc
 {
@@ -446,7 +507,7 @@ command = "mcp-db"
 args = ["--port", "5432"]
 ```
 
-### Pattern 10: Multi-Target with Different Formats
+### Pattern 11: Multi-Target with Different Formats
 
 ```jsonc
 {
@@ -473,7 +534,7 @@ args = ["--port", "5432"]
 
 ## Conditional Flows
 
-### Pattern 11: Platform-Specific Flow
+### Pattern 12: Platform-Specific Flow
 
 ```jsonc
 {
@@ -491,7 +552,7 @@ args = ["--port", "5432"]
 
 Executes only when Cursor is detected.
 
-### Pattern 12: Development vs Production
+### Pattern 13: Development vs Production
 
 ```jsonc
 {
@@ -518,7 +579,7 @@ Executes only when Cursor is detected.
 }
 ```
 
-### Pattern 13: Multi-Platform Conditional
+### Pattern 14: Multi-Platform Conditional
 
 ```jsonc
 {
@@ -549,36 +610,26 @@ Executes if **any** of the platforms are detected.
   "cursor": {
     "name": "Cursor",
     "rootDir": ".cursor",
+    "rootFile": "AGENTS.md",
     "aliases": ["cursorcli"],
     "flows": [
-      // Rules with extension change
+      // Rules with extension change (recursive)
       {
-        "from": "rules/*.md",
-        "to": ".cursor/rules/*.mdc"
+        "from": "rules/**/*.md",
+        "to": ".cursor/rules/**/*.mdc"
       },
       
-      // Commands (no change)
+      // Commands (recursive, no extension change)
       {
-        "from": "commands/*.md",
-        "to": ".cursor/commands/*.md"
+        "from": "commands/**/*.md",
+        "to": ".cursor/commands/**/*.md"
       },
       
       // MCP with namespacing
       {
         "from": "mcp.jsonc",
         "to": ".cursor/mcp.json",
-        "namespace": true,
-        "merge": "deep"
-      },
-      
-      // Settings with key remapping
-      {
-        "from": "settings.jsonc",
-        "to": ".cursor/settings.json",
-        "map": {
-          "theme": "workbench.colorTheme",
-          "ai.*": "cursor.*"
-        },
+        "pipe": ["filter-comments"],
         "merge": "deep"
       }
     ]
@@ -596,37 +647,35 @@ Executes if **any** of the platforms are detected.
     "rootFile": "CLAUDE.md",
     "aliases": ["claudecode"],
     "flows": [
-      // Root file
+      // Root file with composite merge
       {
         "from": "AGENTS.md",
         "to": "CLAUDE.md",
-        "when": { "exists": "CLAUDE.md" }
+        "merge": "composite"
       },
       
-      // Rules
+      // Rules (recursive)
       {
-        "from": "rules/*.md",
-        "to": ".claude/rules/*.md"
+        "from": "rules/**/*.md",
+        "to": ".claude/rules/**/*.md"
       },
       
-      // Agents with frontmatter transform
+      // Commands (recursive)
       {
-        "from": "agents/*.md",
-        "to": ".claude/agents/*.md",
-        "map": {
-          "role": "type",
-          "model": {
-            "values": {
-              "anthropic/claude-sonnet-4.5": "claude-sonnet-4.5"
-            }
-          }
-        }
+        "from": "commands/**/*.md",
+        "to": ".claude/commands/**/*.md"
       },
       
-      // Skills
+      // Agents (recursive)
       {
-        "from": "skills/*.md",
-        "to": ".claude/skills/*.md"
+        "from": "agents/**/*.md",
+        "to": ".claude/agents/**/*.md"
+      },
+      
+      // Skills (all files, recursive)
+      {
+        "from": "skills/**/*",
+        "to": ".claude/skills/**/*"
       }
     ]
   }
@@ -639,20 +688,28 @@ Executes if **any** of the platforms are detected.
 {
   "global": {
     "flows": [
-      // Universal files
-      { "from": "AGENTS.md", "to": "AGENTS.md", "when": { "exists": "AGENTS.md" } }
+      // Universal root file with composite merge
+      {
+        "from": "AGENTS.md",
+        "to": "AGENTS.md",
+        "when": { "exists": "AGENTS.md" },
+        "merge": "composite"
+      }
     ]
   },
   
   "cursor": {
     "name": "Cursor",
     "rootDir": ".cursor",
+    "rootFile": "AGENTS.md",
     "flows": [
-      { "from": "rules/*.md", "to": ".cursor/rules/*.mdc" },
+      // Recursive rules with extension change
+      { "from": "rules/**/*.md", "to": ".cursor/rules/**/*.mdc" },
+      // MCP config
       {
         "from": "mcp.jsonc",
         "to": ".cursor/mcp.json",
-        "namespace": true,
+        "pipe": ["filter-comments"],
         "merge": "deep"
       }
     ]
@@ -663,9 +720,10 @@ Executes if **any** of the platforms are detected.
     "rootDir": ".claude",
     "rootFile": "CLAUDE.md",
     "flows": [
-      { "from": "AGENTS.md", "to": "CLAUDE.md", "when": { "exists": "CLAUDE.md" } },
-      { "from": "rules/*.md", "to": ".claude/rules/*.md" },
-      { "from": "agents/*.md", "to": ".claude/agents/*.md" }
+      { "from": "AGENTS.md", "to": "CLAUDE.md", "merge": "composite" },
+      { "from": "rules/**/*.md", "to": ".claude/rules/**/*.md" },
+      { "from": "agents/**/*.md", "to": ".claude/agents/**/*.md" },
+      { "from": "skills/**/*", "to": ".claude/skills/**/*" }
     ]
   },
   
@@ -673,7 +731,7 @@ Executes if **any** of the platforms are detected.
     "name": "Windsurf",
     "rootDir": ".windsurf",
     "flows": [
-      { "from": "rules/*.md", "to": ".windsurf/rules/*.md" }
+      { "from": "rules/**/*.md", "to": ".windsurf/rules/**/*.md" }
     ]
   }
 }
@@ -691,23 +749,29 @@ Executes if **any** of the platforms are detected.
     "rootDir": ".myai",
     "rootFile": "MYAI.md",
     "flows": [
-      // Root file
+      // Root file with composite merge
       {
         "from": "AGENTS.md",
         "to": "MYAI.md",
-        "when": { "exists": "MYAI.md" }
+        "merge": "composite"
       },
       
-      // Rules → prompts
+      // Rules → prompts (recursive)
       {
-        "from": "rules/*.md",
-        "to": ".myai/prompts/*.md"
+        "from": "rules/**/*.md",
+        "to": ".myai/prompts/**/*.md"
       },
       
-      // Agents → assistants with format conversion
+      // Agents → assistants with format conversion (recursive)
       {
-        "from": "agents/*.md",
-        "to": ".myai/assistants/*.yaml"
+        "from": "agents/**/*.md",
+        "to": ".myai/assistants/**/*.yaml"
+      },
+      
+      // Skills → all files (recursive)
+      {
+        "from": "skills/**/*",
+        "to": ".myai/skills/**/*"
       },
       
       // Config with custom structure
@@ -729,16 +793,16 @@ Executes if **any** of the platforms are detected.
 {
   "cursor": {
     "flows": [
-      // Custom directory structure
+      // Custom directory structure (recursive)
       {
-        "from": "rules/*.md",
-        "to": ".cursor/custom-rules/*.mdc"
+        "from": "rules/**/*.md",
+        "to": ".cursor/custom-rules/**/*.mdc"
       },
       
-      // Additional transform
+      // Additional transform (recursive)
       {
-        "from": "custom/*.jsonc",
-        "to": ".cursor/custom/*.json",
+        "from": "custom/**/*.jsonc",
+        "to": ".cursor/custom/**/*.json",
         "pick": ["public"],
         "merge": "deep"
       }
@@ -804,10 +868,13 @@ DEBUG=opkg:flows opkg install @user/package
 
 **Output:**
 ```
-[flows] Executing flow: rules/{name}.md → .cursor/rules/{name}.mdc
+[flows] Executing flow: rules/**/*.md → .cursor/rules/**/*.mdc
 [flows] Matched: rules/typescript.md
 [flows] Transform: extension .md → .mdc
 [flows] Write: .cursor/rules/typescript.mdc
+[flows] Matched: rules/advanced/generics.md
+[flows] Transform: extension .md → .mdc
+[flows] Write: .cursor/rules/advanced/generics.mdc
 ```
 
 ## Common Use Cases

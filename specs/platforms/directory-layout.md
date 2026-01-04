@@ -96,8 +96,8 @@ workspace/
   "cursor": {
     "rootDir": ".cursor",
     "flows": [
-      { "from": "rules/{name}.md", "to": ".cursor/rules/{name}.mdc" },
-      { "from": "commands/{name}.md", "to": ".cursor/commands/{name}.md" },
+      { "from": "rules/**/*.md", "to": ".cursor/rules/**/*.mdc" },
+      { "from": "commands/**/*.md", "to": ".cursor/commands/**/*.md" },
       { "from": "mcp.jsonc", "to": ".cursor/mcp.json", "merge": "deep" }
     ]
   }
@@ -122,9 +122,9 @@ workspace/
     "rootDir": ".claude",
     "rootFile": "CLAUDE.md",
     "flows": [
-      { "from": "agents/{name}.md", "to": ".claude/agents/{name}.md" },
-      { "from": "skills/{name}.md", "to": ".claude/skills/{name}.md" },
-      { "from": "commands/{name}.md", "to": ".claude/commands/{name}.md" }
+      { "from": "agents/**/*.md", "to": ".claude/agents/**/*.md" },
+      { "from": "skills/**/*.md", "to": ".claude/skills/**/*.md" },
+      { "from": "commands/**/*.md", "to": ".claude/commands/**/*.md" }
     ]
   }
 }
@@ -193,8 +193,8 @@ Unlike older systems with static subdirectory mappings, the platform system uses
   "cursor": {
     "flows": [
       {
-        "from": "rules/{name}.md",
-        "to": ".cursor/rules/{name}.mdc"
+        "from": "rules/**/*.md",
+        "to": ".cursor/rules/**/*.mdc"
       }
     ]
   }
@@ -217,8 +217,8 @@ Extensions are handled by **flow patterns**, not static lists.
 **Example: Cursor rules**
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc"
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"
 }
 ```
 
@@ -312,15 +312,15 @@ Captured from source pattern:
 
 ```jsonc
 {
-  "from": "rules/{name}.md",          // Captures 'name'
-  "to": ".cursor/rules/{name}.mdc"    // Reuses 'name'
+  "from": "rules/**/*.md",          // Captures 'name'
+  "to": ".cursor/rules/**/*.mdc"    // Reuses 'name'
 }
 ```
 
 **Example:**
 ```
-rules/typescript.md → {name} = "typescript"
-.cursor/rules/typescript.mdc
+rules/typescript.md → .cursor/rules/typescript.mdc
+rules/advanced/generics.md → .cursor/rules/advanced/generics.mdc
 ```
 
 ## Directory Creation
@@ -457,8 +457,8 @@ Define any directory structure via flows:
   "my-platform": {
     "rootDir": ".myplatform",
     "flows": [
-      { "from": "rules/{name}.md", "to": ".myplatform/prompts/{name}.txt" },
-      { "from": "agents/{name}.md", "to": ".myplatform/bots/{name}.yaml" }
+      { "from": "rules/**/*.md", "to": ".myplatform/prompts/**/*.txt" },
+      { "from": "agents/**/*.md", "to": ".myplatform/bots/**/*.yaml" }
     ]
   }
 }
@@ -547,15 +547,15 @@ ls -R .cursor/
 **Check flow targets:**
 ```jsonc
 {
-  "to": ".cursor/rules/{name}.mdc"  // Verify path
+  "to": ".cursor/rules/**/*.mdc"  // Verify path
 }
 ```
 
 **Check placeholder usage:**
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc"  // {name} must match
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"  // Pattern must match
 }
 ```
 
@@ -576,7 +576,7 @@ opkg install @user/package --dry-run
 **Check extension in flow:**
 ```jsonc
 {
-  "to": ".cursor/rules/{name}.mdc"  // Extension matters
+  "to": ".cursor/rules/**/*.mdc"  // Extension matters
 }
 ```
 

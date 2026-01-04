@@ -50,8 +50,8 @@ A **flow** is a declarative transformation rule that maps source content to targ
 
 ```jsonc
 {
-  "from": "rules/{name}.md",              // Universal source
-  "to": ".cursor/rules/{name}.mdc",       // Platform target
+  "from": "rules/**/*.md",              // Universal source
+  "to": ".cursor/rules/**/*.mdc",       // Platform target
   "map": { "theme": "workbench.theme" },  // Key remapping
   "merge": "deep"                          // Merge strategy
 }
@@ -121,8 +121,8 @@ Always use strict type checking...
 **Flow definition:**
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc",
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc",
   "map": {
     "severity": "level",
     "tags": "categories"
@@ -208,7 +208,7 @@ Everything defined in JSON, no code required:
 {
   "cursor": {
     "flows": [
-      { "from": "rules/{name}.md", "to": ".cursor/rules/{name}.mdc" },
+      { "from": "rules/**/*.md", "to": ".cursor/rules/**/*.mdc" },
       { "from": "mcp.jsonc", "to": ".cursor/mcp.json", "merge": "deep" }
     ]
   }

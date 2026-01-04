@@ -111,8 +111,8 @@ Error: Flow missing required field 'to'
 **Solution:** Add required fields
 ```jsonc
 {
-  "from": "rules/{name}.md",  // Required
-  "to": ".cursor/rules/{name}.mdc"  // Required
+  "from": "rules/**/*.md",  // Required
+  "to": ".cursor/rules/**/*.mdc"  // Required
 }
 ```
 
@@ -264,7 +264,7 @@ DEBUG=opkg:* opkg install @user/package
 ```
 [flows] Loading platforms config...
 [flows] Detected platforms: cursor, claude
-[flows] Executing flow: rules/{name}.md → .cursor/rules/{name}.mdc
+[flows] Executing flow: rules/**/*.md → .cursor/rules/**/*.mdc
 [flows] Matched file: rules/typescript.md
 [flows] Loading source: rules/typescript.md
 [flows] Parsing format: markdown
@@ -311,7 +311,7 @@ Root Directory: .cursor
 Enabled: true
 
 Flows:
-  1. rules/{name}.md → .cursor/rules/{name}.mdc
+  1. rules/**/*.md → .cursor/rules/**/*.mdc
   2. mcp.jsonc → .cursor/mcp.json
      - namespace: true
      - merge: deep
@@ -365,8 +365,8 @@ Actual:   .cursor/typescript.mdc
 **Solution:** Check flow target includes subdirectory
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc"  // Include 'rules/' subdirectory
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"  // Include 'rules/' subdirectory
 }
 ```
 
@@ -383,8 +383,8 @@ Actual:   typescript.md
 **Solution:** Specify correct extension in flow
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc"  // Explicit .mdc extension
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"  // Explicit .mdc extension
 }
 ```
 
@@ -540,8 +540,8 @@ opkg status  # Check detected platforms
 
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc"
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"
 }
 ```
 

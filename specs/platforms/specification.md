@@ -113,8 +113,13 @@ The system SHALL support declarative flow configurations with following structur
 
 #### Scenario: Simple file mapping flow loads successfully
 
-- **WHEN** flow defines `{ "from": "rules/{name}.md", "to": ".cursor/rules/{name}.mdc" }`
+- **WHEN** flow defines `{ "from": "rules/**/*.md", "to": ".cursor/rules/**/*.mdc" }`
 - **THEN** flow is validated and ready for execution
+
+#### Scenario: Recursive glob pattern flow loads successfully
+
+- **WHEN** flow defines `{ "from": "skills/**/*", "to": ".platform/skills/**/*" }`
+- **THEN** flow is validated and supports recursive directory traversal
 
 #### Scenario: Multi-target flow with different transforms loads successfully
 
@@ -164,6 +169,50 @@ The system SHALL execute flows through multi-stage pipeline:
 
 - **WHEN** flow has no transform options (only `from` and `to`)
 - **THEN** file is copied directly without parsing for performance optimization
+
+### Requirement: Glob Pattern Support
+
+The system SHALL support glob patterns for file matching:
+
+- **Single-level glob** (`*`): Matches files in a single directory level
+- **Recursive glob** (`**`): Matches files in all subdirectories recursively
+- **Extension mapping**: Target patterns can specify different extensions
+- **Directory structure preservation**: Recursive globs maintain nested directory structure
+
+#### Scenario: Single-level glob matches files in directory
+
+- **WHEN** flow uses pattern `rules/*.md`
+- **THEN** all `.md` files in `rules/` directory are matched (not subdirectories)
+
+#### Scenario: Recursive glob matches nested files
+
+- **WHEN** flow uses pattern `rules/**/*.md`
+- **THEN** all `.md` files in `rules/` and all subdirectories are matched
+- **AND** directory structure is preserved in target
+
+#### Scenario: Recursive glob with all file types
+
+- **WHEN** flow uses pattern `skills/**/*`
+- **THEN** all files of any type in `skills/` and subdirectories are matched
+- **AND** complete directory tree is replicated in target
+
+#### Scenario: Extension mapping in recursive glob
+
+- **WHEN** flow defines `from: "rules/**/*.md", to: ".cursor/rules/**/*.mdc"`
+- **THEN** all `.md` files are copied with `.mdc` extension
+- **AND** directory structure `rules/advanced/types.md` → `.cursor/rules/advanced/types.mdc`
+
+#### Scenario: Empty glob match returns no error
+
+- **WHEN** glob pattern matches no files
+- **THEN** flow succeeds with warning "No files matched pattern"
+- **AND** no error is raised
+
+#### Scenario: Glob pattern preserves directory structure
+
+- **WHEN** source has `rules/typescript/advanced/generics.md`
+- **AND** flow uses `rules/**/*.md` → `.cursor/rules/**/*.md`
+- **THEN** target is `.cursor/rules/typescript/advanced/generics.md`
 
 ## Format Conversion Requirements
 

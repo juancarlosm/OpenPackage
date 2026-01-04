@@ -21,12 +21,12 @@
     "rootDir": ".agent",
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".agent/rules/*.md"
+        "from": "rules/**/*.md",
+        "to": ".agent/rules/**/*.md"
       },
       {
-        "from": "commands/*.md",
-        "to": ".agent/workflows/*.md"
+        "from": "commands/**/*.md",
+        "to": ".agent/workflows/**/*.md"
       }
     ]
   },
@@ -36,12 +36,12 @@
     "rootDir": ".augment",
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".augment/rules/*.md"
+        "from": "rules/**/*.md",
+        "to": ".augment/rules/**/*.md"
       },
       {
-        "from": "commands/*.md",
-        "to": ".augment/commands/*.md"
+        "from": "commands/**/*.md",
+        "to": ".augment/commands/**/*.md"
       }
     ]
   },
@@ -58,20 +58,20 @@
         "merge": "composite"
       },
       {
-        "from": "rules/*.md",
-        "to": ".claude/rules/*.md"
+        "from": "rules/**/*.md",
+        "to": ".claude/rules/**/*.md"
       },
       {
-        "from": "commands/*.md",
-        "to": ".claude/commands/*.md"
+        "from": "commands/**/*.md",
+        "to": ".claude/commands/**/*.md"
       },
       {
-        "from": "agents/*.md",
-        "to": ".claude/agents/*.md"
+        "from": "agents/**/*.md",
+        "to": ".claude/agents/**/*.md"
       },
       {
-        "from": "skills/*",
-        "to": ".claude/skills/*"
+        "from": "skills/**/*",
+        "to": ".claude/skills/**/*"
       }
     ]
   },
@@ -83,8 +83,8 @@
     "aliases": ["codexcli"],
     "flows": [
       {
-        "from": "commands/*.md",
-        "to": ".codex/prompts/*.md"
+        "from": "commands/**/*.md",
+        "to": ".codex/prompts/**/*.md"
       }
     ]
   },
@@ -95,17 +95,12 @@
     "rootFile": "AGENTS.md",
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".cursor/rules/*.mdc"
+        "from": "rules/**/*.md",
+        "to": ".cursor/rules/**/*.mdc"
       },
       {
-        "from": "commands/*.md",
-        "to": ".cursor/commands/*.md"
-      },
-      {
-        "from": "settings.json",
-        "to": ".cursor/settings.json",
-        "merge": "deep"
+        "from": "commands/**/*.md",
+        "to": ".cursor/commands/**/*.md"
       },
       {
         "from": "mcp.jsonc",
@@ -122,12 +117,12 @@
     "rootFile": "AGENTS.md",
     "flows": [
       {
-        "from": "commands/*.md",
-        "to": ".factory/commands/*.md"
+        "from": "commands/**/*.md",
+        "to": ".factory/commands/**/*.md"
       },
       {
-        "from": "agents/*.md",
-        "to": ".factory/droids/*.md"
+        "from": "agents/**/*.md",
+        "to": ".factory/droids/**/*.md"
       }
     ]
   },
@@ -139,12 +134,12 @@
     "aliases": ["kilocode"],
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".kilocode/rules/*.md"
+        "from": "rules/**/*.md",
+        "to": ".kilocode/rules/**/*.md"
       },
       {
-        "from": "commands/*.md",
-        "to": ".kilocode/workflows/*.md"
+        "from": "commands/**/*.md",
+        "to": ".kilocode/workflows/**/*.md"
       }
     ]
   },
@@ -154,8 +149,8 @@
     "rootDir": ".kiro",
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".kiro/steering/*.md"
+        "from": "rules/**/*.md",
+        "to": ".kiro/steering/**/*.md"
       }
     ]
   },
@@ -166,12 +161,16 @@
     "rootFile": "AGENTS.md",
     "flows": [
       {
-        "from": "commands/*.md",
-        "to": ".opencode/command/*.md"
+        "from": "commands/**/*.md",
+        "to": ".opencode/command/**/*.md"
       },
       {
-        "from": "agents/*.md",
-        "to": ".opencode/agent/*.md"
+        "from": "agents/**/*.md",
+        "to": ".opencode/agent/**/*.md"
+      },
+      {
+        "from": "skills/**/*",
+        "to": ".opencode/skill/**/*"
       },
       {
         "from": "mcp.jsonc",
@@ -194,8 +193,8 @@
         "merge": "composite"
       },
       {
-        "from": "agents/*.md",
-        "to": ".qwen/agents/*.md"
+        "from": "agents/**/*.md",
+        "to": ".qwen/agents/**/*.md"
       }
     ]
   },
@@ -206,8 +205,8 @@
     "rootFile": "AGENTS.md",
     "flows": [
       {
-        "from": "commands/*.md",
-        "to": ".roo/commands/*.md"
+        "from": "commands/**/*.md",
+        "to": ".roo/commands/**/*.md"
       }
     ]
   },
@@ -230,8 +229,8 @@
     "rootDir": ".windsurf",
     "flows": [
       {
-        "from": "rules/*.md",
-        "to": ".windsurf/rules/*.md"
+        "from": "rules/**/*.md",
+        "to": ".windsurf/rules/**/*.md"
       }
     ]
   }

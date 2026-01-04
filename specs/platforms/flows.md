@@ -39,16 +39,23 @@ Source file pattern relative to package root.
 { "from": "rules/code-quality.md" }
 ```
 
-**Pattern with placeholder:**
+**Single-level glob:**
 ```jsonc
-{ "from": "rules/{name}.md" }  // Matches: rules/typescript.md, rules/python.md
+{ "from": "rules/*.md" }       // All .md files in rules/ only (not subdirs)
 ```
 
-**Wildcards:**
+**Recursive glob:**
 ```jsonc
-{ "from": "config.yaml" }      // Single file
-{ "from": "rules/*.md" }       // All .md files in rules/
-{ "from": "**/*.md" }          // All .md files recursively
+{ "from": "rules/**/*.md" }    // All .md files in rules/ and subdirectories
+{ "from": "skills/**/*" }      // All files of any type, recursively
+```
+
+**Examples:**
+```jsonc
+{ "from": "config.yaml" }           // Single file
+{ "from": "rules/*.md" }            // Top-level only
+{ "from": "rules/**/*.md" }         // Recursive with extension filter
+{ "from": "skills/**/*" }           // All files recursively
 ```
 
 #### `to` (string | object)
@@ -57,7 +64,12 @@ Target file path relative to workspace root.
 
 **Simple target:**
 ```jsonc
-{ "to": ".cursor/rules/{name}.mdc" }  // Use {name} from source pattern
+{ "to": ".cursor/rules/*.mdc" }       // Single-level glob with extension change
+```
+
+**Recursive target:**
+```jsonc
+{ "to": ".cursor/rules/**/*.mdc" }    // Preserves directory structure
 ```
 
 **Multi-target object:**
@@ -69,6 +81,273 @@ Target file path relative to workspace root.
     ".codex/config.toml": { "section": "mcp", "merge": "deep" }
   }
 }
+```
+
+## Glob Patterns
+
+The flow system supports powerful glob patterns for file matching:
+
+### Single-Level Glob (`*`)
+
+Matches files in a single directory level only:
+
+```jsonc
+{
+  "from": "rules/*.md",
+  "to": ".cursor/rules/*.md"
+}
+```
+
+**Package structure:**
+```
+rules/
+├── typescript.md     ← Matched
+├── python.md         ← Matched
+└── advanced/
+    └── generics.md   ← NOT matched (in subdirectory)
+```
+
+**Result:**
+```
+.cursor/rules/
+├── typescript.md
+└── python.md
+```
+
+### Recursive Glob (`**`)
+
+Matches files in all subdirectories recursively:
+
+```jsonc
+{
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.md"
+}
+```
+
+**Package structure:**
+```
+rules/
+├── typescript.md
+├── python.md
+└── advanced/
+    ├── generics.md
+    └── types/
+        └── unions.md
+```
+
+**Result (preserves structure):**
+```
+.cursor/rules/
+├── typescript.md
+├── python.md
+└── advanced/
+    ├── generics.md
+    └── types/
+        └── unions.md
+```
+
+**Key features:**
+- `**` means "any number of directories" (including zero)
+- Directory structure is fully preserved in target
+- Relative paths maintained
+
+### All Files Recursively (`**/*`)
+
+Matches all files of any type:
+
+```jsonc
+{
+  "from": "skills/**/*",
+  "to": ".claude/skills/**/*"
+}
+```
+
+**Package structure:**
+```
+skills/
+├── code-review/
+│   ├── analyze.md
+│   ├── config.json
+│   └── helpers/
+│       ├── utils.ts
+│       └── types.d.ts
+└── testing/
+    └── test-gen.md
+```
+
+**Result (all files copied):**
+```
+.claude/skills/
+├── code-review/
+│   ├── analyze.md
+│   ├── config.json
+│   └── helpers/
+│       ├── utils.ts
+│       └── types.d.ts
+└── testing/
+    └── test-gen.md
+```
+
+**Use cases:**
+- Mixed file types (`.md`, `.json`, `.ts`, etc.)
+- Complete directory replication
+- Skills, tools, or utility directories
+
+### Extension Mapping with Recursive Globs
+
+Change file extensions while preserving structure:
+
+```jsonc
+{
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"
+}
+```
+
+**Package:**
+```
+rules/
+├── typescript.md
+└── advanced/
+    └── generics.md
+```
+
+**Result:**
+```
+.cursor/rules/
+├── typescript.mdc      ← Extension changed
+└── advanced/
+    └── generics.mdc    ← Extension changed
+```
+
+**Extension mapping rules:**
+- Source extension specified: `/**/*.md`
+- Target extension specified: `/**/*.mdc`
+- All matched files get extension changed
+- Works at any depth
+
+### Common Patterns
+
+#### Pattern 1: Recursive Rules with Extension Mapping
+```jsonc
+{
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"
+}
+```
+Use for: Cursor-style rules with nested structure
+
+#### Pattern 2: Recursive Commands
+```jsonc
+{
+  "from": "commands/**/*.md",
+  "to": ".agent/workflows/**/*.md"
+}
+```
+Use for: Commands organized in subdirectories
+
+#### Pattern 3: Complete Skills Directory
+```jsonc
+{
+  "from": "skills/**/*",
+  "to": ".claude/skills/**/*"
+}
+```
+Use for: Mixed file types with full structure
+
+#### Pattern 4: Recursive Agents
+```jsonc
+{
+  "from": "agents/**/*.md",
+  "to": ".factory/droids/**/*.md"
+}
+```
+Use for: Agent definitions with categories
+
+### Glob Matching Behavior
+
+#### Empty Matches
+
+If no files match the pattern:
+- Flow succeeds with warning
+- No error thrown
+- Warning: "No files matched pattern"
+
+```jsonc
+{
+  "from": "nonexistent/**/*.md",
+  "to": ".cursor/rules/**/*.md"
+}
+```
+**Result:** Success, 0 files processed, warning logged
+
+#### Case Sensitivity
+
+Glob patterns are case-sensitive:
+- `Rules/*.md` ≠ `rules/*.md`
+- `README.md` ≠ `readme.md`
+
+#### Hidden Files
+
+Glob patterns do NOT match hidden files by default:
+- `.gitignore` not matched by `*`
+- `.config/**/*` not matched by `**/*`
+
+To match hidden files explicitly:
+```jsonc
+{ "from": ".config/**/*" }
+```
+
+### Best Practices
+
+#### 1. Use `**` for Nested Structures
+
+**Good:**
+```jsonc
+{ "from": "rules/**/*.md" }
+```
+
+**Bad (misses nested files):**
+```jsonc
+{ "from": "rules/*.md" }
+```
+
+#### 2. Match Target Pattern to Source
+
+**Good (consistent structure):**
+```jsonc
+{
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.md"
+}
+```
+
+**Bad (structure mismatch):**
+```jsonc
+{
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/*.md"  // Wrong: single-level target
+}
+```
+
+#### 3. Use `**/*` for Mixed Types
+
+**Good (all files):**
+```jsonc
+{ "from": "skills/**/*" }
+```
+
+**Bad (only markdown):**
+```jsonc
+{ "from": "skills/**/*.md" }
+```
+
+#### 4. Prefer Recursive Patterns
+
+Recommended approach:
+```jsonc
+{ "from": "rules/**/*.md" }
 ```
 
 ## Execution Pipeline
@@ -384,8 +663,8 @@ Transforms YAML frontmatter while preserving body:
 
 ```jsonc
 {
-  "from": "agents/{name}.md",
-  "to": ".claude/agents/{name}.md",
+  "from": "agents/**/*.md",
+  "to": ".claude/agents/**/*.md",
   "map": {
     "role": "type"
   }
@@ -764,12 +1043,12 @@ Flows with no transforms skip pipeline:
 
 ```jsonc
 {
-  "from": "rules/{name}.md",
-  "to": ".cursor/rules/{name}.mdc"
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"
 }
 ```
 
-**Optimized:** Direct file copy, no parsing.
+**Optimized:** Direct file copy for simple extension changes, no content parsing.
 
 ### Parser Caching
 

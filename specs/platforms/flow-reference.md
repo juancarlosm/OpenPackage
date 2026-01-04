@@ -34,31 +34,39 @@ Source file pattern relative to package root.
 **Pattern syntax:**
 ```jsonc
 "rules/typescript.md"          // Exact file
-"rules/*.md"                   // Glob pattern (all .md files)
-"commands/*.md"                // Glob in specific directory
-"skills/code-review/*.md"      // Glob in nested directory
+"rules/*.md"                   // Single-level glob (files in rules/ only)
+"rules/**/*.md"                // Recursive glob (all .md files in rules/ and subdirs)
+"skills/**/*"                  // Recursive glob (all files in skills/ and subdirs)
 ```
 
 **Glob pattern usage:**
 ```jsonc
+// Single-level glob
 {
   "from": "rules/*.md",
   "to": ".cursor/rules/*.mdc"  // * matches filename, changes extension
+}
+
+// Recursive glob with nested directories
+{
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"  // Preserves nested directory structure
+}
+
+// All files recursively
+{
+  "from": "skills/**/*",
+  "to": ".claude/skills/**/*"  // Copies all file types with full structure
 }
 ```
 
 **Examples:**
 ```jsonc
 "config.yaml"                  // Single file
-"rules/*.md"                   // All markdown in rules/
-"agents/*.md"                  // All agents
-"commands/*.md"                // All commands
-```
-
-**Future support (coming soon):**
-```jsonc
-"**/*.md"                      // Recursive glob
-"*.{md,yaml}"                  // Multiple extensions
+"rules/**/*.md"                // All markdown in rules/ and subdirectories
+"agents/**/*.md"               // All agents, including nested directories
+"commands/**/*.md"             // All commands with full directory structure
+"skills/**/*"                  // All files in skills/, any type, nested
 ```
 
 ### `to` (string | object)
@@ -69,6 +77,13 @@ Target path(s) relative to workspace root.
 ```jsonc
 {
   "to": ".cursor/rules/*.mdc"  // * matches source filename
+}
+```
+
+**Recursive target with glob:**
+```jsonc
+{
+  "to": ".cursor/rules/**/*.mdc"  // ** preserves directory structure
 }
 ```
 
@@ -799,15 +814,27 @@ Used in `map` field for value transformations.
 
 ```jsonc
 {
-  "from": "rules/*.md",
-  "to": ".cursor/rules/*.mdc"
+  "from": "rules/**/*.md",
+  "to": ".cursor/rules/**/*.mdc"
 }
 ```
 
 **Behavior:**
-- Copies all `.md` files from `rules/` directory
+- Recursively copies all `.md` files from `rules/` directory and subdirectories
+- Preserves nested directory structure
 - Changes extension from `.md` to `.mdc`
 - No content transformation
+
+**Example structure:**
+```
+Package:                      Workspace:
+rules/                        .cursor/rules/
+├── typescript.md      →      ├── typescript.mdc
+├── advanced/          →      ├── advanced/
+│   └── generics.md    →      │   └── generics.mdc
+└── basic/             →      └── basic/
+    └── variables.md   →          └── variables.mdc
+```
 
 ### Example 2: Format Conversion with Key Mapping
 
@@ -918,7 +945,35 @@ Used in `map` field for value transformations.
 - Maps model values
 - Preserves markdown body
 
-### Example 7: Complex Pipeline with Filtering
+### Example 7: Recursive Directory Copy with Mixed File Types
+
+```jsonc
+{
+  "from": "skills/**/*",
+  "to": ".claude/skills/**/*"
+}
+```
+
+**Behavior:**
+- Recursively copies all files from `skills/` directory
+- Preserves all file types (.md, .ts, .json, etc.)
+- Maintains complete directory structure
+- No content transformation
+
+**Example structure:**
+```
+Package:                           Workspace:
+skills/                            .claude/skills/
+├── code-review/            →      ├── code-review/
+│   ├── analyze.md          →      │   ├── analyze.md
+│   ├── config.json         →      │   ├── config.json
+│   └── helpers/            →      │   └── helpers/
+│       └── utils.ts        →      │       └── utils.ts
+└── testing/                →      └── testing/
+    └── test-gen.md         →          └── test-gen.md
+```
+
+### Example 8: Complex Pipeline with Filtering
 
 ```jsonc
 {
@@ -945,7 +1000,7 @@ Used in `map` field for value transformations.
 
 Start with minimal options:
 ```jsonc
-{ "from": "rules/{name}.md", "to": ".platform/rules/{name}.md" }
+{ "from": "rules/**/*.md", "to": ".platform/rules/**/*.md" }
 ```
 
 Add complexity only when needed.
