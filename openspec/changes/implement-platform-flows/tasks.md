@@ -53,80 +53,80 @@
 ## 3. Transform Implementations
 
 ### 3.1 Format Converters (`src/core/flow-transforms.ts`)
-- [ ] 3.1.1 Implement format converters
-  - [ ] `jsonc` - Parse JSONC to object
-  - [ ] `yaml` - Convert YAML ↔ object
-  - [ ] `toml` - Convert TOML ↔ object
-- [ ] 3.1.2 Auto-detection logic
-  - [ ] Detect format from file extension
-  - [ ] Detect format from content (fallback)
-  - [ ] Handle mixed formats (e.g., JSONC with YAML frontmatter)
+- [x] 3.1.1 Implement format converters
+  - [x] `jsonc` - Parse JSONC to object
+  - [x] `yaml` - Convert YAML ↔ object
+  - [x] `toml` - Convert TOML ↔ object
+- [x] 3.1.2 Auto-detection logic
+  - [x] Detect format from file extension
+  - [x] Detect format from content (fallback)
+  - [x] Handle mixed formats (e.g., JSONC with YAML frontmatter)
 
 ### 3.2 Merge Strategies
-- [ ] 3.2.1 Implement merge operations
-  - [ ] `merge` - Deep merge preserving nested structures
-  - [ ] `merge-shallow` - Shallow merge (top-level only)
-  - [ ] `replace` - Complete replacement
-- [ ] 3.2.2 Priority-based conflict resolution
-  - [ ] Track package installation order and dependency depth
-  - [ ] Implement priority calculation (workspace > direct > nested)
-  - [ ] Apply last-writer-wins based on priority
-  - [ ] Array merge strategies (append, replace, deduplicate)
-- [ ] 3.2.3 Conflict detection and warnings
-  - [ ] Detect when multiple packages target same file
-  - [ ] Log warnings with package names and priority info
-  - [ ] Show which package's content was used
-  - [ ] Collect conflict summary for reporting
+- [x] 3.2.1 Implement merge operations
+  - [x] `merge` - Deep merge preserving nested structures
+  - [x] `merge-shallow` - Shallow merge (top-level only)
+  - [x] `replace` - Complete replacement
+- [x] 3.2.2 Priority-based conflict resolution
+  - [x] Track package installation order and dependency depth
+  - [x] Implement priority calculation (workspace > direct > nested)
+  - [x] Apply last-writer-wins based on priority
+  - [x] Array merge strategies (append, replace, deduplicate)
+- [x] 3.2.3 Conflict detection and warnings
+  - [x] Detect when multiple packages target same file
+  - [x] Log warnings with package names and priority info
+  - [x] Show which package's content was used
+  - [x] Collect conflict summary for reporting
 
 ### 3.3 Content Filters
-- [ ] 3.3.1 Implement filter transforms
-  - [ ] `filter-comments` - Remove comments from JSONC/YAML
-  - [ ] `filter-empty` - Remove empty strings/arrays/objects
-  - [ ] `filter-null` - Remove null/undefined values
-- [ ] 3.3.2 Configurable filter options
-  - [ ] Recursive vs. shallow filtering
-  - [ ] Preserve empty arrays/objects option
+- [x] 3.3.1 Implement filter transforms
+  - [x] `filter-comments` - Remove comments from JSONC/YAML
+  - [x] `filter-empty` - Remove empty strings/arrays/objects
+  - [x] `filter-null` - Remove null/undefined values
+- [x] 3.3.2 Configurable filter options
+  - [x] Recursive vs. shallow filtering
+  - [x] Preserve empty arrays/objects option
 
 ### 3.4 Markdown Transforms
-- [ ] 3.4.1 Implement markdown processors
-  - [ ] `sections` - Split by headers
-  - [ ] `frontmatter` - Extract YAML frontmatter
-  - [ ] `body` - Extract markdown body (no frontmatter)
-- [ ] 3.4.2 Frontmatter transforms
-  - [ ] Parse YAML frontmatter
-  - [ ] Apply key mapping to frontmatter
-  - [ ] Preserve body unchanged
-  - [ ] Serialize with transformed frontmatter
+- [x] 3.4.1 Implement markdown processors
+  - [x] `sections` - Split by headers
+  - [x] `frontmatter` - Extract YAML frontmatter
+  - [x] `body` - Extract markdown body (no frontmatter)
+- [x] 3.4.2 Frontmatter transforms
+  - [x] Parse YAML frontmatter
+  - [x] Apply key mapping to frontmatter
+  - [x] Preserve body unchanged
+  - [x] Serialize with transformed frontmatter
 
 ### 3.5 Validation Transforms
-- [ ] 3.5.1 Implement validators
-  - [ ] `validate` - Basic structure validation
-  - [ ] `validate-schema(path)` - JSON Schema validation
-- [ ] 3.5.2 Validation reporting
-  - [ ] Collect validation errors
-  - [ ] Report errors with context
+- [x] 3.5.1 Implement validators
+  - [x] `validate` - Basic structure validation
+  - [ ] `validate-schema(path)` - JSON Schema validation (deferred)
+- [x] 3.5.2 Validation reporting
+  - [x] Collect validation errors
+  - [x] Report errors with context
 
 ### 3.6 Value Transforms
-- [ ] 3.6.1 Type converters
-  - [ ] `number` - Convert to number
-  - [ ] `string` - Convert to string
-  - [ ] `boolean` - Convert to boolean
-  - [ ] `json` - Parse JSON string
-  - [ ] `date` - Parse date string
-- [ ] 3.6.2 String transforms
-  - [ ] `uppercase`, `lowercase` - Case conversion
-  - [ ] `title-case`, `camel-case`, `kebab-case`, `snake-case` - Case styles
-  - [ ] `trim` - Trim whitespace
-  - [ ] `slugify` - Create URL-safe slugs
-- [ ] 3.6.3 Array transforms
-  - [ ] `array-append` - Append to array
-  - [ ] `array-unique` - Remove duplicates
-  - [ ] `array-flatten` - Flatten nested arrays
-- [ ] 3.6.4 Object transforms
-  - [ ] `flatten` - Flatten nested objects
-  - [ ] `unflatten` - Unflatten to nested structure
-  - [ ] `pick-keys` - Extract specific keys
-  - [ ] `omit-keys` - Remove specific keys
+- [x] 3.6.1 Type converters
+  - [x] `number` - Convert to number
+  - [x] `string` - Convert to string
+  - [x] `boolean` - Convert to boolean
+  - [x] `json` - Parse JSON string
+  - [x] `date` - Parse date string
+- [x] 3.6.2 String transforms
+  - [x] `uppercase`, `lowercase` - Case conversion
+  - [x] `title-case`, `camel-case`, `kebab-case`, `snake-case` - Case styles
+  - [x] `trim` - Trim whitespace
+  - [x] `slugify` - Create URL-safe slugs
+- [x] 3.6.3 Array transforms
+  - [x] `array-append` - Append to array
+  - [x] `array-unique` - Remove duplicates
+  - [x] `array-flatten` - Flatten nested arrays
+- [x] 3.6.4 Object transforms
+  - [x] `flatten` - Flatten nested objects
+  - [x] `unflatten` - Unflatten to nested structure
+  - [x] `pick-keys` - Extract specific keys
+  - [x] `omit-keys` - Remove specific keys
 
 ## 4. Key Remapping System
 

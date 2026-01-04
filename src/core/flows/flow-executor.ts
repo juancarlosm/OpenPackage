@@ -30,11 +30,24 @@ import type {
   MultiTargetFlows,
 } from '../../types/flows.js';
 import { logger } from '../../utils/logger.js';
+import { 
+  defaultTransformRegistry, 
+  TransformRegistry,
+  serializeMarkdownWithFrontmatter,
+  frontmatterTransform,
+  bodyTransform
+} from './flow-transforms.js';
 
 /**
  * Default flow executor implementation
  */
 export class DefaultFlowExecutor implements FlowExecutor {
+  private transformRegistry: TransformRegistry;
+
+  constructor(transformRegistry?: TransformRegistry) {
+    this.transformRegistry = transformRegistry || defaultTransformRegistry;
+  }
+
   /**
    * Execute a single flow
    */
@@ -647,22 +660,18 @@ export class DefaultFlowExecutor implements FlowExecutor {
    * Apply a single transform to a value
    */
   private applySingleTransform(value: any, transform: string): any {
-    switch (transform) {
-      case 'number':
-        return Number(value);
-      case 'string':
-        return String(value);
-      case 'boolean':
-        return Boolean(value);
-      case 'uppercase':
-        return typeof value === 'string' ? value.toUpperCase() : value;
-      case 'lowercase':
-        return typeof value === 'string' ? value.toLowerCase() : value;
-      case 'trim':
-        return typeof value === 'string' ? value.trim() : value;
-      default:
-        logger.warn(`Unknown transform: ${transform}`);
-        return value;
+    try {
+      // Use transform registry for all transforms
+      if (this.transformRegistry.has(transform)) {
+        return this.transformRegistry.execute(transform, value);
+      }
+      
+      // Fallback for backward compatibility
+      logger.warn(`Unknown transform: ${transform}`);
+      return value;
+    } catch (error) {
+      logger.warn(`Transform '${transform}' failed: ${error instanceof Error ? error.message : String(error)}`);
+      return value;
     }
   }
 
@@ -672,13 +681,64 @@ export class DefaultFlowExecutor implements FlowExecutor {
   private async applyPipeTransforms(data: any, transforms: string[], context: FlowContext): Promise<any> {
     let result = data;
 
-    for (const transform of transforms) {
-      // For now, just log the transform
-      // Transform implementation will be added in section 3
-      logger.debug(`Applying transform: ${transform}`);
+    for (const transformSpec of transforms) {
+      try {
+        // Parse transform specification
+        // Format: "transform-name" or "transform-name(option1=value1,option2=value2)"
+        const { name, options } = this.parseTransformSpec(transformSpec);
+
+        logger.debug(`Applying transform: ${name}`, options);
+
+        // Execute transform
+        result = this.transformRegistry.execute(name, result, options);
+      } catch (error) {
+        throw new Error(`Transform '${transformSpec}' failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
 
     return result;
+  }
+
+  /**
+   * Parse transform specification
+   * Examples: "trim", "number", "pick-keys(keys=[a,b,c])"
+   */
+  private parseTransformSpec(spec: string): { name: string; options?: any } {
+    const match = spec.match(/^([a-z-]+)(?:\((.+)\))?$/);
+    if (!match) {
+      throw new Error(`Invalid transform specification: ${spec}`);
+    }
+
+    const [, name, optionsStr] = match;
+
+    if (!optionsStr) {
+      return { name };
+    }
+
+    // Parse options (simple key=value format)
+    const options: any = {};
+    const pairs = optionsStr.split(',').map(s => s.trim());
+    
+    for (const pair of pairs) {
+      const [key, value] = pair.split('=').map(s => s.trim());
+      
+      // Parse value type
+      if (value.startsWith('[') && value.endsWith(']')) {
+        // Array
+        options[key] = value.slice(1, -1).split(',').map(s => s.trim());
+      } else if (value === 'true' || value === 'false') {
+        // Boolean
+        options[key] = value === 'true';
+      } else if (!isNaN(Number(value))) {
+        // Number
+        options[key] = Number(value);
+      } else {
+        // String
+        options[key] = value;
+      }
+    }
+
+    return { name, options };
   }
 
   /**
@@ -871,7 +931,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
     return {
       source: results[0]?.source || '',
-      target: results.map(r => r.target),
+      target: results.flatMap(r => typeof r.target === 'string' ? [r.target] : r.target),
       success: true,
       transformed: results.some(r => r.transformed),
       warnings: results.flatMap(r => r.warnings || []),
