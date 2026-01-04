@@ -23,29 +23,13 @@ import type { PlatformFlowsConfig as PlatformFlowsConfigType, GlobalFlowsConfig 
 
 export type Platform = string
 
-// New unified platform definition structure
-export interface SubdirFileTransformation {
-  packageExt: string
-  workspaceExt: string
-}
-
-export interface SubdirDef {
-  // Base path under the platform root directory for this subdir
-  // Examples: 'rules', 'memories', 'commands'
-  path: string
-  // Allowed workspace file extensions; undefined = all allowed, [] = none allowed
-  exts?: string[]
-  // Optional extension transformations between package (registry) and workspace
-  transformations?: SubdirFileTransformation[]
-}
-
+// Platform definition structure - flows-only (no legacy subdirs)
 export interface PlatformDefinition {
   id: Platform
   name: string
   rootDir: string
   rootFile?: string
-  subdirs: Map<string, SubdirDef>  // Map<universalDir, SubdirDef> - legacy
-  flows?: Flow[]  // Flow-based transformations (new system)
+  flows: Flow[]  // Flow-based transformations (required for non-rootFile-only platforms)
   aliases?: string[]
   enabled: boolean
   description?: string
@@ -53,19 +37,11 @@ export interface PlatformDefinition {
 }
 
 // Types for JSONC config structure (array format)
-interface SubdirConfigEntry {
-  universalDir: string   // Custom universal directory name
-  platformDir: string    // Platform-specific path
-  exts?: string[]
-  transformations?: SubdirFileTransformation[]
-}
-
 interface PlatformConfig {
   name: string
   rootDir: string
   rootFile?: string
-  subdirs?: SubdirConfigEntry[]  // Array format in config (legacy)
-  flows?: Flow[]  // Flow-based transformations (new system)
+  flows?: Flow[]  // Flow-based transformations (required unless rootFile-only platform)
   aliases?: string[]
   enabled?: boolean
   description?: string
@@ -95,8 +71,7 @@ function isGlobalFlowsConfig(cfg: PlatformConfig | GlobalFlowsConfig): cfg is Gl
 
 /**
  * Create platform definitions from a PlatformsConfig object
- * Converts array-based config to Map-based internal representation for O(1) lookups
- * Supports both legacy subdirs and new flow-based configurations
+ * Flows-only configuration (no legacy subdirs support)
  * Assumes config is already validated.
  * @param config - The merged platforms configuration
  */
@@ -119,43 +94,12 @@ function createPlatformDefinitions(
     const platformConfig = cfg as PlatformConfig
     const platformId = id as Platform
 
-    // Handle subdirs (legacy support)
-    const subdirsMap = new Map<string, SubdirDef>()
-    
-    if (platformConfig.subdirs && platformConfig.subdirs.length > 0) {
-      for (const entry of platformConfig.subdirs) {
-        subdirsMap.set(entry.universalDir, {
-          path: entry.platformDir,
-          exts: entry.exts,
-          transformations: entry.transformations,
-        })
-      }
-      
-      // Log deprecation warning if using subdirs
-      if (!platformConfig.flows || platformConfig.flows.length === 0) {
-        logger.warn(
-          `Platform '${platformId}': Using deprecated 'subdirs' format. ` +
-          `Please migrate to 'flows' format. See migration guide for details.`
-        )
-      }
-    }
-
-    // Prefer flows over subdirs if both are present
-    const flows = platformConfig.flows && platformConfig.flows.length > 0 ? platformConfig.flows : undefined
-    if (flows && platformConfig.subdirs && platformConfig.subdirs.length > 0) {
-      logger.warn(
-        `Platform '${platformId}': Both 'flows' and 'subdirs' defined. ` +
-        `Using 'flows' and ignoring 'subdirs'.`
-      )
-    }
-
     result[platformId] = {
       id: platformId,
       name: platformConfig.name,
       rootDir: platformConfig.rootDir,
       rootFile: platformConfig.rootFile,
-      subdirs: subdirsMap,
-      flows: flows,
+      flows: platformConfig.flows || [],
       aliases: platformConfig.aliases,
       enabled: platformConfig.enabled !== false,
       description: platformConfig.description,
@@ -221,11 +165,6 @@ export function mergePlatformsConfig(base: PlatformsConfig, override: PlatformsC
       description: overrideCfg.description ?? baseCfg.description,
       variables: overrideCfg.variables ?? baseCfg.variables,
       flows: overrideCfg.flows ?? baseCfg.flows, // replace array (no merge)
-      subdirs: (() => {
-        const baseSub = Array.isArray(baseCfg.subdirs) ? baseCfg.subdirs : []
-        const ovSub = Array.isArray(overrideCfg.subdirs) ? overrideCfg.subdirs : []
-        return mergeSubdirsConfigs(baseSub, ovSub)
-      })(),
     }
   }
 
@@ -233,52 +172,8 @@ export function mergePlatformsConfig(base: PlatformsConfig, override: PlatformsC
 }
 
 /**
- * Merge subdirs arrays by universalDir.
- * For matches, override specific fields if present.
- * Adds new entries; preserves base order.
- */
-function mergeSubdirsConfigs(
-  base: SubdirConfigEntry[], 
-  overrideArr: SubdirConfigEntry[]
-): SubdirConfigEntry[] {
-  const baseMap = new Map<string, SubdirConfigEntry>(
-    base.map(entry => [entry.universalDir, { ...entry }]) // shallow copy
-  )
-
-  for (const ovEntry of overrideArr) {
-    const baseEntry = baseMap.get(ovEntry.universalDir)
-    if (baseEntry) {
-      // Override if field present and defined
-      if ('platformDir' in ovEntry && ovEntry.platformDir !== undefined) {
-        baseEntry.platformDir = ovEntry.platformDir
-      }
-      if ('exts' in ovEntry && ovEntry.exts !== undefined) {
-        baseEntry.exts = ovEntry.exts
-      }
-      if ('transformations' in ovEntry && ovEntry.transformations !== undefined) {
-        baseEntry.transformations = ovEntry.transformations
-      }
-    } else {
-      baseMap.set(ovEntry.universalDir, { ...ovEntry })
-    }
-  }
-
-  // Preserve base order, then append new
-  const result: SubdirConfigEntry[] = []
-  for (const entry of base) {
-    result.push(baseMap.get(entry.universalDir)!)
-  }
-  for (const [key, entry] of baseMap) {
-    if (!base.some(b => b.universalDir === key)) {
-      result.push(entry)
-    }
-  }
-  return result
-}
-
-/**
  * Validate a PlatformsConfig object and return any validation errors.
- * Now supports both legacy subdirs and new flow-based configurations.
+ * Flows-only configuration (no legacy subdirs support).
  * @param config - The config to validate
  * @returns Array of error messages; empty if valid
  */
@@ -315,45 +210,7 @@ export function validatePlatformsConfig(config: PlatformsConfig): string[] {
       errors.push(`Platform '${platformId}': Missing or empty name`)
     }
 
-    // Validate subdirs (legacy)
-    if (cfg.subdirs && Array.isArray(cfg.subdirs)) {
-      const seenUniversalDirs = new Set<string>()
-      for (let index = 0; index < cfg.subdirs.length; index++) {
-        const entry = cfg.subdirs[index]
-        if (!entry || typeof entry !== 'object') {
-          errors.push(`Platform '${platformId}', subdirs[${index}]: Invalid entry (must be object)`)
-          continue
-        }
-        if (!entry.universalDir || typeof entry.universalDir !== 'string' || entry.universalDir.trim() === '') {
-          errors.push(`Platform '${platformId}', subdirs[${index}].universalDir: Missing or invalid string`)
-        } else if (seenUniversalDirs.has(entry.universalDir)) {
-          errors.push(`Platform '${platformId}', subdirs[${index}]: Duplicate universalDir '${entry.universalDir}'`)
-        } else {
-          seenUniversalDirs.add(entry.universalDir)
-        }
-        if (!entry.platformDir || typeof entry.platformDir !== 'string' || entry.platformDir.trim() === '') {
-          errors.push(`Platform '${platformId}', subdirs[${index}].platformDir: Missing or invalid string`)
-        }
-        if (entry.exts !== undefined && (!Array.isArray(entry.exts) || entry.exts.some((e: any) => typeof e !== 'string'))) {
-          errors.push(`Platform '${platformId}', subdirs[${index}].exts: Must be array of strings or undefined`)
-        }
-        if (entry.transformations !== undefined) {
-          if (!Array.isArray(entry.transformations)) {
-            errors.push(`Platform '${platformId}', subdirs[${index}].transformations: Must be array or undefined`)
-          } else {
-            entry.transformations.forEach((t: any, tIndex: number) => {
-              if (!t || typeof t !== 'object' || typeof t.packageExt !== 'string' || typeof t.workspaceExt !== 'string') {
-                errors.push(`Platform '${platformId}', subdirs[${index}].transformations[${tIndex}]: Invalid {packageExt: string, workspaceExt: string}`)
-              }
-            })
-          }
-        }
-      }
-    } else if (cfg.subdirs !== undefined) {
-      errors.push(`Platform '${platformId}': subdirs must be array or undefined`)
-    }
-
-    // Validate flows (new system)
+    // Validate flows
     if (cfg.flows !== undefined) {
       if (!Array.isArray(cfg.flows)) {
         errors.push(`Platform '${platformId}': flows must be array or undefined`)
@@ -362,12 +219,9 @@ export function validatePlatformsConfig(config: PlatformsConfig): string[] {
       }
     }
 
-    // Validate that at least one of subdirs or flows is present
-    // Exception: platforms with only rootFile (like Warp) don't need subdirs/flows
-    if ((!cfg.subdirs || cfg.subdirs.length === 0) && 
-        (!cfg.flows || cfg.flows.length === 0) &&
-        !cfg.rootFile) {
-      errors.push(`Platform '${platformId}': Must define either 'subdirs', 'flows', or 'rootFile'`)
+    // Validate that flows is present (unless rootFile-only platform like Warp)
+    if ((!cfg.flows || cfg.flows.length === 0) && !cfg.rootFile) {
+      errors.push(`Platform '${platformId}': Must define either 'flows' or 'rootFile'`)
     }
 
     if (cfg.aliases !== undefined && (!Array.isArray(cfg.aliases) || cfg.aliases.some((a: any) => typeof a !== 'string'))) {
@@ -527,10 +381,6 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
     for (const alias of def.aliases ?? []) {
       aliasLookup[alias.toLowerCase()] = def.id
     }
-    // Add universal subdirs from legacy subdirs config
-    for (const univ of def.subdirs.keys()) {
-      universalSubdirs.add(univ)
-    }
     // Add universal subdirs from flows config
     if (def.flows && def.flows.length > 0) {
       for (const flow of def.flows) {
@@ -598,10 +448,10 @@ export function platformUsesFlows(platform: Platform, cwd?: string): boolean {
 
 /**
  * Check if a platform uses legacy subdirs configuration
+ * @deprecated Always returns false - subdirs support removed
  */
 export function platformUsesSubdirs(platform: Platform, cwd?: string): boolean {
-  const def = getPlatformDefinition(platform, cwd)
-  return def.subdirs.size > 0 && (!def.flows || def.flows.length === 0)
+  return false
 }
 
 /**
@@ -738,12 +588,7 @@ function buildDirectoryPaths(
 ): PlatformPaths {
   const subdirsPaths: Record<string, string> = {}
   
-  // Build from subdirs (legacy)
-  for (const [universalDir, subdirDef] of definition.subdirs.entries()) {
-    subdirsPaths[universalDir] = join(cwd, definition.rootDir, subdirDef.path)
-  }
-  
-  // Build from flows (new system)
+  // Build from flows
   if (definition.flows && definition.flows.length > 0) {
     for (const flow of definition.flows) {
       // Extract universal subdir from 'from' pattern
@@ -853,6 +698,11 @@ export async function getDetectedPlatforms(cwd: string): Promise<Platform[]> {
 /**
  * Create platform directories
  */
+/**
+ * Create platform directories
+ * @deprecated Subdirs support removed - flows create directories as needed
+ * Only creates root directory for platforms now
+ */
 export async function createPlatformDirectories(
   cwd: string,
   platforms: Platform[]
@@ -865,21 +715,23 @@ export async function createPlatformDirectories(
     if (!definition) {
       throw new Error(`Unknown platform: ${platform}`)
     }
-    for (const [universalDir, subdirDef] of definition.subdirs.entries()) {
-      const dirPath = join(cwd, definition.rootDir, subdirDef.path)
-      try {
-        const dirExists = await exists(dirPath)
-        if (!dirExists) {
-          await ensureDir(dirPath)
-          created.push(relative(cwd, dirPath))
-          logger.debug(`Created platform directory ${universalDir}: ${dirPath}`)
-        }
-      } catch (error) {
-        logger.error(
-          `Failed to create platform directory ${universalDir} (${dirPath}): ${error}`
-        )
+    
+    // Only create root directory
+    const rootPath = join(cwd, definition.rootDir)
+    try {
+      const dirExists = await exists(rootPath)
+      if (!dirExists) {
+        await ensureDir(rootPath)
+        created.push(relative(cwd, rootPath))
+        logger.debug(`Created platform root directory: ${rootPath}`)
       }
+    } catch (error) {
+      logger.error(
+        `Failed to create platform root directory (${rootPath}): ${error}`
+      )
     }
+    
+    // Flow-based installations will create subdirectories as needed
   }
 
   return created
@@ -908,13 +760,8 @@ export async function validatePlatformStructure(
     }
   }
 
-  // Check all subdirs directories exist
-  for (const [universalDir, subdirDef] of definition.subdirs.entries()) {
-    const dirPath = join(cwd, definition.rootDir, subdirDef.path)
-    if (!(await exists(dirPath))) {
-      issues.push(`${universalDir} directory does not exist: ${dirPath}`)
-    }
-  }
+  // TODO: Optionally check flow-based directories exist
+  // (may not be necessary since flows handle missing directories gracefully)
 
   return {
     valid: issues.length === 0,
@@ -938,13 +785,7 @@ export function getPlatformSubdirExts(
     throw new Error(`Unknown platform: ${platform}`)
   }
   
-  // First check subdirs (legacy)
-  const subdirDef = definition.subdirs.get(universalSubdir)
-  if (subdirDef) {
-    return subdirDef.exts || []
-  }
-  
-  // Check flows (new system)
+  // Check flows
   if (definition.flows && definition.flows.length > 0) {
     const extensions = new Set<string>()
     
@@ -1029,56 +870,36 @@ export function isPlatformId(
 }
 
 /**
- * Determine whether an extension is allowed for a given subdir definition.
+ * @deprecated Subdirs support removed - use flows instead
+ * Always returns false for backward compatibility
  */
 export function isExtAllowed(
-  subdirDef: SubdirDef | undefined,
+  subdirDef: any,
   ext: string
 ): boolean {
-  if (!subdirDef) {
-    return false
-  }
-  if (subdirDef.exts === undefined) {
-    return true
-  }
-  if (subdirDef.exts.length === 0) {
-    return false
-  }
-  return subdirDef.exts.includes(ext)
+  return false
 }
 
 /**
- * Convert a package (registry) extension to the workspace extension.
- * Falls back to the original extension if no transformation applies.
+ * @deprecated Subdirs support removed - use flows instead
+ * Always returns original extension for backward compatibility
  */
 export function getWorkspaceExt(
-  subdirDef: SubdirDef,
+  subdirDef: any,
   packageExt: string
 ): string {
-  if (!subdirDef.transformations || packageExt === "") {
-    return packageExt
-  }
-  const transformation = subdirDef.transformations.find(
-    ({ packageExt: candidate }) => candidate === packageExt
-  )
-  return transformation?.workspaceExt ?? packageExt
+  return packageExt
 }
 
 /**
- * Convert a workspace extension to the package (registry) extension.
- * Falls back to the original extension if no transformation applies.
+ * @deprecated Subdirs support removed - use flows instead
+ * Always returns original extension for backward compatibility
  */
 export function getPackageExt(
-  subdirDef: SubdirDef,
+  subdirDef: any,
   workspaceExt: string
 ): string {
-  if (!subdirDef.transformations || workspaceExt === "") {
-    return workspaceExt
-  }
-  const transformation = subdirDef.transformations.find(
-    ({ workspaceExt: candidate }) => candidate === workspaceExt
-  )
-  return transformation?.packageExt ?? workspaceExt
+  return workspaceExt
 }
 
 /**

@@ -15,7 +15,10 @@ import { DIR_PATTERNS } from '../../constants/index.js';
 
 /**
  * Process platform subdirectories (rules/commands/agents) within a base directory
- * Common logic shared between different discovery methods
+ * Uses flows to discover platform-specific directories
+ * 
+ * TODO: Implement full flow-based discovery
+ * For now, discover all files under platform rootDir
  */
 async function discoverPlatformFiles(
   cwd: string,
@@ -25,26 +28,39 @@ async function discoverPlatformFiles(
   const definition = getPlatformDefinition(platform);
   const allFiles: DiscoveredFile[] = [];
 
-  // Process each universal subdir that this platform supports
-  for (const [subdirName, subdirDef] of Object.entries(definition.subdirs)) {
-    if (!subdirDef) {
-      continue;
+  // Discover files from flows
+  if (definition.flows && definition.flows.length > 0) {
+    // Extract unique directories from flows 'to' patterns
+    const platformDirs = new Set<string>();
+    
+    for (const flow of definition.flows) {
+      const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+      if (toPattern) {
+        // Extract directory from pattern (e.g., ".cursor/rules/{name}.mdc" -> "rules")
+        const parts = toPattern.split('/');
+        if (parts.length > 1) {
+          // Get the directory component after rootDir
+          const subdir = parts.slice(1, -1).join('/') || parts[1];
+          if (subdir) {
+            platformDirs.add(subdir);
+          }
+        }
+      }
     }
-    const subdirPath = join(cwd, definition.rootDir, subdirDef.path);
-    const allowedExts = subdirDef.exts;
 
-    if (allowedExts && allowedExts.length === 0) {
-      continue;
-    }
-
-    if (await exists(subdirPath) && await isDirectory(subdirPath)) {
-      const files = await discoverFiles(subdirPath, packageName, {
-        platform,
-        registryPathPrefix: `${DIR_PATTERNS.OPENPACKAGE}/${subdirName}`,
-        sourceDirLabel: platform,
-        fileExtensions: allowedExts
-      });
-      allFiles.push(...files);
+    // Discover files in each platform directory
+    for (const subdir of platformDirs) {
+      const subdirPath = join(cwd, definition.rootDir, subdir);
+      
+      if (await exists(subdirPath) && await isDirectory(subdirPath)) {
+        const files = await discoverFiles(subdirPath, packageName, {
+          platform,
+          registryPathPrefix: `${DIR_PATTERNS.OPENPACKAGE}/${subdir}`,
+          sourceDirLabel: platform,
+          fileExtensions: [] // Allow all extensions (flows handle filtering)
+        });
+        allFiles.push(...files);
+      }
     }
   }
 

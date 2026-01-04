@@ -151,10 +151,9 @@
 
 - [x] 5.1 Update platform loader (`src/core/platforms.ts`)
   - [x] Load flow-based configs
-  - [x] Support both subdirs and flows (transition period)
+  - [ ] Remove subdirs support (flows-only)
   - [x] Merge hierarchy (built-in → global → workspace)
   - [x] Validate flow schemas
-  - [x] Generate warnings for deprecated subdirs
 - [x] 5.2 Add global flows support
   - [x] Load `global.flows` section
   - [x] Apply global flows before platform-specific flows
@@ -257,134 +256,78 @@
   - [x] All tests passing (except 1 unrelated)
   - [x] Backward compatibility maintained
 
-## 8. CLI Commands and Tooling
+## 8. Testing
 
-- [ ] 8.1 Add validation command
-  - [ ] `opkg validate platforms` - Validate platform configs
-  - [ ] Check flow syntax
-  - [ ] Validate transform names
-  - [ ] Check for circular dependencies
-  - [ ] Report warnings and errors
-- [ ] 8.2 Enhance status command
-  - [ ] `opkg status` - Show detected platforms
-  - [ ] List enabled flows for each platform
-  - [ ] Show global flows
-  - [ ] Display flow execution summary
-- [ ] 8.3 Enhance dry-run mode
-  - [ ] `opkg install --dry-run` - Preview flow execution
-  - [ ] Show source → target mappings
-  - [ ] Display transform pipeline for each file
-  - [ ] Preview merge conflicts
-- [ ] 8.4 Add debug logging
-  - [ ] `DEBUG=opkg:flows` environment variable
-  - [ ] Log flow execution steps
-  - [ ] Log transform application
-  - [ ] Log merge operations
-  - [ ] Log conditional evaluation
-
-## 9. Migration Tooling
-
-- [ ] 9.1 Create migration utilities
-  - [ ] `convertSubdirsToFlows(platform)` - Auto-convert subdirs to flows
-  - [ ] Detect simple mappings
-  - [ ] Preserve extension transformations
-  - [ ] Generate flow configs
-- [ ] 9.2 Add migration warnings
-  - [ ] Detect old subdirs format
-  - [ ] Show migration instructions
-  - [ ] Provide conversion examples
-- [ ] 9.3 Create migration guide
-  - [ ] Document conversion process
-  - [ ] Provide examples for each pattern
-  - [ ] Include troubleshooting section
-
-## 10. Testing
-
-### 10.1 Unit Tests
-- [ ] 10.1.1 Flow executor tests
+### 8.1 Unit Tests
+- [ ] 8.1.1 Flow executor tests
   - [ ] Test each pipeline step
   - [ ] Test multi-target flows
   - [ ] Test conditional execution
   - [ ] Test error handling
-- [ ] 10.1.2 Transform tests
+- [ ] 8.1.2 Transform tests
   - [ ] Test each format converter
   - [ ] Test each merge strategy
   - [ ] Test each filter
   - [ ] Test each value transform
-- [ ] 10.1.3 Key mapper tests
+- [ ] 8.1.3 Key mapper tests
   - [ ] Test dot notation
   - [ ] Test wildcards
   - [ ] Test value transforms
   - [ ] Test default values
-- [ ] 10.1.4 Platform loader tests
+- [ ] 8.1.4 Platform loader tests
   - [ ] Test config merging
   - [ ] Test schema validation
   - [ ] Test global flows
-  - [ ] Test backward compatibility
 
-### 10.2 Integration Tests
-- [ ] 10.2.1 Install pipeline tests
+### 8.2 Integration Tests
+- [ ] 8.2.1 Install pipeline tests
   - [ ] Simple file mapping
   - [ ] Format conversion
   - [ ] Key remapping
   - [ ] Multi-package composition
   - [ ] Namespace isolation
-- [ ] 10.2.2 Save pipeline tests
+- [ ] 8.2.2 Save pipeline tests
   - [ ] Reverse transformations
   - [ ] Platform detection
   - [ ] Format preservation
-- [ ] 10.2.3 Apply pipeline tests
+- [ ] 8.2.3 Apply pipeline tests
   - [ ] Conditional flows
   - [ ] Merge strategies
   - [ ] Conflict resolution
-- [ ] 10.2.4 Real-world scenarios
+- [ ] 8.2.4 Real-world scenarios
   - [ ] Test with actual packages
   - [ ] Test all 13 platforms
   - [ ] Test custom platform configs
   - [ ] Test global + local overrides
 
-### 10.3 Performance Tests
-- [ ] 10.3.1 Benchmark flow execution
+### 8.3 Performance Tests
+- [ ] 8.3.1 Benchmark flow execution
   - [ ] Simple file copy (baseline)
   - [ ] Format conversion overhead
   - [ ] Complex transforms
   - [ ] Multi-target flows
-- [ ] 10.3.2 Optimize hot paths
+- [ ] 8.3.2 Optimize hot paths
   - [ ] Cache format parsers
   - [ ] Lazy evaluation
   - [ ] Structural sharing for merges
-- [ ] 10.3.3 Memory profiling
+- [ ] 8.3.3 Memory profiling
   - [ ] Large file handling
   - [ ] Multi-package scenarios
   - [ ] Memory leaks
 
-### 10.4 Migration Tests
-- [ ] 10.4.1 Subdirs to flows conversion
-  - [ ] Test auto-conversion
-  - [ ] Verify behavior equivalence
-  - [ ] Test with custom configs
-- [ ] 10.4.2 Backward compatibility
-  - [ ] Support both formats during transition
-  - [ ] Verify no breaking changes for default configs
+## 9. Documentation
 
-## 11. Documentation
-
-- [ ] 11.1 API documentation
+- [ ] 9.1 API documentation
   - [ ] Flow schema reference
   - [ ] Transform catalog
   - [ ] Configuration format
   - [ ] TypeScript interfaces
-- [ ] 11.2 User guides
+- [ ] 9.2 User guides
   - [ ] Quick start guide
-  - [ ] Common patterns
+  - [ ] Common flows patterns
   - [ ] Advanced features
   - [ ] Troubleshooting
-- [ ] 11.3 Migration guide
-  - [ ] Subdirs to flows conversion
-  - [ ] Custom platform migration
-  - [ ] Breaking changes
-  - [ ] Migration timeline
-- [ ] 11.4 Examples
+- [ ] 9.3 Examples
   - [ ] Simple file mapping
   - [ ] Format conversion
   - [ ] Key remapping
@@ -393,24 +336,23 @@
   - [ ] Multi-target flows
   - [ ] Custom handlers
 
-## 12. Finalization
+## 10. Finalization
 
-- [ ] 12.1 Code review
+- [ ] 10.1 Code review
   - [ ] Review all new code
   - [ ] Check error handling
   - [ ] Verify type safety
   - [ ] Review performance optimizations
-- [ ] 12.2 Documentation review
+- [ ] 10.2 Documentation review
   - [ ] Verify completeness
   - [ ] Check examples
-  - [ ] Review migration guide
   - [ ] Update main README
-- [ ] 12.3 Testing review
+- [ ] 10.3 Testing review
   - [ ] Verify test coverage (>90%)
   - [ ] Check edge cases
   - [ ] Run full test suite
   - [ ] Performance benchmarks
-- [ ] 12.4 Release preparation
+- [ ] 10.4 Release preparation
   - [ ] Update CHANGELOG
   - [ ] Version bump (consider major version)
   - [ ] Create release notes
@@ -418,7 +360,7 @@
 
 ## Notes
 
-- Maintain backward compatibility during transition
+- **No backward compatibility** - Flows-only system, no subdirs support
 - Prioritize clear error messages
 - Optimize for common cases (simple file copies)
 - Keep transform implementations simple and composable

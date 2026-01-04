@@ -464,19 +464,24 @@ interface Condition {
 }
 ```
 
-### Decision 7: Backward Compatibility Strategy
+### Decision 7: No Backward Compatibility
 
-**Chosen:** Support both subdirs and flows during transition, with deprecation warnings
-
-**Timeline:**
-- **Phase 1** (v1.0): Add flow support, keep subdirs working
-- **Phase 2** (v1.5): Deprecate subdirs, show migration warnings
-- **Phase 3** (v2.0): Remove subdirs support (breaking change)
+**Chosen:** Flows-only system, no subdirs support
 
 **Rationale:**
-- Gives users time to migrate
-- Allows testing flows in production
-- Clear migration path
+- **Cleaner codebase:** No migration logic needed
+- **Simpler system:** One clear way to define platforms
+- **All built-in platforms already use flows:** No migration needed for default configs
+- **Better UX:** No confusion between subdirs and flows
+- **Faster development:** Skip migration tooling entirely
+- **Less maintenance:** No legacy code to support
+
+**For Custom Platforms:**
+Users with custom `platforms.jsonc` files using subdirs will need to convert to flows format. This is acceptable because:
+- Custom platforms are rare (most users use built-ins)
+- Conversion is straightforward (documented in user guide)
+- Flow format is more powerful and flexible
+- Better long-term system
 
 ## Risks / Trade-offs
 
@@ -505,16 +510,22 @@ interface Condition {
 - Dry-run mode to preview transformations
 - Debug logging for troubleshooting
 
-### Risk 3: Breaking Changes
+### Risk 3: Custom Platform Migration
 
-**Concern:** Moving from subdirs to flows may break existing workflows
+**Concern:** Users with custom `platforms.jsonc` using subdirs need to migrate
 
 **Mitigation:**
-- Support both formats during transition
-- Provide migration tooling
-- Clear migration guide
-- Gradual deprecation timeline
-- Maintain backward compatibility for built-in platforms
+- Comprehensive flow configuration guide
+- Clear examples for common patterns
+- Simple conversion process (well-documented)
+- Built-in platforms already use flows (serve as examples)
+- Schema validation provides immediate feedback
+- Error messages guide users to correct format
+
+**Acceptable Trade-off:**
+- Custom platforms are rare (most users use built-ins)
+- Flow format is more powerful and worth the one-time conversion
+- Cleaner codebase benefits all users long-term
 
 ### Risk 4: Edge Cases in Transforms
 
@@ -557,13 +568,13 @@ interface Condition {
 - Integrate with apply pipeline
 - Update platform utilities
 
-### Phase 4: Migration (Week 7-8)
-- Convert built-in platforms to flows
-- Test all 13 platforms
-- Create migration tooling
-- Write migration guide
+### Phase 4: Platform Completion (Week 7-8)
+- Verify all built-in platforms use flows (already complete)
+- Test all 13+ platforms
+- Remove subdirs support from codebase
+- Write flow configuration guide
 
-### Phase 5: Cleanup & Release (Week 9-10)
+### Phase 5: Cleanup & Release (Week 9)
 - Performance optimization
 - Documentation completion
 - Integration testing
@@ -599,13 +610,16 @@ interface Condition {
 
 ### Alternative 1: Keep subdirs, add transformation hooks
 
-**Description:** Keep current subdirs array, add optional `transform` field
+**Description:** Keep current subdirs array, add optional `transform` field, support both subdirs and flows
 
 **Rejected because:**
 - Still limited to predefined subdirectories
 - Doesn't handle multi-package composition
 - Harder to express complex transformations
 - Less declarative (mixing structure and transformation)
+- Maintaining two systems increases complexity
+- Confusing for users (which format to use?)
+- More code to test and maintain
 
 ### Alternative 2: External transformation tools (e.g., jq, yq)
 

@@ -297,17 +297,37 @@ export async function checkExistingPackageInMarkdownFiles(
     label: DEFAULT_INSTALL_ROOT
   });
 
-  // Add detected platforms' subdirectories (rules/commands/agents, etc.)
+  // Add detected platforms' directories from flows
   try {
     const platforms = await getDetectedPlatforms(cwd);
     for (const platform of platforms) {
       const def = getPlatformDefinition(platform as Platform);
-      for (const [_, subdirDef] of Object.entries(def.subdirs)) {
-        const dirPath = join(cwd, def.rootDir, subdirDef.path);
-        if (subdirDef.exts && subdirDef.exts.length === 0) {
-          continue;
+      
+      // Extract directories from flows
+      if (def.flows && def.flows.length > 0) {
+        const platformDirs = new Set<string>();
+        
+        for (const flow of def.flows) {
+          const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+          if (toPattern) {
+            // Extract directory from pattern
+            const parts = toPattern.split('/');
+            if (parts.length > 1) {
+              const fullPath = parts.slice(0, -1).join('/');
+              platformDirs.add(fullPath);
+            }
+          }
         }
-        targets.push({ dir: dirPath, exts: subdirDef.exts, label: def.id });
+        
+        // Add each unique directory as a target
+        for (const dirPath of platformDirs) {
+          const fullDirPath = join(cwd, dirPath);
+          targets.push({ 
+            dir: fullDirPath, 
+            exts: undefined, // Allow all extensions (flows handle this)
+            label: def.id 
+          });
+        }
       }
     }
   } catch (error) {

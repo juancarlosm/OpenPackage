@@ -47,37 +47,13 @@ export function mapUniversalToPlatform(
 ): { absDir: string; absFile: string } {
   const definition = getPlatformDefinition(platform, cwd);
   
-  // Check if platform uses flows
+  // Use flow-based resolution
   if (definition.flows && definition.flows.length > 0) {
-    // Use flow-based resolution
     return mapUniversalToPlatformWithFlows(definition, subdir, relPath);
   }
   
-  const subdirDef = definition.subdirs.get(subdir);
-
-  if (!subdirDef) {
-    throw new Error(`Platform ${platform} does not support subdir ${subdir}`);
-  }
-
-  // Build the absolute directory path
-  const absDir = join(definition.rootDir, subdirDef.path);
-
-  const packageExtMatch = relPath.match(/\.[^.]+$/);
-  const packageExt = packageExtMatch?.[0] ?? '';
-  const baseName = packageExt ? relPath.slice(0, -packageExt.length) : relPath;
-  const targetExt = packageExt ? getWorkspaceExt(subdirDef, packageExt) : '';
-  if (targetExt && !isExtAllowed(subdirDef, targetExt)) {
-    logger.warn(
-      `Skipped ${relPath} for platform ${platform}: extension ${targetExt} is not allowed in ${subdir}`
-    );
-    throw new Error(
-      `Extension ${targetExt} is not allowed for subdir ${subdir} on platform ${platform}`
-    );
-  }
-  const targetFileName = packageExt ? `${baseName}${targetExt}` : relPath;
-  const absFile = join(absDir, targetFileName);
-
-  return { absDir, absFile };
+  // No flows defined - should not happen with flows-only system
+  throw new Error(`Platform ${platform} does not have flows defined for subdir ${subdir}`);
 }
 
 /**
@@ -91,39 +67,56 @@ export function mapPlatformFileToUniversal(
   const normalizedPath = normalizePathForProcessing(absPath);
 
 
-  // Check each platform
+  // Check each platform using flows
   for (const platform of getAllPlatforms({ includeDisabled: true }, cwd)) {
     const definition = getPlatformDefinition(platform, cwd);
 
-    // Check each subdir in this platform
-    for (const [subdirName, subdirDef] of definition.subdirs.entries()) {
-      const subdir = subdirName;
-      const platformSubdirPath = join(definition.rootDir, subdirDef.path);
+    // TODO: Implement full flow-based reverse mapping
+    // For now, extract subdirs from flows and do basic mapping
+    if (definition.flows && definition.flows.length > 0) {
+      for (const flow of definition.flows) {
+        const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+        if (!toPattern) continue;
+        
+        // Extract directory from 'to' pattern (e.g., ".cursor/rules/{name}.mdc" -> ".cursor/rules")
+        const parts = toPattern.split('/');
+        const platformSubdirPath = parts.slice(0, -1).join('/');
+        
+        // Check if the path contains this platform subdir
+        const subdirIndex = findSubpathIndex(normalizedPath, platformSubdirPath);
+        if (subdirIndex !== -1) {
+          // Extract universal subdir from 'from' pattern
+          const fromParts = flow.from.split('/');
+          const subdir = fromParts[0];
+          
+          // Extract the relative path within the subdir
+          const absPattern = `/${platformSubdirPath}/`;
+          const relPattern = `${platformSubdirPath}/`;
+          const isAbsPattern = normalizedPath.indexOf(absPattern) !== -1;
 
-      // Check if the path contains this platform subdir
-      const subdirIndex = findSubpathIndex(normalizedPath, platformSubdirPath);
-      if (subdirIndex !== -1) {
-        // Extract the relative path within the subdir
-        // Find where the subdir ends (either /subdir/ or subdir/)
-        const absPattern = `/${platformSubdirPath}/`;
-        const relPattern = `${platformSubdirPath}/`;
-        const isAbsPattern = normalizedPath.indexOf(absPattern) !== -1;
+          const patternLength = isAbsPattern ? absPattern.length : relPattern.length;
+          const relPathStart = subdirIndex + patternLength;
 
-        const patternLength = isAbsPattern ? absPattern.length : relPattern.length;
-        const relPathStart = subdirIndex + patternLength;
+          let relPath = normalizedPath.substring(relPathStart);
 
-        let relPath = normalizedPath.substring(relPathStart);
-
-        const workspaceExtMatch = relPath.match(/\.[^.]+$/);
-        if (workspaceExtMatch) {
-          const workspaceExt = workspaceExtMatch[0];
-          const packageExt = getPackageExt(subdirDef, workspaceExt);
-          if (packageExt !== workspaceExt) {
-            relPath = relPath.slice(0, -workspaceExt.length) + packageExt;
+          // Handle extension transformations from flow
+          const workspaceExtMatch = relPath.match(/\.[^.]+$/);
+          const toExtMatch = toPattern.match(/\.[^./]+$/);
+          const fromExtMatch = flow.from.match(/\.[^./]+$/);
+          
+          if (workspaceExtMatch && toExtMatch && fromExtMatch) {
+            const workspaceExt = workspaceExtMatch[0];
+            const toExt = toExtMatch[0];
+            const fromExt = fromExtMatch[0];
+            
+            if (workspaceExt === toExt && toExt !== fromExt) {
+              // Transform back to package extension
+              relPath = relPath.slice(0, -workspaceExt.length) + fromExt;
+            }
           }
-        }
 
-        return { platform, subdir, relPath };
+          return { platform, subdir, relPath };
+        }
       }
     }
   }

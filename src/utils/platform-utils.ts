@@ -29,13 +29,23 @@ export function getPlatformNameFromSource(sourceDir: string, cwd?: string): stri
   const fromDir = dirLookup[sourceDir];
   if (fromDir) return fromDir;
 
-  // Full scan for subdir matches
+  // Full scan for flow-based matches
   for (const platform of getAllPlatforms({ includeDisabled: true }, cwd)) {
     const definition = getPlatformDefinition(platform, cwd);
-    for (const [subdirName, subdirDef] of Object.entries(definition.subdirs)) {
-      const subdirPath = join(definition.rootDir, subdirDef.path);
-      if (sourceDir.includes(subdirPath)) {
-        return platform;
+    
+    // Check if sourceDir matches any flow 'to' pattern directory
+    if (definition.flows && definition.flows.length > 0) {
+      for (const flow of definition.flows) {
+        const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+        if (toPattern) {
+          // Extract directory from 'to' pattern
+          const parts = toPattern.split('/');
+          const subdirPath = parts.slice(0, -1).join('/');
+          
+          if (sourceDir.includes(subdirPath)) {
+            return platform;
+          }
+        }
       }
     }
   }

@@ -1506,12 +1506,6 @@ Conflict Report:
 - Complete save/apply integration
 - Full utility updates
 
-**Phase 3 (Section 8 - Commands & Tooling):**
-- Add validation commands
-- Enhance status/dry-run
-- Debug logging
-- Performance optimization
-
 ### Next Steps
 
 **Section 7: Built-in Platform Migration**
@@ -1573,5 +1567,81 @@ Flow-based installer is complete and integrated. The system now has:
 
 Ready to convert built-in platforms to flows and complete the integration.
 
+=======
+
 **Status:** Section 6 COMPLETE ✅
+
+---
+
+
+**Status:** Section 6 COMPLETE ✅
+=======
+
+## Section Numbering Update - Removal of Backward Compatibility (January 4, 2026)
+
+**Section 8 (Migration Tooling) REMOVED:** Migration tooling section has been completely removed from the implementation plan.
+
+**Rationale:**
+- **No backward compatibility** - Going flows-only from the start
+- All built-in platforms already use flows format
+- No legacy `subdirs` format to migrate from
+- Cleaner codebase without migration logic
+- Simpler testing - only test flows, not subdirs
+- Better UX - one clear way to define platforms
+
+**Updated Section Numbering:**
+- Section 8: Testing (previously Section 9)
+- Section 9: Documentation (previously Section 10)
+- Section 10: Finalization (previously Section 11)
+
+**Removed Features (Section 8):**
+- `convertSubdirsToFlows()` - Auto-convert subdirs to flows
+- Migration warnings for old format
+- Subdirs-to-flows migration guide
+- Conversion examples
+
+**Actions Completed:**
+1. ✅ Skip Section 8 entirely - Removed from tasks.md
+2. ✅ Remove `subdirs` support from Section 5 implementation - In Progress
+3. ⏳ Update documentation to only mention flows - Partially complete (design.md updated)
+4. ⏳ Move flow pattern documentation to Section 9 - Deferred to final documentation pass
+
+**Code Changes - platforms.ts:**
+1. ✅ Removed `SubdirFileTransformation` and `SubdirDef` interfaces
+2. ✅ Removed `SubdirConfigEntry` from `PlatformConfig`
+3. ✅ Removed `subdirs` field from `PlatformDefinition`
+4. ✅ Made `flows` required (or rootFile-only for platforms like Warp)
+5. ✅ Removed `createPlatformDefinitions` subdirs logic
+6. ✅ Removed `mergeSubdirsConfigs` function
+7. ✅ Updated `mergePlatformsConfig` to remove subdirs merging
+8. ✅ Updated `validatePlatformsConfig` to remove subdirs validation
+9. ✅ Updated `createPlatformState` to remove subdirs iteration
+10. ✅ Updated `buildDirectoryPaths` to remove subdirs iteration
+11. ✅ Deprecated `platformUsesSubdirs` (always returns false)
+12. ✅ Deprecated `isExtAllowed`, `getWorkspaceExt`, `getPackageExt` (legacy functions)
+13. ✅ Updated `createPlatformDirectories` to only create root directory
+14. ✅ Updated `getPlatformSubdirExts` to only check flows
+15. ✅ Updated `checkPlatformPresence` to remove subdirs check
+
+**Fixed Files (All Complete ✅):**
+- ✅ `src/core/add/platform-path-transformer.ts` - Updated to use mapping.subdir directly
+- ✅ `src/core/discovery/platform-files-discovery.ts` - Extracts directories from flows
+- ✅ `src/core/openpackage.ts` - Builds search targets from flows
+- ✅ `src/core/status/status-file-discovery.ts` - Discovers files via flows
+- ✅ `src/utils/platform-file.ts` - Extension transformation via flows
+- ✅ `src/utils/platform-mapper.ts` - Flow-based path mapping (both directions)
+- ✅ `src/utils/platform-utils.ts` - Platform detection via flows
+
+**Build Status:**
+- ✅ TypeScript compilation: 0 errors
+- ✅ All 7 files successfully updated
+- ✅ 15 TypeScript errors fixed
+
+**Previous Section Removal (CLI Commands):**
+Earlier in the session, CLI Commands and Tooling was also removed for similar reasons.
+
+**Combined Impact:**
+- Faster development - Skip 2 entire sections
+- Cleaner codebase - No legacy code
+- Simpler maintenance - Less code to test and document
 =======

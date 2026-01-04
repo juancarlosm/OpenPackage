@@ -96,23 +96,35 @@ export function getPlatformSpecificFilename(universalPath: string, platform: Pla
   const registryFileName = basename(universalPath);
 
   const platformDef = getPlatformDefinition(platform, cwd);
-  const subdirDef = platformDef.subdirs.get(universalSubdir);
-
-  if (!subdirDef) {
-    // Fallback to original filename if subdir not supported by platform
-    return registryFileName;
+  
+  // TODO: Use flows to determine extension transformation
+  // For now, check flows for extension mappings
+  if (platformDef.flows && platformDef.flows.length > 0) {
+    for (const flow of platformDef.flows) {
+      // Check if this flow matches the universal path
+      if (flow.from.includes(universalSubdir)) {
+        const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+        if (toPattern) {
+          // Extract extension from 'to' pattern
+          const toExtMatch = toPattern.match(/\.[^./]+$/);
+          const fromExtMatch = flow.from.match(/\.[^./]+$/);
+          
+          if (toExtMatch && fromExtMatch) {
+            // Extension transformation found
+            const fromExt = fromExtMatch[0];
+            const toExt = toExtMatch[0];
+            
+            if (registryFileName.endsWith(fromExt)) {
+              return registryFileName.slice(0, -fromExt.length) + toExt;
+            }
+          }
+        }
+      }
+    }
   }
 
-  const extensionMatch = registryFileName.match(/\.[^.]+$/);
-  const packageExt = extensionMatch?.[0] ?? '';
-
-  if (!packageExt) {
-    return registryFileName;
-  }
-
-  const baseName = registryFileName.slice(0, -packageExt.length);
-  const workspaceExt = getWorkspaceExt(subdirDef, packageExt);
-  return baseName + workspaceExt;
+  // No transformation found, return original filename
+  return registryFileName;
 }
 
 /**

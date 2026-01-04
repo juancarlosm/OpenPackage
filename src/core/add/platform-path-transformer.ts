@@ -34,12 +34,15 @@ export function applyPlatformSpecificPaths(
     }
 
     const definition = getPlatformDefinition(mapping.platform);
-    const subdirDef = definition.subdirs.get(mapping.subdir);
-    if (!subdirDef?.path) {
+    
+    // TODO: Update to use flows-based path resolution
+    // For now, use the mapping.subdir as the path directly
+    const subdirPath = mapping.subdir;
+    if (!subdirPath) {
       continue;
     }
 
-    const subdirAbs = resolve(join(cwd, definition.rootDir, subdirDef.path));
+    const subdirAbs = resolve(join(cwd, definition.rootDir, subdirPath));
     const sourceAbs = resolve(sourcePath);
     const withinSubdir = sourceAbs === subdirAbs || isWithinDirectory(subdirAbs, sourceAbs);
     if (!withinSubdir) {

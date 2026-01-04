@@ -79,18 +79,32 @@ async function discoverPlatformForPackages(
   const def = getPlatformDefinition(platform as any);
   const platformRoot = join(cwd, def.rootDir);
 
-  for (const [subKey, subDef] of Object.entries(def.subdirs)) {
-    const targetDir = join(platformRoot, (subDef as any).path || '');
-    if (!(await exists(targetDir))) continue;
-
-    for await (const fp of walkFiles(targetDir)) {
-      const allowedExts: string[] | undefined = (subDef as any).exts;
-      if (allowedExts) {
-        if (allowedExts.length === 0) continue;
-        if (!allowedExts.some((ext) => fp.endsWith(ext))) continue;
+  // TODO: Implement flow-based discovery
+  // For now, discover files from flows 'to' patterns
+  if (def.flows && def.flows.length > 0) {
+    const platformDirs = new Set<string>();
+    
+    for (const flow of def.flows) {
+      const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+      if (toPattern) {
+        // Extract directory from pattern
+        const parts = toPattern.split('/');
+        if (parts.length > 1) {
+          const dirPath = parts.slice(0, -1).join('/');
+          platformDirs.add(dirPath);
+        }
       }
+    }
+    
+    // Walk each discovered directory
+    for (const dirPath of platformDirs) {
+      const targetDir = join(cwd, dirPath);
+      if (!(await exists(targetDir))) continue;
 
-      // Frontmatter support removed - cannot determine package ownership
+      for await (const fp of walkFiles(targetDir)) {
+        // TODO: Check package ownership via flows or other metadata
+        // Frontmatter support removed - cannot determine package ownership without more work
+      }
     }
   }
 
