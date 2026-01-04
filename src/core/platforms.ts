@@ -106,6 +106,9 @@ function createPlatformDefinitions(
   const result: Record<Platform, PlatformDefinition> = {}
 
   for (const [id, cfg] of Object.entries(config)) {
+    // Skip special keys
+    if (id === '$schema') continue
+    
     // Skip global config entry
     if (id === 'global') continue
     
@@ -179,6 +182,12 @@ export function mergePlatformsConfig(base: PlatformsConfig, override: PlatformsC
   const merged: PlatformsConfig = { ...base }
 
   for (const [platformId, overridePlat] of Object.entries(override)) {
+    // Skip special keys
+    if (platformId === '$schema') {
+      merged[platformId] = overridePlat
+      continue
+    }
+
     const basePlat = base[platformId]
     if (!basePlat) {
       merged[platformId] = overridePlat
@@ -277,6 +286,11 @@ export function validatePlatformsConfig(config: PlatformsConfig): string[] {
   const errors: string[] = []
 
   for (const [platformId, platConfig] of Object.entries(config)) {
+    // Skip special keys
+    if (platformId === '$schema') {
+      continue
+    }
+
     // Skip global config - validate separately
     if (platformId === 'global') {
       if (isGlobalFlowsConfig(platConfig)) {
@@ -513,11 +527,33 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
     for (const alias of def.aliases ?? []) {
       aliasLookup[alias.toLowerCase()] = def.id
     }
+    // Add universal subdirs from legacy subdirs config
     for (const univ of def.subdirs.keys()) {
       universalSubdirs.add(univ)
     }
+    // Add universal subdirs from flows config
+    if (def.flows && def.flows.length > 0) {
+      for (const flow of def.flows) {
+        // Extract first path component from 'from' pattern
+        const firstComponent = flow.from.split('/')[0]
+        // Skip if it's a file pattern (contains extension) or root file
+        if (firstComponent && !firstComponent.includes('.')) {
+          universalSubdirs.add(firstComponent)
+        }
+      }
+    }
     if (def.rootFile) {
       rootFiles.push(def.rootFile)
+    }
+  }
+
+  // Add universal subdirs from global flows
+  if (globalFlows && globalFlows.length > 0) {
+    for (const flow of globalFlows) {
+      const firstComponent = flow.from.split('/')[0]
+      if (firstComponent && !firstComponent.includes('.')) {
+        universalSubdirs.add(firstComponent)
+      }
     }
   }
 
@@ -701,8 +737,34 @@ function buildDirectoryPaths(
   cwd: string
 ): PlatformPaths {
   const subdirsPaths: Record<string, string> = {}
+  
+  // Build from subdirs (legacy)
   for (const [universalDir, subdirDef] of definition.subdirs.entries()) {
     subdirsPaths[universalDir] = join(cwd, definition.rootDir, subdirDef.path)
+  }
+  
+  // Build from flows (new system)
+  if (definition.flows && definition.flows.length > 0) {
+    for (const flow of definition.flows) {
+      // Extract universal subdir from 'from' pattern
+      const fromPattern = flow.from
+      const firstComponent = fromPattern.split('/')[0]
+      
+      // Skip if it's a file (contains extension) or already exists
+      if (firstComponent && !firstComponent.includes('.') && !subdirsPaths[firstComponent]) {
+        // Extract platform subdir from 'to' pattern
+        const toPattern = typeof flow.to === 'string' ? flow.to : Object.values(flow.to)[0]
+        
+        if (typeof toPattern === 'string') {
+          // Get the directory part of the target path
+          const targetPath = toPattern.split('/').slice(0, -1).join('/')
+          
+          if (targetPath) {
+            subdirsPaths[firstComponent] = join(cwd, targetPath)
+          }
+        }
+      }
+    }
   }
 
   return {
@@ -875,12 +937,45 @@ export function getPlatformSubdirExts(
   if (!definition) {
     throw new Error(`Unknown platform: ${platform}`)
   }
+  
+  // First check subdirs (legacy)
   const subdirDef = definition.subdirs.get(universalSubdir)
-  if (!subdirDef) {
-    logger.warn(`Platform ${platform} does not support universal subdir '${universalSubdir}'`)
-    return []
+  if (subdirDef) {
+    return subdirDef.exts || []
   }
-  return subdirDef.exts || []
+  
+  // Check flows (new system)
+  if (definition.flows && definition.flows.length > 0) {
+    const extensions = new Set<string>()
+    
+    for (const flow of definition.flows) {
+      // Check if this flow matches the universal subdir
+      if (flow.from.startsWith(`${universalSubdir}/`)) {
+        // Extract extension from the 'from' pattern
+        const fromPattern = flow.from
+        const extMatch = fromPattern.match(/\.[^./]+$/)
+        if (extMatch) {
+          extensions.add(extMatch[0])
+        }
+        
+        // Also check 'to' pattern for extension changes
+        const toPattern = typeof flow.to === 'string' ? flow.to : Object.values(flow.to)[0]
+        if (typeof toPattern === 'string') {
+          const toExtMatch = toPattern.match(/\.[^./]+$/)
+          if (toExtMatch) {
+            extensions.add(toExtMatch[0])
+          }
+        }
+      }
+    }
+    
+    if (extensions.size > 0) {
+      return Array.from(extensions)
+    }
+  }
+  
+  logger.warn(`Platform ${platform} does not support universal subdir '${universalSubdir}'`)
+  return []
 }
 
 /**

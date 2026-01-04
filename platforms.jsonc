@@ -1,20 +1,33 @@
 {
+  "$schema": "./schemas/platforms-v1.json",
+
+  // Global flows that apply to all platforms
+  "global": {
+    "description": "Universal flows applied across all platforms",
+    "flows": [
+      {
+        "from": "AGENTS.md",
+        "to": "{rootFile}",
+        "when": { "exists": "{rootFile}" }
+      }
+    ]
+  },
+
   // Platform definitions for all supported AI coding platforms
-  // Each platform defines its directory structure, root files, and subdirectories
+  // Each platform defines its flows for transforming universal package format to platform-specific format
 
   "antigravity": {
     "name": "Google Antigravity",
     "rootDir": ".agent",
-    "subdirs": [
+    "description": "Google's AI coding agent platform",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "rules",
-        "exts": [".md"]
+        "from": "rules/{name}.md",
+        "to": ".agent/rules/{name}.md"
       },
       {
-        "universalDir": "commands",
-        "platformDir": "workflows",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".agent/workflows/{name}.md"
       }
     ]
   },
@@ -22,16 +35,15 @@
   "augment": {
     "name": "Augment Code",
     "rootDir": ".augment",
-    "subdirs": [
+    "description": "Augment AI code assistant",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "rules",
-        "exts": [".md"]
+        "from": "rules/{name}.md",
+        "to": ".augment/rules/{name}.md"
       },
       {
-        "universalDir": "commands",
-        "platformDir": "commands",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".augment/commands/{name}.md"
       }
     ]
   },
@@ -41,25 +53,23 @@
     "rootDir": ".claude",
     "rootFile": "CLAUDE.md",
     "aliases": ["claudecode"],
-    "subdirs": [
+    "description": "Anthropic Claude coding assistant with agents and skills",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "rules",
-        "exts": [".md"]
+        "from": "rules/{name}.md",
+        "to": ".claude/rules/{name}.md"
       },
       {
-        "universalDir": "commands",
-        "platformDir": "commands",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".claude/commands/{name}.md"
       },
       {
-        "universalDir": "agents",
-        "platformDir": "agents",
-        "exts": [".md"]
+        "from": "agents/{name}.md",
+        "to": ".claude/agents/{name}.md"
       },
       {
-        "universalDir": "skills",
-        "platformDir": "skills"
+        "from": "skills/{name}",
+        "to": ".claude/skills/{name}"
       }
     ]
   },
@@ -69,11 +79,11 @@
     "rootDir": ".codex",
     "rootFile": "AGENTS.md",
     "aliases": ["codexcli"],
-    "subdirs": [
+    "description": "Codex command-line AI assistant",
+    "flows": [
       {
-        "universalDir": "commands",
-        "platformDir": "prompts",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".codex/prompts/{name}.md"
       }
     ]
   },
@@ -82,22 +92,26 @@
     "name": "Cursor",
     "rootDir": ".cursor",
     "rootFile": "AGENTS.md",
-    "subdirs": [
+    "description": "Cursor AI code editor with rules, commands, and MCP support",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "rules",
-        "exts": [".mdc", ".md"],
-        "transformations": [
-          {
-            "packageExt": ".md",
-            "workspaceExt": ".mdc"
-          }
-        ]
+        "from": "rules/{name}.md",
+        "to": ".cursor/rules/{name}.mdc"
       },
       {
-        "universalDir": "commands",
-        "platformDir": "commands",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".cursor/commands/{name}.md"
+      },
+      {
+        "from": "settings.json",
+        "to": ".cursor/settings.json",
+        "merge": "deep"
+      },
+      {
+        "from": "mcp.jsonc",
+        "to": ".cursor/mcp.json",
+        "pipe": ["filter-comments"],
+        "merge": "deep"
       }
     ]
   },
@@ -106,16 +120,15 @@
     "name": "Factory AI",
     "rootDir": ".factory",
     "rootFile": "AGENTS.md",
-    "subdirs": [
+    "description": "Factory AI with commands and droids (agents)",
+    "flows": [
       {
-        "universalDir": "commands",
-        "platformDir": "commands",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".factory/commands/{name}.md"
       },
       {
-        "universalDir": "agents",
-        "platformDir": "droids",
-        "exts": [".md"]
+        "from": "agents/{name}.md",
+        "to": ".factory/droids/{name}.md"
       }
     ]
   },
@@ -125,16 +138,15 @@
     "rootDir": ".kilocode",
     "rootFile": "AGENTS.md",
     "aliases": ["kilocode"],
-    "subdirs": [
+    "description": "Kilo coding assistant with rules and workflows",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "rules",
-        "exts": [".md"]
+        "from": "rules/{name}.md",
+        "to": ".kilocode/rules/{name}.md"
       },
       {
-        "universalDir": "commands",
-        "platformDir": "workflows",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".kilocode/workflows/{name}.md"
       }
     ]
   },
@@ -142,11 +154,11 @@
   "kiro": {
     "name": "Kiro",
     "rootDir": ".kiro",
-    "subdirs": [
+    "description": "Kiro AI assistant with steering files",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "steering",
-        "exts": [".md"]
+        "from": "rules/{name}.md",
+        "to": ".kiro/steering/{name}.md"
       }
     ]
   },
@@ -155,16 +167,21 @@
     "name": "OpenCode",
     "rootDir": ".opencode",
     "rootFile": "AGENTS.md",
-    "subdirs": [
+    "description": "OpenCode AI assistant with commands and agents",
+    "flows": [
       {
-        "universalDir": "commands",
-        "platformDir": "command",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".opencode/command/{name}.md"
       },
       {
-        "universalDir": "agents",
-        "platformDir": "agent",
-        "exts": [".md"]
+        "from": "agents/{name}.md",
+        "to": ".opencode/agent/{name}.md"
+      },
+      {
+        "from": "mcp.jsonc",
+        "to": ".opencode/mcp.json",
+        "pipe": ["filter-comments"],
+        "merge": "deep"
       }
     ]
   },
@@ -174,11 +191,11 @@
     "rootDir": ".qwen",
     "rootFile": "QWEN.md",
     "aliases": ["qwencode"],
-    "subdirs": [
+    "description": "Qwen AI coding assistant with agent support",
+    "flows": [
       {
-        "universalDir": "agents",
-        "platformDir": "agents",
-        "exts": [".md"]
+        "from": "agents/{name}.md",
+        "to": ".qwen/agents/{name}.md"
       }
     ]
   },
@@ -187,11 +204,11 @@
     "name": "Roo Code",
     "rootDir": ".roo",
     "rootFile": "AGENTS.md",
-    "subdirs": [
+    "description": "Roo AI assistant with command support",
+    "flows": [
       {
-        "universalDir": "commands",
-        "platformDir": "commands",
-        "exts": [".md"]
+        "from": "commands/{name}.md",
+        "to": ".roo/commands/{name}.md"
       }
     ]
   },
@@ -200,17 +217,17 @@
     "name": "Warp",
     "rootDir": ".warp",
     "rootFile": "WARP.md",
-    "subdirs": []
+    "description": "Warp terminal with AI features"
   },
 
   "windsurf": {
     "name": "Windsurf",
     "rootDir": ".windsurf",
-    "subdirs": [
+    "description": "Windsurf AI assistant with rules",
+    "flows": [
       {
-        "universalDir": "rules",
-        "platformDir": "rules",
-        "exts": [".md"]
+        "from": "rules/{name}.md",
+        "to": ".windsurf/rules/{name}.md"
       }
     ]
   }

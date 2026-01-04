@@ -1,4 +1,4 @@
-import { join, basename, dirname } from 'path';
+import { join, basename, dirname, extname } from 'path';
 import {
   getPlatformDefinition,
   getDetectedPlatforms,
@@ -8,7 +8,8 @@ import {
   getPackageExt,
   isExtAllowed,
   type Platform,
-  type PlatformPaths
+  type PlatformPaths,
+  type PlatformDefinition
 } from '../core/platforms.js';
 import { logger } from './logger.js';
 import { type UniversalSubdir } from '../constants/index.js';
@@ -46,10 +47,11 @@ export function mapUniversalToPlatform(
 ): { absDir: string; absFile: string } {
   const definition = getPlatformDefinition(platform, cwd);
   
-  // TODO: Check if platform uses flows and delegate to flow-based resolution
-  // if (definition.flows && definition.flows.length > 0) {
-  //   return mapUniversalToPlatformWithFlows(platform, subdir, relPath, cwd);
-  // }
+  // Check if platform uses flows
+  if (definition.flows && definition.flows.length > 0) {
+    // Use flow-based resolution
+    return mapUniversalToPlatformWithFlows(definition, subdir, relPath);
+  }
   
   const subdirDef = definition.subdirs.get(subdir);
 
@@ -178,6 +180,91 @@ export function resolveTargetDirectory(targetPath: string, registryPath: string)
     return targetPath;
   }
   return join(targetPath, dir);
+}
+
+/**
+ * Map universal path to platform-specific path using flows configuration.
+ * This is a simplified implementation for backward compatibility with existing tests.
+ * Full flow execution happens during install/apply operations.
+ */
+function mapUniversalToPlatformWithFlows(
+  definition: PlatformDefinition,
+  subdir: string,
+  relPath: string
+): { absDir: string; absFile: string } {
+  const flows = definition.flows || [];
+  
+  // Find a flow that matches this subdir
+  const matchingFlow = flows.find(flow => {
+    const fromPattern = flow.from;
+    // Simple pattern matching: check if flow starts with subdir
+    return fromPattern.startsWith(`${subdir}/`);
+  });
+  
+  if (!matchingFlow) {
+    throw new Error(`Platform ${definition.id} does not support subdir ${subdir}`);
+  }
+  
+  // Extract the file name from relPath
+  const fileName = basename(relPath);
+  const fileExt = extname(relPath);
+  
+  // Simple pattern resolution for {name} placeholder
+  const toPattern = matchingFlow.to;
+  let targetPath: string;
+  
+  if (typeof toPattern === 'string') {
+    // Replace {name} with the base name (without extension)
+    const baseName = fileName.slice(0, -fileExt.length);
+    targetPath = toPattern.replace('{name}', baseName);
+    
+    // Check if the target pattern changes the extension
+    const targetExt = extname(targetPath);
+    
+    // If no extension in pattern, preserve original extension
+    if (!targetExt && fileExt) {
+      targetPath += fileExt;
+    }
+  } else {
+    // Multi-target flow - use first target
+    const targets = toPattern as Record<string, Partial<import('../types/flows.js').Flow>>;
+    const firstTargetConfig = Object.values(targets)[0];
+    const firstTargetPath = typeof firstTargetConfig === 'string' ? firstTargetConfig : (firstTargetConfig as any).to;
+    
+    if (typeof firstTargetPath === 'string') {
+      const baseName = fileName.slice(0, -fileExt.length);
+      targetPath = firstTargetPath.replace('{name}', baseName);
+      
+      const targetExt = extname(targetPath);
+      if (!targetExt && fileExt) {
+        targetPath += fileExt;
+      }
+    } else {
+      throw new Error(`Invalid multi-target flow configuration for platform ${definition.id}`);
+    }
+  }
+  
+  // Extension validation for flows
+  const targetExt = extname(targetPath);
+  
+  // Check if extension is allowed by checking if the flow pattern includes it
+  const fromPattern = matchingFlow.from;
+  const fromExt = extname(fromPattern);
+  
+  // If the original file has an extension not matching the pattern, warn
+  if (fileExt && fromExt && fileExt !== fromExt) {
+    logger.warn(
+      `Skipped ${relPath} for platform ${definition.id}: extension ${fileExt} does not match flow pattern ${fromPattern}`
+    );
+    throw new Error(
+      `Extension ${fileExt} is not allowed for subdir ${subdir} on platform ${definition.id}`
+    );
+  }
+  
+  const absFile = join(process.cwd(), targetPath);
+  const absDir = dirname(absFile);
+  
+  return { absDir, absFile };
 }
 
 /**
