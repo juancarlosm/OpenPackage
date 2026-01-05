@@ -72,6 +72,15 @@
       {
         "from": "skills/**/*",
         "to": ".claude/skills/**/*"
+      },
+      {
+        "from": "mcp.jsonc",
+        "to": ".mcp.json",
+        "pipe": ["filter-comments"],
+        "map": {
+          "mcp.*": "mcpServers.*"
+        },
+        "merge": "deep"
       }
     ]
   },
@@ -85,6 +94,15 @@
       {
         "from": "commands/**/*.md",
         "to": ".codex/prompts/**/*.md"
+      },
+      {
+        "from": "mcp.jsonc",
+        "to": ".codex/mcp-servers.toml",
+        "pipe": ["filter-comments", "json-to-toml"],
+        "map": {
+          "mcp.*": "mcp_servers.*"
+        },
+        "merge": "deep"
       }
     ]
   },
@@ -143,6 +161,15 @@
       {
         "from": "commands/**/*.md",
         "to": ".kilocode/workflows/**/*.md"
+      },
+      {
+        "from": "mcp.jsonc",
+        "to": ".kilocode/mcp.json",
+        "pipe": ["filter-comments"],
+        "map": {
+          "mcp.*": "mcpServers.*"
+        },
+        "merge": "deep"
       }
     ]
   },
@@ -213,6 +240,15 @@
       {
         "from": "commands/**/*.md",
         "to": ".roo/commands/**/*.md"
+      },
+      {
+        "from": "mcp.jsonc",
+        "to": ".roo/mcp.json",
+        "pipe": ["filter-comments"],
+        "map": {
+          "mcp.*": "mcpServers.*"
+        },
+        "merge": "deep"
       }
     ]
   },
