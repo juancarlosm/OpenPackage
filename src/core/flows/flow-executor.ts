@@ -17,6 +17,7 @@ import fsSync from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import * as TOML from '@iarna/toml';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { JSONPath } from 'jsonpath-plus';
 import { minimatch } from 'minimatch';
 import * as fsUtils from '../../utils/fs.js';
@@ -471,7 +472,14 @@ export class DefaultFlowExecutor implements FlowExecutor {
         case 'json':
         case 'jsonc':
           // Remove comments for JSONC
-          const cleaned = format === 'jsonc' ? this.stripJSONComments(content) : content;
+          const cleaned = content;
+          if (format === 'jsonc') {
+            const parsed = parseJsonc(cleaned);
+            if (parsed === undefined) {
+              throw new Error('jsonc-parser returned undefined');
+            }
+            return parsed;
+          }
           return JSON.parse(cleaned);
 
         case 'yaml':

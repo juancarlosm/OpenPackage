@@ -62,6 +62,43 @@ export function toTildePath(absolutePath: string, homeDir: string = os.homedir()
 }
 
 /**
+ * Format a path for writing to workspace index.
+ * Prefers workspace-relative paths (e.g., ./.openpackage/packages/name) when the source
+ * lives under the workspace root. Otherwise, converts absolute paths under ~/.openpackage/
+ * to tilde notation (e.g., ~/.openpackage/registry/...).
+ * 
+ * @param rawPath - The absolute or relative path to format
+ * @param workspaceRoot - The workspace root directory
+ * @returns Formatted path for workspace index
+ */
+export function formatPathForWorkspaceIndex(rawPath: string, workspaceRoot: string): string {
+  // If already relative or tilde notation, return as-is
+  if (!path.isAbsolute(rawPath)) {
+    return rawPath;
+  }
+
+  const hasTrailingSlash = rawPath.endsWith(path.sep) || rawPath.endsWith('/');
+  const pathWithoutTrailing = hasTrailingSlash ? rawPath.slice(0, -1) : rawPath;
+
+  const normalizedAbs = path.normalize(pathWithoutTrailing);
+  const normalizedRoot = path.normalize(workspaceRoot);
+
+  // Convert to workspace-relative path if under workspace
+  if (
+    normalizedAbs === normalizedRoot ||
+    normalizedAbs.startsWith(normalizedRoot + path.sep)
+  ) {
+    const rel = path.relative(normalizedRoot, normalizedAbs);
+    const normalizedRel = rel.split(path.sep).join('/');
+    const result = normalizedRel ? `./${normalizedRel}` : './';
+    return hasTrailingSlash ? result + '/' : result;
+  }
+
+  // For paths outside workspace, convert ~/.openpackage/ to tilde notation
+  return toTildePath(rawPath);
+}
+
+/**
  * Resolve a declared path (as written in YAML) to an absolute path,
  * while preserving the original declaration for round-tripping.
  */

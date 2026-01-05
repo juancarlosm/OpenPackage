@@ -19,7 +19,7 @@ import { parseUniversalPath } from "../utils/platform-file.js"
 import { readJsoncFileSync, readJsoncOrJson } from "../utils/jsonc.js"
 import * as os from "os"
 import type { Flow } from "../types/flows.js"
-import type { PlatformFlowsConfig as PlatformFlowsConfigType, GlobalFlowsConfig } from "../types/platform-flows.js"
+import type { GlobalFlowsConfig } from "../types/platform-flows.js"
 import { 
   matchesAnyPattern, 
   extractSubdirectoriesFromPatterns 

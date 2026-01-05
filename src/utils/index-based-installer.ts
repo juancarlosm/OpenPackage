@@ -23,7 +23,7 @@ import { getPlatformRootFileNames, stripRootCopyPrefix } from './platform-root-f
 import type { Platform } from '../core/platforms.js';
 import { getAllUniversalSubdirs, platformUsesFlows } from '../core/platforms.js';
 import { normalizePathForProcessing } from './path-normalization.js';
-import { toTildePath } from './path-resolution.js';
+import { formatPathForWorkspaceIndex } from './path-resolution.js';
 import {
   isAllowedRegistryPath,
   isRootRegistryPath,
@@ -172,34 +172,9 @@ async function writePackageIndex(record: PackageIndexRecord, cwd?: string): Prom
     return;
   }
 
-  const toWorkspaceRelativePath = (absolutePath: string, workspaceRoot: string): string => {
-    if (!path.isAbsolute(absolutePath)) {
-      return absolutePath;
-    }
-
-    const hasTrailingSlash = absolutePath.endsWith(path.sep) || absolutePath.endsWith('/');
-    const pathWithoutTrailing = hasTrailingSlash ? absolutePath.slice(0, -1) : absolutePath;
-
-    const normalizedAbs = path.normalize(pathWithoutTrailing);
-    const normalizedRoot = path.normalize(workspaceRoot);
-
-    if (
-      normalizedAbs === normalizedRoot ||
-      normalizedAbs.startsWith(normalizedRoot + path.sep)
-    ) {
-      const rel = path.relative(normalizedRoot, normalizedAbs);
-      const normalizedRel = rel.split(path.sep).join('/');
-      const result = normalizedRel ? `./${normalizedRel}` : './';
-      return hasTrailingSlash ? result + '/' : result;
-    }
-
-    return absolutePath;
-  };
-
   // Prefer workspace-relative paths when the source lives under the workspace root.
   // Otherwise, convert absolute paths under ~/.openpackage/ to tilde notation.
-  const workspaceRelativeOrAbsolute = toWorkspaceRelativePath(rawPath, resolvedCwd);
-  const pathToUse = toTildePath(workspaceRelativeOrAbsolute);
+  const pathToUse = formatPathForWorkspaceIndex(rawPath, resolvedCwd);
 
   wsRecord.index.packages[record.packageName] = {
     ...entry,
@@ -1138,88 +1113,30 @@ export async function installPackageByIndex(
   const hasFlowPlatforms = platforms.some(platform => platformUsesFlows(platform, cwd));
   
   if (hasFlowPlatforms) {
-    logger.debug(`Platform(s) using flows detected, delegating to flow-based installer for ${packageName}`);
+    logger.debug(`Using flow-based installer for ${packageName} on platforms: ${platforms.join(', ')}`);
     
-    // For now, log and continue with subdirs-based installer
-    // Flow-based installer will be fully integrated in subsequent updates
-    logger.warn(`Flow-based installation for ${packageName} is not yet fully implemented. Using subdirs-based installer.`);
+    // Delegate to flow-based installer
+    const { installPackageByIndexWithFlows } = await import('./flow-index-installer.js');
+    return await installPackageByIndexWithFlows(
+      cwd,
+      packageName,
+      version,
+      platforms,
+      options,
+      includePaths,
+      contentRoot
+    );
   }
   
-  const resolvedContentRoot = contentRoot ?? await resolvePackageContentRoot({ cwd, packageName, version });
-  const registryEntries = await loadRegistryFileEntries(packageName, version, {
-    cwd,
-    contentRoot: resolvedContentRoot
-  });
-
-  const normalizedIncludes = includePaths && includePaths.length > 0
-    ? new Set(includePaths.map(p => normalizeRegistryPath(p)))
-    : null;
-
-  const plannedFiles = createPlannedFiles(registryEntries).filter(planned => {
-    if (!normalizedIncludes) return true;
-    return normalizedIncludes.has(normalizeRegistryPath(planned.registryPath));
-  });
-
-  if (normalizedIncludes && plannedFiles.length === 0) {
-    const available = registryEntries.map(e => normalizeRegistryPath(e.registryPath)).sort();
-    const message = `Requested specific file(s) not found in ${packageName}@${version}. Available registry paths: ${available.join(
-      ', '
-    )}`;
-    // Align with package-missing behavior: warn and skip instead of throwing
-    logger.warn(`${message}. Skipping package install.`);
-    return {
-      installed: 0,
-      updated: 0,
-      deleted: 0,
-      skipped: 1,
-      files: [],
-      installedFiles: [],
-      updatedFiles: [],
-      deletedFiles: []
-    };
-  }
-  attachTargetsToPlannedFiles(cwd, plannedFiles, platforms);
-
-  const groups = groupPlannedFiles(plannedFiles, cwd);
-  const previousIndex = await readPackageIndex(cwd, packageName);
-  const otherIndexes = await loadOtherPackageIndexes(cwd, packageName);
-  const context = await buildExpandedIndexesContext(cwd, otherIndexes);
-  const groupPlans = await decideGroupPlans(cwd, groups, previousIndex, context);
-  const previousOwnedPaths = await expandIndexToFilePaths(cwd, previousIndex);
-
-  const conflictWarnings = await resolveConflictsForPlannedFiles(
-    cwd,
-    plannedFiles,
-    context,
-    otherIndexes,
-    previousOwnedPaths,
-    options
+  // No platforms use flows - this should not happen with current config
+  throw new Error(
+    `Platform(s) ${platforms.join(', ')} do not use flows. ` +
+    `Flow-based installation is required. Please check platforms.jsonc configuration.`
   );
-  for (const warning of conflictWarnings) {
-    logger.warn(warning);
-  }
-
-  const plannedTargetMap = buildPlannedTargetMap(plannedFiles, cwd);
-  const { planned, deletions } = computeDiff(plannedTargetMap, previousOwnedPaths);
-
-  const operationResult = await applyFileOperations(cwd, planned, deletions, options, packageName, resolvedContentRoot);
-
-  if (!options.dryRun) {
-    const mapping = buildIndexMappingFromPlans(groupPlans);
-    const indexRecord: PackageIndexRecord = {
-      path: contentRoot ?? join(getRegistryDirectories().packages, packageName, version, sep),
-      packageName,
-      workspace: {
-        version
-      },
-      files: mapping
-    };
-    await writePackageIndex(indexRecord, cwd);
-  }
-
-  return operationResult;
+  
+  // Legacy subdirs-based code removed - now using flow-based installation exclusively
+  // See flow-index-installer.ts for the new implementation
 }
-
 
 
 

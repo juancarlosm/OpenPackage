@@ -13,7 +13,7 @@ import { ensureDir, writeTextFile } from '../../utils/fs.js';
 import { syncRootFiles } from '../sync/root-files-sync.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
 import { PlatformSyncResult } from '../sync/platform-sync.js';
-import { resolveDeclaredPath, toTildePath } from '../../utils/path-resolution.js';
+import { resolveDeclaredPath, formatPathForWorkspaceIndex } from '../../utils/path-resolution.js';
 import { isRegistryPath } from '../../utils/source-mutability.js';
 import { MUTABILITY, SOURCE_TYPES } from '../../constants/index.js';
 import { installPackageWithFlows } from '../install/flow-based-installer.js';
@@ -183,8 +183,10 @@ async function upsertWorkspaceIndexEntry(
   update: WorkspaceIndexUpdate
 ): Promise<void> {
   const record = await readWorkspaceIndex(cwd);
-  // Convert absolute paths under ~/.openpackage/ to tilde notation
-  const pathToWrite = toTildePath(update.path);
+  
+  // Convert to workspace-relative path if under workspace, then apply tilde notation for global paths
+  const pathToWrite = formatPathForWorkspaceIndex(update.path, cwd);
+  
   record.index.packages[update.name] = {
     path: pathToWrite,
     version: update.version,

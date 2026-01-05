@@ -6,7 +6,7 @@
  * for each package file, with multi-package composition and priority-based merging.
  */
 
-import { join, dirname, basename, relative } from 'path';
+import { join, dirname, basename, relative, extname } from 'path';
 import { promises as fs } from 'fs';
 import type { Platform } from '../platforms.js';
 import type { Flow, FlowContext, FlowResult } from '../../types/flows.js';
@@ -16,6 +16,7 @@ import { createFlowExecutor } from '../flows/flow-executor.js';
 import { exists, ensureDir } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { toTildePath } from '../../utils/path-resolution.js';
+import { minimatch } from 'minimatch';
 
 // ============================================================================
 // Types and Interfaces
@@ -37,6 +38,16 @@ export interface FlowInstallResult {
   filesWritten: number;
   conflicts: FlowConflictReport[];
   errors: FlowInstallError[];
+  /**
+   * Workspace-absolute target files written (or that would be written in dryRun)
+   * Used for workspace index updates.
+   */
+  targetPaths: string[];
+  /**
+   * Package-relative source file -> workspace-relative target files
+   * Used for precise uninstall and index tracking.
+   */
+  fileMapping: Record<string, string[]>;
 }
 
 export interface FlowConflictReport {
@@ -91,18 +102,11 @@ async function discoverFlowSources(
   context: FlowContext
 ): Promise<Map<Flow, string[]>> {
   const flowSources = new Map<Flow, string[]>();
-  
   for (const flow of flows) {
-    const sources: string[] = [];
-    
-    // Resolve source pattern
     const sourcePattern = resolvePattern(flow.from, context);
     const sourcePaths = await matchPattern(sourcePattern, packageRoot);
-    
-    sources.push(...sourcePaths);
-    flowSources.set(flow, sources);
+    flowSources.set(flow, sourcePaths);
   }
-  
   return flowSources;
 }
 
@@ -156,51 +160,136 @@ function extractCapturedName(sourcePath: string, pattern: string): string | unde
  * Supports simple patterns with {name} placeholders and * wildcards
  */
 async function matchPattern(pattern: string, baseDir: string): Promise<string[]> {
-  const matches: string[] = [];
-  
-  // Extract directory path and file pattern
-  const patternDir = dirname(pattern);
-  const filePattern = basename(pattern);
-  
-  const searchDir = join(baseDir, patternDir);
-  
-  // Check if directory exists
-  if (!(await exists(searchDir))) {
-    return matches;
-  }
-  
-  // Handle simple patterns (no wildcards or placeholders)
-  if (!filePattern.includes('*') && !filePattern.includes('{')) {
-    // Exact file match
-    const exactPath = join(searchDir, filePattern);
+  // Fast path: no wildcards/placeholders, just check exact file
+  if (!pattern.includes('*') && !pattern.includes('{')) {
+    const exactPath = join(baseDir, pattern);
     if (await exists(exactPath)) {
-      matches.push(relative(baseDir, exactPath));
+      return [relative(baseDir, exactPath)];
+    }
+    return [];
+  }
+
+  // Globs: reuse a minimatch-based recursive walk similar to flow-executor.ts
+  const parts = pattern.split('/');
+  const globPart = parts.findIndex(p => p.includes('*'));
+
+  const matches: string[] = [];
+
+  // No glob segment (e.g. {name}.md): scan the parent dir and filter
+  if (globPart === -1) {
+    const dirRel = dirname(pattern);
+    const filePattern = basename(pattern);
+    const searchDir = join(baseDir, dirRel);
+    if (!(await exists(searchDir))) return [];
+    const entries = await fs.readdir(searchDir, { withFileTypes: true });
+    const regex = new RegExp(
+      '^' +
+        filePattern
+          .replace(/\{name\}/g, '([^/]+)')
+          .replace(/\./g, '\\.')
+          .replace(/\*/g, '.*') +
+        '$'
+    );
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!regex.test(entry.name)) continue;
+      matches.push(relative(baseDir, join(searchDir, entry.name)));
     }
     return matches;
   }
-  
-  // Handle patterns with wildcards or placeholders
-  const files = await fs.readdir(searchDir);
-  
-  // Convert pattern to regex
-  // Replace {name} with capture group, * with .*
-  let regexPattern = filePattern
-    .replace(/\{name\}/g, '([^/]+)')
-    .replace(/\*/g, '.*');
-  
-  const regex = new RegExp('^' + regexPattern + '$');
-  
-  for (const file of files) {
-    if (regex.test(file)) {
-      const fullPath = join(searchDir, file);
-      const stat = await fs.stat(fullPath);
-      if (stat.isFile()) {
-        matches.push(relative(baseDir, fullPath));
+
+  const dirPath = join(baseDir, ...parts.slice(0, globPart));
+  const filePattern = parts.slice(globPart).join('/');
+  if (!(await exists(dirPath))) {
+    return [];
+  }
+
+  await findMatchingFiles(dirPath, filePattern, baseDir, matches);
+  return matches;
+}
+
+async function findMatchingFiles(
+  dir: string,
+  pattern: string,
+  baseDir: string,
+  matches: string[]
+): Promise<void> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      const rel = relative(baseDir, fullPath);
+      if (entry.isDirectory()) {
+        await findMatchingFiles(fullPath, pattern, baseDir, matches);
+      } else if (entry.isFile()) {
+        if (minimatch(rel, pattern, { dot: false })) {
+          matches.push(rel);
+        }
       }
     }
+  } catch {
+    // ignore
   }
-  
-  return matches;
+}
+
+function resolveTargetFromGlob(
+  sourceAbsPath: string,
+  fromPattern: string,
+  toPattern: string,
+  context: FlowContext
+): string {
+  const sourceRelFromPackage = relative(context.packageRoot, sourceAbsPath);
+
+  // If 'to' pattern has glob, map the structure
+  if (toPattern.includes('*')) {
+    // Handle ** recursive patterns
+    if (fromPattern.includes('**') && toPattern.includes('**')) {
+      const fromParts = fromPattern.split('**');
+      const toParts = toPattern.split('**');
+      const fromBase = fromParts[0].replace(/\/$/, '');
+      const toBase = toParts[0].replace(/\/$/, '');
+
+      const fromSuffix = fromParts[1] || '';
+      const toSuffix = toParts[1] || '';
+
+      let relativeSubpath = sourceRelFromPackage;
+      if (fromBase) {
+        relativeSubpath = sourceRelFromPackage.startsWith(fromBase + '/')
+          ? sourceRelFromPackage.slice(fromBase.length + 1)
+          : sourceRelFromPackage;
+      }
+
+      // Handle extension mapping if suffixes specify extensions: /**/*.md -> /**/*.mdc
+      if (fromSuffix && toSuffix) {
+        const fromExt = fromSuffix.replace(/^\/?\*+/, '');
+        const toExt = toSuffix.replace(/^\/?\*+/, '');
+        if (fromExt && toExt && fromExt !== toExt) {
+          relativeSubpath = relativeSubpath.replace(
+            new RegExp(fromExt.replace('.', '\\.') + '$'),
+            toExt
+          );
+        }
+      }
+
+      const targetPath = toBase ? join(toBase, relativeSubpath) : relativeSubpath;
+      return join(context.workspaceRoot, targetPath);
+    }
+
+    // Single-level * patterns
+    const sourceExt = extname(sourceAbsPath);
+    const sourceBase = basename(sourceAbsPath, sourceExt);
+
+    const toParts = toPattern.split('*');
+    const toPrefix = toParts[0];
+    const toSuffix = toParts[1] || '';
+
+    const targetExt = toSuffix.startsWith('.') ? toSuffix : (sourceExt + toSuffix);
+    const targetFileName = sourceBase + targetExt;
+    return join(context.workspaceRoot, toPrefix + targetFileName);
+  }
+
+  // No glob in target - use as-is
+  return join(context.workspaceRoot, toPattern);
 }
 
 // ============================================================================
@@ -229,7 +318,9 @@ export async function installPackageWithFlows(
     filesProcessed: 0,
     filesWritten: 0,
     conflicts: [],
-    errors: []
+    errors: [],
+    targetPaths: [],
+    fileMapping: {}
   };
   
   try {
@@ -272,66 +363,63 @@ export async function installPackageWithFlows(
     
     // Discover source files for each flow
     const flowSources = await discoverFlowSources(flows, packageRoot, flowContext);
-    
-    // Execute flows
+
+    // Execute flows per *concrete source file* (avoid re-expanding globs inside executor)
     for (const [flow, sources] of flowSources) {
-      for (const sourcePath of sources) {
+      for (const sourceRel of sources) {
+        const sourceAbs = join(packageRoot, sourceRel);
         try {
-          // Extract captured {name} from source path for use in target path
-          const capturedName = extractCapturedName(sourcePath, flow.from);
-          
-          // Update context with current source
+          const capturedName = extractCapturedName(sourceRel, flow.from);
+
           const sourceContext: FlowContext = {
             ...flowContext,
             variables: {
               ...flowContext.variables,
-              sourcePath,
-              sourceDir: dirname(sourcePath),
-              sourceFile: basename(sourcePath),
-              // Override name with captured value if it exists
+              sourcePath: sourceRel,
+              sourceDir: dirname(sourceRel),
+              sourceFile: basename(sourceRel),
               ...(capturedName ? { capturedName } : {})
             }
           };
-          
-          // Execute flow
-          const flowResult = await executor.executeFlow(flow, sourceContext);
-          
-          // Check if flow was skipped due to condition
+
+          // Resolve a concrete target path so flow-executor doesn't need glob expansion.
+          const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0] ?? '';
+          const targetAbs = resolveTargetFromGlob(sourceAbs, flow.from, toPattern, sourceContext);
+          const targetRel = relative(workspaceRoot, targetAbs);
+
+          const concreteFlow: Flow = {
+            ...flow,
+            from: sourceRel,
+            to: targetRel
+          };
+
+          const flowResult = await executor.executeFlow(concreteFlow, sourceContext);
           const wasSkipped = flowResult.warnings?.includes('Flow skipped due to condition');
-          
-          // Only count as processed if the flow wasn't skipped
+
           if (!wasSkipped) {
             result.filesProcessed++;
           }
-          
+
           if (flowResult.success && !wasSkipped) {
-            // Count as written if not dry run
+            const target = typeof flowResult.target === 'string' ? flowResult.target : (flowResult.target as any);
+            if (typeof target === 'string') {
+              result.targetPaths.push(target);
+              const targetRelFromWorkspace = relative(workspaceRoot, target);
+              if (!result.fileMapping[sourceRel]) result.fileMapping[sourceRel] = [];
+              result.fileMapping[sourceRel].push(targetRelFromWorkspace);
+            }
+
             if (!dryRun) {
               result.filesWritten++;
             }
-            
-            // Collect conflicts
+
             if (flowResult.conflicts && flowResult.conflicts.length > 0) {
               for (const conflict of flowResult.conflicts) {
-                // Build packages array with priority info
                 const packages: Array<{ packageName: string; priority: number; chosen: boolean }> = [];
-                
-                // Add winner
-                packages.push({
-                  packageName: conflict.winner,
-                  priority: 0, // We don't have priority info in FlowConflict
-                  chosen: true
-                });
-                
-                // Add losers
+                packages.push({ packageName: conflict.winner, priority: 0, chosen: true });
                 for (const loser of conflict.losers) {
-                  packages.push({
-                    packageName: loser,
-                    priority: 0,
-                    chosen: false
-                  });
+                  packages.push({ packageName: loser, priority: 0, chosen: false });
                 }
-                
                 result.conflicts.push({
                   targetPath: conflict.path,
                   packages,
@@ -340,23 +428,21 @@ export async function installPackageWithFlows(
               }
             }
           } else if (!flowResult.success) {
-            // Flow failed with an error
             result.success = false;
             result.errors.push({
               flow,
-              sourcePath,
+              sourcePath: sourceRel,
               error: flowResult.error || new Error('Unknown error'),
-              message: `Failed to execute flow for ${sourcePath}: ${flowResult.error?.message || 'Unknown error'}`
+              message: `Failed to execute flow for ${sourceRel}: ${flowResult.error?.message || 'Unknown error'}`
             });
           }
-          // Note: Skipped flows (wasSkipped=true) are not errors, just log at debug level
         } catch (error) {
           result.success = false;
           result.errors.push({
             flow,
-            sourcePath,
+            sourcePath: sourceRel,
             error: error as Error,
-            message: `Error processing ${sourcePath}: ${(error as Error).message}`
+            message: `Error processing ${sourceRel}: ${(error as Error).message}`
           });
         }
       }
@@ -417,7 +503,9 @@ export async function installPackagesWithFlows(
     filesProcessed: 0,
     filesWritten: 0,
     conflicts: [],
-    errors: []
+    errors: [],
+    targetPaths: [],
+    fileMapping: {}
   };
   
   const dryRun = options?.dryRun ?? false;
@@ -482,6 +570,11 @@ export async function installPackagesWithFlows(
     aggregatedResult.filesProcessed += result.filesProcessed;
     aggregatedResult.filesWritten += result.filesWritten;
     aggregatedResult.errors.push(...result.errors);
+    aggregatedResult.targetPaths.push(...(result.targetPaths ?? []));
+    for (const [source, targets] of Object.entries(result.fileMapping ?? {})) {
+      const existing = aggregatedResult.fileMapping[source] ?? [];
+      aggregatedResult.fileMapping[source] = Array.from(new Set([...existing, ...targets])).sort();
+    }
     
     if (!result.success) {
       aggregatedResult.success = false;
