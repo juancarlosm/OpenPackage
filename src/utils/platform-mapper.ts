@@ -177,8 +177,7 @@ export function resolveTargetDirectory(targetPath: string, registryPath: string)
 
 /**
  * Map universal path to platform-specific path using flows configuration.
- * This is a simplified implementation for backward compatibility with existing tests.
- * Full flow execution happens during install/apply operations.
+ * Handles glob patterns correctly by resolving them to concrete file paths.
  */
 function mapUniversalToPlatformWithFlows(
   definition: PlatformDefinition,
@@ -187,29 +186,136 @@ function mapUniversalToPlatformWithFlows(
 ): { absDir: string; absFile: string } {
   const flows = definition.flows || [];
   
-  // Find a flow that matches this subdir
+  // Construct the full source path for matching
+  const sourcePath = `${subdir}/${relPath}`;
+  
+  // Find a flow that matches this source path
   const matchingFlow = flows.find(flow => {
     const fromPattern = flow.from;
+    
     // Simple pattern matching: check if flow starts with subdir
-    return fromPattern.startsWith(`${subdir}/`);
+    if (!fromPattern.startsWith(`${subdir}/`)) {
+      return false;
+    }
+    
+    // Check if the source path matches the pattern
+    // Handle glob patterns with ** and *
+    if (fromPattern.includes('*')) {
+      // Convert glob pattern to regex for matching
+      // Use placeholders to prevent replacement interference
+      const regexPattern = fromPattern
+        .replace(/\./g, '\\.')
+        .replace(/\*\*\//g, '___DOUBLESTAR_SLASH___')   // **/ matches zero or more segments
+        .replace(/\/\*\*/g, '___SLASH_DOUBLESTAR___')   // /** matches zero or more segments
+        .replace(/\*\*/g, '___DOUBLESTAR___')           // ** alone matches anything
+        .replace(/\*/g, '[^/]+')                        // * matches filename characters
+        .replace(/___DOUBLESTAR_SLASH___/g, '(?:.*/)?' )  // Replace placeholders
+        .replace(/___SLASH_DOUBLESTAR___/g, '(?:/.*)?')
+        .replace(/___DOUBLESTAR___/g, '.*');
+      const regex = new RegExp(`^${regexPattern}$`);
+      return regex.test(sourcePath);
+    }
+    
+    // Exact match
+    return fromPattern === sourcePath;
   });
   
   if (!matchingFlow) {
     throw new Error(`Platform ${definition.id} does not support subdir ${subdir}`);
   }
   
-  // Extract the file name from relPath
-  const fileName = basename(relPath);
-  const fileExt = extname(relPath);
-  
-  // Simple pattern resolution for {name} placeholder
+  const fromPattern = matchingFlow.from;
   const toPattern = matchingFlow.to;
-  let targetPath: string;
   
+  // Get the target path string (handle multi-target by taking first)
+  let targetPathPattern: string;
   if (typeof toPattern === 'string') {
-    // Replace {name} with the base name (without extension)
+    targetPathPattern = toPattern;
+  } else {
+    // Multi-target flow - use first target
+    const targets = toPattern as Record<string, Partial<import('../types/flows.js').Flow>>;
+    const firstTargetConfig = Object.values(targets)[0];
+    targetPathPattern = typeof firstTargetConfig === 'string' ? firstTargetConfig : (firstTargetConfig as any).to;
+    
+    if (typeof targetPathPattern !== 'string') {
+      throw new Error(`Invalid multi-target flow configuration for platform ${definition.id}`);
+    }
+  }
+  
+  // Resolve the target path from the glob pattern
+  const targetPath = resolveTargetPathFromGlob(sourcePath, fromPattern, targetPathPattern);
+  
+  const absFile = join(process.cwd(), targetPath);
+  const absDir = dirname(absFile);
+  
+  return { absDir, absFile };
+}
+
+/**
+ * Resolve target path from glob patterns
+ * This implements the same logic as flow-executor's resolveTargetFromGlob
+ */
+function resolveTargetPathFromGlob(sourcePath: string, fromPattern: string, toPattern: string): string {
+  // If 'to' pattern has glob, map the structure
+  if (toPattern.includes('*')) {
+    // Handle ** recursive patterns
+    if (fromPattern.includes('**') && toPattern.includes('**')) {
+      // Extract the base directories before **
+      const fromParts = fromPattern.split('**');
+      const toParts = toPattern.split('**');
+      const fromBase = fromParts[0].replace(/\/$/, '');
+      const toBase = toParts[0].replace(/\/$/, '');
+      
+      // Get the file pattern after **
+      const fromSuffix = fromParts[1] || '';
+      const toSuffix = toParts[1] || '';
+      
+      // Extract the relative path after the base directory
+      let relativeSubpath = sourcePath;
+      if (fromBase) {
+        relativeSubpath = sourcePath.startsWith(fromBase + '/') 
+          ? sourcePath.slice(fromBase.length + 1)
+          : sourcePath;
+      }
+      
+      // Handle extension mapping if suffixes specify extensions
+      // e.g., /**/*.md -> /**/*.mdc
+      if (fromSuffix && toSuffix) {
+        const fromExt = fromSuffix.replace(/^\/?\*+/, '');
+        const toExt = toSuffix.replace(/^\/?\*+/, '');
+        if (fromExt && toExt && fromExt !== toExt) {
+          relativeSubpath = relativeSubpath.replace(new RegExp(fromExt.replace('.', '\\.') + '$'), toExt);
+        }
+      }
+      
+      // Build target path
+      const targetPath = toBase ? join(toBase, relativeSubpath) : relativeSubpath;
+      return targetPath;
+    }
+    
+    // Handle single-level * patterns
+    const sourceFileName = basename(sourcePath);
+    const sourceExt = extname(sourcePath);
+    const sourceBase = basename(sourcePath, sourceExt);
+    
+    const toParts = toPattern.split('*');
+    const toPrefix = toParts[0];
+    const toSuffix = toParts[1] || '';
+    
+    const targetExt = toSuffix.startsWith('.') ? toSuffix : (sourceExt + toSuffix);
+    const targetFileName = sourceBase + targetExt;
+    
+    const resolvedTo = toPrefix + targetFileName;
+    return resolvedTo;
+  }
+  
+  // Handle {name} placeholder pattern
+  if (toPattern.includes('{name}')) {
+    const fileName = basename(sourcePath);
+    const fileExt = extname(sourcePath);
     const baseName = fileName.slice(0, -fileExt.length);
-    targetPath = toPattern.replace('{name}', baseName);
+    
+    let targetPath = toPattern.replace('{name}', baseName);
     
     // Check if the target pattern changes the extension
     const targetExt = extname(targetPath);
@@ -218,46 +324,12 @@ function mapUniversalToPlatformWithFlows(
     if (!targetExt && fileExt) {
       targetPath += fileExt;
     }
-  } else {
-    // Multi-target flow - use first target
-    const targets = toPattern as Record<string, Partial<import('../types/flows.js').Flow>>;
-    const firstTargetConfig = Object.values(targets)[0];
-    const firstTargetPath = typeof firstTargetConfig === 'string' ? firstTargetConfig : (firstTargetConfig as any).to;
     
-    if (typeof firstTargetPath === 'string') {
-      const baseName = fileName.slice(0, -fileExt.length);
-      targetPath = firstTargetPath.replace('{name}', baseName);
-      
-      const targetExt = extname(targetPath);
-      if (!targetExt && fileExt) {
-        targetPath += fileExt;
-      }
-    } else {
-      throw new Error(`Invalid multi-target flow configuration for platform ${definition.id}`);
-    }
+    return targetPath;
   }
   
-  // Extension validation for flows
-  const targetExt = extname(targetPath);
-  
-  // Check if extension is allowed by checking if the flow pattern includes it
-  const fromPattern = matchingFlow.from;
-  const fromExt = extname(fromPattern);
-  
-  // If the original file has an extension not matching the pattern, warn
-  if (fileExt && fromExt && fileExt !== fromExt) {
-    logger.warn(
-      `Skipped ${relPath} for platform ${definition.id}: extension ${fileExt} does not match flow pattern ${fromPattern}`
-    );
-    throw new Error(
-      `Extension ${fileExt} is not allowed for subdir ${subdir} on platform ${definition.id}`
-    );
-  }
-  
-  const absFile = join(process.cwd(), targetPath);
-  const absDir = dirname(absFile);
-  
-  return { absDir, absFile };
+  // No glob or placeholder in target - use as-is
+  return toPattern;
 }
 
 /**
