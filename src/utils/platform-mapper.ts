@@ -244,10 +244,28 @@ function mapUniversalToPlatformWithFlows(
   
   // Resolve the target path from the glob pattern
   const targetPath = resolveTargetPathFromGlob(sourcePath, fromPattern, targetPathPattern);
-  
-  const absFile = join(process.cwd(), targetPath);
+
+  // Normalize: callers expect paths relative to the workspace root (cwd),
+  // and will join them to an absolute root themselves.
+  const workspaceRoot = normalizePathForProcessing(process.cwd());
+  let relTarget = normalizePathForProcessing(targetPath);
+  const workspaceRootNoLeading = workspaceRoot.replace(/^\/+/, '');
+
+  // If targetPath accidentally includes the workspace root, strip it back to a workspace-relative path.
+  if (relTarget === workspaceRoot) {
+    relTarget = '';
+  } else if (relTarget.startsWith(`${workspaceRoot}/`)) {
+    relTarget = relTarget.slice(workspaceRoot.length + 1);
+  } else if (workspaceRootNoLeading && relTarget.startsWith(`${workspaceRootNoLeading}/`)) {
+    relTarget = relTarget.slice(workspaceRootNoLeading.length + 1);
+  }
+
+  // Ensure it's relative (no leading slash), but keep leading dot dirs like ".claude".
+  relTarget = relTarget.replace(/^\/+/, '');
+
+  const absFile = relTarget;
   const absDir = dirname(absFile);
-  
+
   return { absDir, absFile };
 }
 
