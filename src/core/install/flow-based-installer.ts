@@ -412,8 +412,7 @@ export async function installPackageWithFlows(
               const normalizedTargetRel = targetRelFromWorkspace.replace(/\\/g, '/');
               const isKeyTrackedMerge =
                 (flowResult.merge === 'deep' || flowResult.merge === 'shallow') &&
-                Array.isArray(flowResult.keys) &&
-                flowResult.keys.length > 0;
+                Array.isArray(flowResult.keys);
 
               if (isKeyTrackedMerge) {
                 result.fileMapping[sourceRel].push({
