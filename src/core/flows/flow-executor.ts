@@ -38,10 +38,8 @@ import { logger } from '../../utils/logger.js';
 import { 
   defaultTransformRegistry, 
   TransformRegistry,
-  serializeMarkdownWithFrontmatter,
-  frontmatterTransform,
-  bodyTransform
 } from './flow-transforms.js';
+import { mergeInlinePlatformOverride } from '../../utils/platform-yaml-merge.js';
 import { 
   applyKeyMap,
   getNestedValue,
@@ -189,7 +187,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
     for (const sourcePath of sourcePaths) {
       // Load and parse source once
-      const sourceContent = await this.loadSourceFile(sourcePath);
+      const sourceContent = await this.loadSourceFile(sourcePath, context);
 
       // Execute each target
       for (const [targetPath, targetFlow] of Object.entries(multiTarget)) {
@@ -326,7 +324,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
     context: FlowContext
   ): Promise<Omit<FlowResult, 'executionTime'>> {
     // Step 1: Load source file
-    const sourceContent = await this.loadSourceFile(sourcePath);
+    const sourceContent = await this.loadSourceFile(sourcePath, context);
 
     return this.executePipelineWithContent(flow, sourceContent, targetPath, context);
   }
@@ -391,7 +389,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
       // Step 7: Merge with existing target (if needed)
       if (targetExists) {
-        const targetContent = await this.loadSourceFile(targetPath);
+        const targetContent = await this.loadSourceFile(targetPath, context);
         const targetKeys = shouldTrackKeys ? extractAllKeys(targetContent.data) : undefined;
         targetKeysBeforeMerge = targetKeys ? new Set(targetKeys) : undefined;
         
@@ -458,9 +456,15 @@ export class DefaultFlowExecutor implements FlowExecutor {
   /**
    * Load and parse source file
    */
-  async loadSourceFile(filePath: string): Promise<ParsedContent> {
-    const raw = await fsUtils.readTextFile(filePath);
+  async loadSourceFile(filePath: string, context?: FlowContext): Promise<ParsedContent> {
+    let raw = await fsUtils.readTextFile(filePath);
     const format = this.detectFormat(filePath, raw);
+    
+    // Apply platform-specific frontmatter overrides for markdown files during install
+    if ((format === 'markdown' || format === 'md') && context?.platform && context?.direction === 'install') {
+      raw = mergeInlinePlatformOverride(raw, context.platform, context.workspaceRoot);
+    }
+    
     const data = this.parseSourceContent(raw, format);
 
     return { data, format, raw };
