@@ -29,7 +29,7 @@
 
 # OpenPackage
 
-OpenPackage turns your AI coding setups into reusable modules, allowing instant installs to any platform for consistent workflows across projects and teams. **No API keys. No MCP.** 
+OpenPackage turns your AI coding setups into reusable modules that anyone can instantly install to any platform, any codebase, ensuring consistent workflows across projects and teams. **No API keys. No MCP.** 
 
 ## Why OpenPackage?
 
@@ -38,7 +38,7 @@ Modern AI coding tools are powerful, but lack organization, reusability, and eff
 - Familiar workflows rebuilt for each project, incompatible between AI coding platforms.
 - Specs across individuals and codebases, diverging, unversioned, and incohesive.
 
-OpenPackage manages the complexity of cross-platform conversions, composition, and portability of configs, so you can build faster.
+OpenPackage takes care of cross-platform conversions, config composition, and portability, freeing you to build more, faster.
 
 - Install & sync pre-built workflows to speed up coding. No more reinventing the wheel.
 - Reuse rules, slash commands, and skills across multiple codebases and platforms.
@@ -46,7 +46,7 @@ OpenPackage manages the complexity of cross-platform conversions, composition, a
 
 ## How it works
 
-At its core, OpenPackage is a lightweight CLI tool for creating versioned, AI coding platform agnostic packages, each contaning sets of specs and coding config files for simplified installs, uninstalls, and distribution. It's basically Claude Code Plugins, but universal, more powerful, and open source.
+At its core, OpenPackage is a lightweight CLI tool for creating versioned, AI coding platform agnostic packages, each contaning sets of coding config files and specs for simplified installs, uninstalls, and distribution. It's basically Claude Code Plugins, but universal, more powerful, and open source.
 
 1. Declare a package
 2. Add rules, commands, subagents, skills, mcp configs, specs, docs etc.
@@ -138,11 +138,11 @@ OpenPackage performs installation and platform sync of files for supported AI co
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Antigravity | .agent/ | | rules/ | workflows/ |  | | |
 | Augment Code | .augment/ | | rules/ | commands/ |  | | |
-| Claude Code | .claude/ | CLAUDE.md | | commands/ | agents/ | skills/ | .mcp.json |
+| Claude Code | .claude/ | CLAUDE.md | rules/ | commands/ | agents/ | skills/ | .mcp.json |
 | Codex | .codex/ | AGENTS.md | | prompts/ | | | |
-| Cursor | .cursor/ | AGENTS.md | rules/ | commands/ | | | mcp.json |
+| Cursor | .cursor/ | AGENTS.md | rules/ | commands/ | agents/ | | mcp.json |
 | Factory | .factory/ | AGENTS.md | | commands/ | droids/ | | |
-| Kilo Code | .kilocode/ | AGENTS.md | rules/ | workflows/ | |  | |
+| Kilo Code | .kilocode/ | AGENTS.md | rules/ | workflows/ | |  | mcp.json |
 | Kiro | .kiro/ | | steering/ |  | | | |
 | OpenCode | .opencode/ | AGENTS.md | | command/ | agent/ | skills/ | opencode.json |
 | Qwen Code | .qwen/ | QWEN.md | | | agents/ | | |
@@ -158,7 +158,7 @@ Deep-merged (local > global > built-in) for per-project customization.
 
 ## Contributing
 
-We would love your help building the future of package management for agentic coding.  
+We would love your help building a more open source and universally compatible agentic coding ecosystem.  
 
 Feel free to create [PRs](https://github.com/enulus/OpenPackage/pulls) and [Github issues](https://github.com/enulus/OpenPackage/issues) for:
 - Bugs
