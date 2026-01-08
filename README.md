@@ -138,15 +138,15 @@ OpenPackage performs installation and platform sync of files for supported AI co
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Antigravity | .agent/ | | rules/ | workflows/ |  | | |
 | Augment Code | .augment/ | | rules/ | commands/ |  | | |
-| Claude Code | .claude/ | CLAUDE.md | rules/ | commands/ | agents/ | skills/ | .mcp.json |
-| Codex | .codex/ | AGENTS.md | | prompts/ | | | |
+| Claude Code | .claude/ | CLAUDE.md | rules/ | commands/ | agents/ | skills/ | .mcp.json (root) |
+| Codex | .codex/ | AGENTS.md | | prompts/ | | | mcp-servers.toml |
 | Cursor | .cursor/ | AGENTS.md | rules/ | commands/ | agents/ | | mcp.json |
-| Factory | .factory/ | AGENTS.md | | commands/ | droids/ | | |
+| Factory | .factory/ | AGENTS.md | | commands/ | droids/ | | mcp.json |
 | Kilo Code | .kilocode/ | AGENTS.md | rules/ | workflows/ | |  | mcp.json |
-| Kiro | .kiro/ | | steering/ |  | | | |
+| Kiro | .kiro/ | | steering/ |  | | | settings/mcp.json |
 | OpenCode | .opencode/ | AGENTS.md | | command/ | agent/ | skills/ | opencode.json |
-| Qwen Code | .qwen/ | QWEN.md | | | agents/ | | |
-| Roo | .roo/ | AGENTS.md | | commands/ | | | |
+| Qwen Code | .qwen/ | QWEN.md | | | agents/ | | settings.json |
+| Roo | .roo/ | AGENTS.md | | commands/ | | | mcp.json |
 | Warp | .warp/ | WARP.md | | | | |
 | Windsurf | .windsurf/ | | rules/ |  | | | |
 
