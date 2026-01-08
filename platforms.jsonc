@@ -152,6 +152,10 @@
         "to": ".cursor/commands/**/*.md"
       },
       {
+        "from": "agents/**/*.md",
+        "to": ".cursor/agents/**/*.md"
+      },
+      {
         "from": "mcp.jsonc",
         "to": ".cursor/mcp.json",
         "pipe": ["filter-comments"],
