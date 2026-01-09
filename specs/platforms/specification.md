@@ -13,22 +13,23 @@ Each platform entry in `platforms.jsonc` SHALL have the following structure:
 - `rootFile?` (string): Optional root file at project root (e.g., `CLAUDE.md`, `QWEN.md`)
 - `aliases?` (string[]): Optional CLI aliases
 - `enabled?` (boolean): Whether platform is enabled (default: `true`)
-- `flows` (Flow[]): Declarative transformation flows
+- `export?` (Flow[]): Export flows (package → workspace, used by install/apply)
+- `import?` (Flow[]): Import flows (workspace → package, used by save)
 
 #### Scenario: Load platform with valid configuration
 
 - **WHEN** platform config defines all required fields with valid types
 - **THEN** platform is loaded successfully and available for use
 
-#### Scenario: Load platform with flows configuration
+#### Scenario: Load platform with export/import flows configuration
 
-- **WHEN** platform config defines `flows` array with valid flow objects
+- **WHEN** platform config defines `export` and/or `import` arrays with valid flow objects
 - **THEN** flows are loaded and validated according to flow schema
 
 #### Scenario: Invalid platform configuration missing required field
 
-- **WHEN** platform config is missing `name`, `rootDir`, or `flows` field
-- **THEN** configuration load fails with error: "Platform 'id': missing required field 'fieldName'"
+- **WHEN** platform config is missing `name`, `rootDir`, or both `export`/`import`/`rootFile` fields
+- **THEN** configuration load fails with error: "Platform 'id': Must define at least one of 'export', 'import', or 'rootFile'"
 
 #### Scenario: Invalid platform configuration with wrong types
 
@@ -47,8 +48,8 @@ Merge order: workspace > global > built-in (last writer wins)
 
 #### Scenario: Global override of platform flows
 
-- **WHEN** global config defines flows for existing built-in platform
-- **THEN** global flows completely replace built-in flows for that platform
+- **WHEN** global config defines export/import flows for existing built-in platform
+- **THEN** global export/import arrays completely replace built-in flows for that platform (per array)
 
 #### Scenario: Workspace adds custom platform
 
@@ -69,7 +70,7 @@ Merge order: workspace > global > built-in (last writer wins)
 
 - **WHEN** platform field is defined in multiple configs
 - **THEN** last writer wins (workspace > global > built-in)
-- **AND** flows array is replaced entirely, not merged at element level
+- **AND** export/import arrays are replaced entirely, not merged at element level
 
 ### Requirement: Platform Detection
 
@@ -579,34 +580,66 @@ The system SHALL optimize flow execution:
 - **WHEN** flow has `when` condition that evaluates to false
 - **THEN** flow is skipped without loading or parsing source file
 
-## Unidirectional Flow Requirements
+## Bidirectional Flow Requirements
 
-### Requirement: Unidirectional Flow Configuration
+### Requirement: Explicit Bidirectional Flow Configuration
 
-The system SHALL define all flows as unidirectional transformations from package to workspace:
+The system SHALL define flows as explicit bidirectional transformations using separate export and import flows:
 
-- **Flow direction**: All flows transform from universal package format to platform-specific workspace format
-- **Source (`from`)**: Always relative to package root (universal format)
-- **Target (`to`)**: Always relative to workspace root (platform-specific format)
-- **Save operation**: Uses reverse lookup and inverse transformation (workspace → package)
-- **No circular dependencies**: Flows cannot reference each other in cycles
+- **Export flows**: Transform from universal package format to platform-specific workspace format (package → workspace)
+- **Import flows**: Transform from platform-specific workspace format to universal package format (workspace → package)
+- **Export `from`**: Always relative to package root (universal format)
+- **Export `to`**: Always relative to workspace root (platform-specific format)
+- **Import `from`**: Always relative to workspace root (platform-specific format)
+- **Import `to`**: Always relative to package root (universal format)
+- **No automatic inversion**: Import flows must be explicitly defined, no automatic reversal of export flows
+- **Independent flows**: Export and import flows are independent; no pairing or coupling required
 
-#### Scenario: Install executes flows forward (package → workspace)
+#### Scenario: Install executes export flows (package → workspace)
 
-- **WHEN** installing a package with flows
-- **THEN** flows execute in forward direction from package to workspace
+- **WHEN** installing a package with export flows
+- **THEN** export flows execute transforming package files to workspace files
 - **AND** source files are in universal package format
+- **AND** target files are in platform-specific format
 
-#### Scenario: Save performs reverse lookup (workspace → package)
+#### Scenario: Apply re-executes export flows (package → workspace)
+
+- **WHEN** applying a package with export flows
+- **THEN** export flows execute again transforming package files to workspace files
+- **AND** existing workspace files may be overwritten based on merge strategy
+
+#### Scenario: Save executes import flows (workspace → package)
 
 - **WHEN** saving workspace files to package
-- **THEN** system performs reverse lookup matching workspace paths to flow targets
-- **AND** applies inverse transformations to convert workspace format to universal format
+- **THEN** system matches workspace files against import flow `from` patterns
+- **AND** executes import flows to transform workspace format to universal format
+- **AND** only processes files tracked in workspace index
 
-#### Scenario: Circular dependency validation prevents cycles
+#### Scenario: Save with no matching import flow
 
-- **WHEN** flows would create circular dependency within same direction
-- **THEN** validation fails with error showing cycle path
+- **WHEN** workspace file is tracked in index but no import flow matches
+- **THEN** file is silently skipped (no error)
+- **AND** package is not updated for that file
+
+#### Scenario: Save only processes indexed files
+
+- **WHEN** workspace contains files not in workspace index
+- **THEN** import flows do not process untracked files
+- **AND** only files previously exported are candidates for import
+
+#### Scenario: Independent export and import flows
+
+- **WHEN** platform defines export flows without corresponding import flows
+- **THEN** install/apply work normally but save cannot update package
+- **WHEN** platform defines import flows without corresponding export flows
+- **THEN** save works normally but install/apply do nothing
+
+#### Scenario: Array pattern support in both directions
+
+- **WHEN** export flow uses array pattern `from: ["file1.jsonc", "file1.json"]`
+- **THEN** first matching file is used (priority order)
+- **WHEN** import flow uses array pattern `from: [".platform/file1.json", ".platform/file1.jsonc"]`
+- **THEN** first matching file is used (priority order)
 
 ## Schema Versioning Requirements
 

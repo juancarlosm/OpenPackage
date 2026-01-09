@@ -38,9 +38,16 @@
           "description": "Whether the platform is enabled (default: true)",
           "default": true
         },
-        "flows": {
+        "export": {
           "type": "array",
-          "description": "Flow-based transformation definitions",
+          "description": "Export flows: Package → Workspace (install, apply)",
+          "items": {
+            "$ref": "#/definitions/flow"
+          }
+        },
+        "import": {
+          "type": "array",
+          "description": "Import flows: Workspace → Package (save)",
           "items": {
             "$ref": "#/definitions/flow"
           }
@@ -311,9 +318,16 @@
       "type": "object",
       "description": "Global flows configuration",
       "properties": {
-        "flows": {
+        "export": {
           "type": "array",
-          "description": "Global flows applied before platform-specific flows",
+          "description": "Global export flows (package → workspace) applied before platform-specific flows",
+          "items": {
+            "$ref": "#/definitions/flow"
+          }
+        },
+        "import": {
+          "type": "array",
+          "description": "Global import flows (workspace → package) applied before platform-specific flows",
           "items": {
             "$ref": "#/definitions/flow"
           }
@@ -331,7 +345,7 @@
         "name": "Cursor",
         "rootDir": ".cursor",
         "rootFile": "AGENTS.md",
-        "flows": [
+        "export": [
           {
             "from": "rules/{name}.md",
             "to": ".cursor/rules/{name}.mdc",
@@ -342,10 +356,24 @@
             "to": ".cursor/commands/{name}.md"
           },
           {
-            "from": "mcp.jsonc",
+            "from": ["mcp.jsonc", "mcp.json"],
             "to": ".cursor/mcp.json",
             "pipe": ["filter-comments"],
             "merge": "deep"
+          }
+        ],
+        "import": [
+          {
+            "from": [".cursor/rules/{name}.mdc", ".cursor/rules/{name}.md"],
+            "to": "rules/{name}.md"
+          },
+          {
+            "from": ".cursor/commands/{name}.md",
+            "to": "commands/{name}.md"
+          },
+          {
+            "from": [".cursor/mcp.json", ".cursor/mcp.jsonc"],
+            "to": "mcp.jsonc"
           }
         ]
       },
@@ -354,7 +382,7 @@
         "rootDir": ".claude",
         "rootFile": "CLAUDE.md",
         "aliases": ["claudecode"],
-        "flows": [
+        "export": [
           {
             "from": "rules/{name}.md",
             "to": ".claude/rules/{name}.md"
@@ -364,6 +392,19 @@
             "to": ".claude/agents/{name}.md",
             "map": [
               { "$set": { "name": "$$filename" } }
+            ]
+          }
+        ],
+        "import": [
+          {
+            "from": ".claude/rules/{name}.md",
+            "to": "rules/{name}.md"
+          },
+          {
+            "from": ".claude/agents/{name}.md",
+            "to": "agents/{name}.md",
+            "map": [
+              { "$unset": "name" }
             ]
           }
         ]

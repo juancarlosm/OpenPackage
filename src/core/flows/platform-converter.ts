@@ -18,8 +18,7 @@ import {
   shouldInstallDirectly,
   needsConversion 
 } from '../install/format-detector.js';
-import { getPlatformDefinition, getGlobalFlows } from '../platforms.js';
-import { invertFlows, type InvertedFlow } from './flow-inverter.js';
+import { getPlatformDefinition, getGlobalImportFlows } from '../platforms.js';
 import { createFlowExecutor } from './flow-executor.js';
 import { logger } from '../../utils/logger.js';
 import { ensureDir, writeTextFile } from '../../utils/fs.js';
@@ -143,41 +142,48 @@ export class PlatformConverter {
     if (isPlatformSpecific(sourceFormat) && sourceFormat.platform) {
       const sourcePlatform = sourceFormat.platform;
       
-      // Get source platform flows and invert them
+      // Get source platform import flows (these transform workspace → package)
       const platformDef = getPlatformDefinition(sourcePlatform, this.workspaceRoot);
-      const platformFlows = platformDef.flows || [];
-      const globalFlows = getGlobalFlows(this.workspaceRoot) || [];
+      const platformImportFlows = platformDef.import || [];
+      const globalImportFlows = getGlobalImportFlows(this.workspaceRoot) || [];
       
-      const allSourceFlows = [...globalFlows, ...platformFlows];
-      const invertedFlows = invertFlows(allSourceFlows, sourcePlatform);
+      const allImportFlows = [...globalImportFlows, ...platformImportFlows];
       
-      logger.info(`Building conversion stage with ${invertedFlows.length} inverted flows`, {
+      logger.info(`Building conversion stage with ${allImportFlows.length} import flows`, {
         sourcePlatform,
-        flowCount: invertedFlows.length
+        flowCount: allImportFlows.length
       });
       
       // For plugins: files are already in universal structure, just need content transformation
-      // Adjust inverted flows to match actual file locations
-      const adjustedFlows = invertedFlows.map(flow => {
-        // If inverted flow expects platform-specific path (e.g., ".claude/agents/**/*.md")
-        // but files are actually in universal path (e.g., "agents/**/*.md"),
-        // adjust the 'from' pattern to match universal structure
+      // Import flows already have correct paths (workspace → package)
+      // Adjust for plugins where workspace files are in universal locations
+      const adjustedFlows = allImportFlows.map(flow => {
+        // Import flows have 'from' as workspace path and 'to' as package path
+        // For plugins, workspace paths may need adjustment
         const platformPrefix = `.${sourcePlatform}/`;
-        if (typeof flow.from === 'string' && flow.from.startsWith(platformPrefix)) {
-          return {
-            ...flow,
-            from: flow.from.substring(platformPrefix.length),
-            // Keep 'to' as is (already universal path from inversion)
-          };
+        
+        // Handle both string and array 'from' patterns
+        const fromPatterns = Array.isArray(flow.from) ? flow.from : [flow.from];
+        const adjustedFromPatterns = fromPatterns.map(fromPattern => {
+          if (fromPattern.startsWith(platformPrefix)) {
+            return fromPattern.substring(platformPrefix.length);
+          }
+          return fromPattern;
+        });
+        
+        // Return adjusted flow
+        if (Array.isArray(flow.from)) {
+          return { ...flow, from: adjustedFromPatterns };
+        } else {
+          return { ...flow, from: adjustedFromPatterns[0] };
         }
-        return flow;
       });
       
       stages.push({
         name: 'platform-to-universal',
         description: `Convert from ${sourcePlatform} format to universal format`,
         flows: adjustedFlows,
-        inverted: true
+        inverted: false  // Not inverted - using import flows directly
       });
     }
     

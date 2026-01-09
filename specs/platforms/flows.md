@@ -2,31 +2,71 @@
 
 ## What are Flows?
 
-**Flows** are declarative transformation rules that map universal package content to platform-specific formats. They define how files should be transformed, merged, and written during package installation.
+**Flows** are declarative transformation rules that define bidirectional mappings between universal package content and platform-specific formats. 
 
-**Core concept:** `source → transforms → target`
+**Two types of flows:**
+- **Export flows** (`export`): Package → Workspace (used by `install` and `apply`)
+- **Import flows** (`import`): Workspace → Package (used by `save`)
 
-## Basic Flow Schema
+**Core concept:** Explicit bidirectional transformations without automatic inversion.
 
+## Flow Types
+
+### Export Flows
+
+Transform package files into workspace files (Package → Workspace).
+
+**Used by:** `opkg install`, `opkg apply`
+
+**Schema:**
 ```typescript
-interface Flow {
-  from: string                    // Source pattern (required)
-  to: string | MultiTarget        // Target path (required)
+interface ExportFlow {
+  from: string | string[]         // Source pattern in package (required)
+  to: string | MultiTarget        // Target path in workspace (required)
   
   // Optional transformation fields
   pipe?: string[]                 // Transform pipeline
-  map?: KeyMap                    // Key mapping/transformation
+  map?: Operation[]               // Map pipeline operations
   pick?: string[]                 // Extract specific keys
   omit?: string[]                 // Exclude keys
   path?: string                   // JSONPath extraction
   embed?: string                  // Embed under key
   section?: string                // TOML/INI section
   when?: Condition                // Conditional execution
-  merge?: "deep"|"shallow"|"replace"  // Merge strategy
+  merge?: "deep"|"shallow"|"replace"|"composite"  // Merge strategy
   namespace?: boolean | string    // Namespace isolation
   handler?: string                // Custom handler
 }
 ```
+
+### Import Flows
+
+Transform workspace files back into package files (Workspace → Package).
+
+**Used by:** `opkg save`
+
+**Schema:**
+```typescript
+interface ImportFlow {
+  from: string | string[]         // Source pattern in workspace (required)
+  to: string | MultiTarget        // Target path in package (required)
+  
+  // Optional transformation fields (same as export)
+  pipe?: string[]
+  map?: Operation[]
+  pick?: string[]
+  omit?: string[]
+  path?: string
+  embed?: string
+  section?: string
+  when?: Condition
+  merge?: "deep"|"shallow"|"replace"|"composite"
+  namespace?: boolean | string
+  handler?: string
+}
+```
+
+**Key difference:** Import flows only process files tracked in the workspace index (files previously exported).
 
 ### Required Fields
 
@@ -1382,43 +1422,58 @@ Prevent unintended conflicts.
 }
 ```
 
-## Flow Inversion & Universal Converter
+## Export/Import Architecture
 
-**New in:** Commit `a3fdb9f2a846fa8c183bca851812c491aaf5b8e9`
+### Explicit Bidirectional Flows
 
-Flows can be **automatically inverted** to enable cross-platform package conversion. This powers the **Universal Platform Converter** which allows installing platform-specific packages (like Claude plugins) to any platform.
+Instead of automatic flow inversion, OpenPackage uses **explicit export and import flows**:
+
+**Export flow (package → workspace):**
+```jsonc
+{
+  "export": [
+    {
+      "from": ["mcp.jsonc", "mcp.json"],
+      "to": ".claude/.mcp.json",
+      "pipe": ["filter-comments"],
+      "map": [{ "$rename": { "mcp": "mcpServers" } }]
+    }
+  ]
+}
+```
+
+**Import flow (workspace → package):**
+```jsonc
+{
+  "import": [
+    {
+      "from": [".claude/.mcp.json", ".claude/mcp.json"],
+      "to": "mcp.jsonc",
+      "map": [{ "$rename": { "mcpServers": "mcp" } }]
+    }
+  ]
+}
+```
+
+### Benefits of Explicit Flows
+
+1. **No inversion complexity** - Both directions explicitly defined
+2. **Asymmetric transforms** - Different logic per direction (e.g., add metadata on export, strip on import)
+3. **Array patterns both ways** - Full support for format preferences in both directions
+4. **Lossy transforms** - Can use transforms that can't be automatically inverted
+5. **Clear intent** - Reading config shows exactly what happens in each direction
+
+### Universal Converter
+
+The **Universal Platform Converter** allows installing platform-specific packages to any platform using **import flows** instead of flow inversion.
 
 **Example scenario:**
 - Install a Claude Code plugin (with `.claude/` directories)
 - To Cursor platform (needs `.cursor/` directories)
-- System automatically inverts Claude flows to convert `.claude/` → universal
-- Then applies Cursor flows to convert universal → `.cursor/`
+- System uses Claude's **import flows** to convert `.claude/` → universal
+- Then applies Cursor's **export flows** to convert universal → `.cursor/`
 
-**Inverted flow:**
-```jsonc
-// Original Claude flow
-{
-  "from": "commands/**/*.md",
-  "to": ".claude/commands/**/*.md"
-}
-
-// Automatically inverted for reverse conversion
-{
-  "from": ".claude/commands/**/*.md",
-  "to": "commands/**/*.md"
-}
-```
-
-**Reversible operations:**
-- Path swapping (`from` ↔ `to`)
-- `$rename` key pairs
-- `$copy` from/to
-- Basic `$transform` steps (join/split, keys/arrayToObject)
-
-**Non-reversible (skipped):**
-- `$set` and `$unset` (lose original values)
-- Complex transforms with lossy steps
-- Filters and validators
+**No flow inversion needed** - Import flows are explicitly defined for this purpose.
 
 **See:** [Universal Converter](./universal-converter.md) for complete details on cross-platform conversion.
 

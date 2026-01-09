@@ -33,13 +33,15 @@ Supports both JSONC (with comments) and JSON:
   "$schema": "./node_modules/opkg-cli/schemas/platforms-v1.json",
   
   "global": {
-    "flows": [ /* universal flows */ ]
+    "export": [ /* universal export flows */ ],
+    "import": [ /* universal import flows */ ]
   },
   
   "cursor": {
     "name": "Cursor",
     "rootDir": ".cursor",
-    "flows": [ /* platform-specific flows */ ]
+    "export": [ /* package → workspace flows */ ],
+    "import": [ /* workspace → package flows */ ]
   }
 }
 ```
@@ -54,7 +56,8 @@ Supports both JSONC (with comments) and JSON:
 interface PlatformsConfig {
   $schema?: string                    // Optional: JSON Schema reference
   global?: {                          // Optional: Universal flows
-    flows: Flow[]
+    export?: Flow[]                   // Package → Workspace
+    import?: Flow[]                   // Workspace → Package
   }
   [platformId: string]: {             // Per-platform definitions
     name: string
@@ -62,7 +65,8 @@ interface PlatformsConfig {
     rootFile?: string
     aliases?: string[]
     enabled?: boolean
-    flows: Flow[]
+    export?: Flow[]                   // Package → Workspace
+    import?: Flow[]                   // Workspace → Package
   }
 }
 ```
@@ -79,7 +83,10 @@ Each platform is defined by a top-level key (lowercase, kebab-case):
     "rootFile": "CURSOR.md",           // Optional root file
     "aliases": ["cursorcli"],          // Optional CLI shortcuts
     "enabled": true,                   // Optional (default: true)
-    "flows": [                         // Transformation rules (required)
+    "export": [                        // Export flows (package → workspace)
+      { "from": "...", "to": "..." }
+    ],
+    "import": [                        // Import flows (workspace → package)
       { "from": "...", "to": "..." }
     ]
   }
@@ -95,9 +102,17 @@ Each platform is defined by a top-level key (lowercase, kebab-case):
   - Example: `".cursor"`, `".claude"`, `".windsurf"`
   - Used for: Detection and file path resolution
 
-- **`flows`** (array) - Transformation flows
-  - Minimum: Empty array `[]` (platform exists but no transformations)
+#### Optional Fields
+
+- **`export`** (array) - Export flows (package → workspace, used by install/apply)
+  - Minimum: Empty array `[]` (no install/apply transformations)
   - See: [Flows](./flows.md) for flow schema
+
+- **`import`** (array) - Import flows (workspace → package, used by save)
+  - Minimum: Empty array `[]` (no save transformations)
+  - See: [Flows](./flows.md) for flow schema
+
+**Note:** At least one of `export`, `import`, or `rootFile` must be defined.
 
 #### Optional Fields
 

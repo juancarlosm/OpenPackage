@@ -27,13 +27,14 @@ import {
 
 export type Platform = string
 
-// Platform definition structure - flows-only (no legacy subdirs)
+// Platform definition structure - export/import flows (no legacy subdirs)
 export interface PlatformDefinition {
   id: Platform
   name: string
   rootDir: string
   rootFile?: string
-  flows: Flow[]  // Flow-based transformations (required for non-rootFile-only platforms)
+  export: Flow[]  // Export flows: Package → Workspace (install, apply)
+  import: Flow[]  // Import flows: Workspace → Package (save)
   aliases?: string[]
   enabled: boolean
   description?: string
@@ -45,7 +46,8 @@ interface PlatformConfig {
   name: string
   rootDir: string
   rootFile?: string
-  flows?: Flow[]  // Flow-based transformations (required unless rootFile-only platform)
+  export?: Flow[]  // Export flows: Package → Workspace (install, apply)
+  import?: Flow[]  // Import flows: Workspace → Package (save)
   aliases?: string[]
   enabled?: boolean
   description?: string
@@ -56,11 +58,12 @@ type PlatformsConfig = Record<string, PlatformConfig | GlobalFlowsConfig>
 
 export interface PlatformsState {
   config: PlatformsConfig
-  globalFlows?: Flow[]  // Global flows applied to all platforms
+  globalExportFlows?: Flow[]  // Global export flows applied to all platforms
+  globalImportFlows?: Flow[]  // Global import flows applied to all platforms
   defs: Record<Platform, PlatformDefinition>
   dirLookup: Record<string, Platform>
   aliasLookup: Record<string, Platform>
-  universalPatterns: Set<string>  // All 'from' patterns from flows (source of truth)
+  universalPatterns: Set<string>  // All 'from' patterns from export flows (source of truth)
   universalSubdirs: Set<string>  // Derived from patterns for backward compatibility
   rootFiles: string[]
   allPlatforms: Platform[]
@@ -71,12 +74,12 @@ export interface PlatformsState {
  * Check if a config entry is a global flows config
  */
 function isGlobalFlowsConfig(cfg: PlatformConfig | GlobalFlowsConfig): cfg is GlobalFlowsConfig {
-  return 'flows' in cfg && !('name' in cfg) && !('rootDir' in cfg)
+  return ('export' in cfg || 'import' in cfg) && !('name' in cfg) && !('rootDir' in cfg)
 }
 
 /**
  * Create platform definitions from a PlatformsConfig object
- * Flows-only configuration (no legacy subdirs support)
+ * Export/import flows configuration (no legacy subdirs support)
  * Assumes config is already validated.
  * @param config - The merged platforms configuration
  */
@@ -104,7 +107,8 @@ function createPlatformDefinitions(
       name: platformConfig.name,
       rootDir: platformConfig.rootDir,
       rootFile: platformConfig.rootFile,
-      flows: platformConfig.flows || [],
+      export: platformConfig.export || [],
+      import: platformConfig.import || [],
       aliases: platformConfig.aliases,
       enabled: platformConfig.enabled !== false,
       description: platformConfig.description,
@@ -169,7 +173,8 @@ export function mergePlatformsConfig(base: PlatformsConfig, override: PlatformsC
       enabled: overrideCfg.enabled ?? baseCfg.enabled,
       description: overrideCfg.description ?? baseCfg.description,
       variables: overrideCfg.variables ?? baseCfg.variables,
-      flows: overrideCfg.flows ?? baseCfg.flows, // replace array (no merge)
+      export: overrideCfg.export ?? baseCfg.export, // replace array (no merge)
+      import: overrideCfg.import ?? baseCfg.import, // replace array (no merge)
     }
   }
 
@@ -178,7 +183,7 @@ export function mergePlatformsConfig(base: PlatformsConfig, override: PlatformsC
 
 /**
  * Validate a PlatformsConfig object and return any validation errors.
- * Flows-only configuration (no legacy subdirs support).
+ * Export/import flows configuration (no legacy subdirs support).
  * @param config - The config to validate
  * @returns Array of error messages; empty if valid
  */
@@ -215,18 +220,29 @@ export function validatePlatformsConfig(config: PlatformsConfig): string[] {
       errors.push(`Platform '${platformId}': Missing or empty name`)
     }
 
-    // Validate flows
-    if (cfg.flows !== undefined) {
-      if (!Array.isArray(cfg.flows)) {
-        errors.push(`Platform '${platformId}': flows must be array or undefined`)
+    // Validate export flows
+    if (cfg.export !== undefined) {
+      if (!Array.isArray(cfg.export)) {
+        errors.push(`Platform '${platformId}': export must be array or undefined`)
       } else {
-        errors.push(...validateFlows(cfg.flows, platformId))
+        errors.push(...validateFlows(cfg.export, `${platformId}.export`))
       }
     }
 
-    // Validate that flows is present (unless rootFile-only platform like Warp)
-    if ((!cfg.flows || cfg.flows.length === 0) && !cfg.rootFile) {
-      errors.push(`Platform '${platformId}': Must define either 'flows' or 'rootFile'`)
+    // Validate import flows
+    if (cfg.import !== undefined) {
+      if (!Array.isArray(cfg.import)) {
+        errors.push(`Platform '${platformId}': import must be array or undefined`)
+      } else {
+        errors.push(...validateFlows(cfg.import, `${platformId}.import`))
+      }
+    }
+
+    // Validate that export or import or rootFile is present
+    const hasExport = cfg.export && cfg.export.length > 0;
+    const hasImport = cfg.import && cfg.import.length > 0;
+    if (!hasExport && !hasImport && !cfg.rootFile) {
+      errors.push(`Platform '${platformId}': Must define at least one of 'export', 'import', or 'rootFile'`)
     }
 
     if (cfg.aliases !== undefined && (!Array.isArray(cfg.aliases) || cfg.aliases.some((a: any) => typeof a !== 'string'))) {
@@ -249,11 +265,19 @@ export function validatePlatformsConfig(config: PlatformsConfig): string[] {
 function validateGlobalFlowsConfig(config: GlobalFlowsConfig): string[] {
   const errors: string[] = []
   
-  if (config.flows !== undefined) {
-    if (!Array.isArray(config.flows)) {
-      errors.push(`Global config: flows must be array or undefined`)
+  if (config.export !== undefined) {
+    if (!Array.isArray(config.export)) {
+      errors.push(`Global config: export must be array or undefined`)
     } else {
-      errors.push(...validateFlows(config.flows, 'global'))
+      errors.push(...validateFlows(config.export, 'global.export'))
+    }
+  }
+  
+  if (config.import !== undefined) {
+    if (!Array.isArray(config.import)) {
+      errors.push(`Global config: import must be array or undefined`)
+    } else {
+      errors.push(...validateFlows(config.import, 'global.import'))
     }
   }
   
@@ -385,8 +409,11 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
 
   // Extract global flows if present
   const globalConfig = config['global']
-  const globalFlows = (globalConfig && isGlobalFlowsConfig(globalConfig)) 
-    ? globalConfig.flows 
+  const globalExportFlows = (globalConfig && isGlobalFlowsConfig(globalConfig)) 
+    ? globalConfig.export 
+    : undefined
+  const globalImportFlows = (globalConfig && isGlobalFlowsConfig(globalConfig)) 
+    ? globalConfig.import 
     : undefined
 
   // Create definitions and compute state
@@ -398,7 +425,7 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
   const rootFiles: string[] = []
   const allPlatforms: Platform[] = []
 
-  // Collect all universal patterns from platform flows
+  // Collect all universal patterns from platform export flows
   for (const def of Object.values(defs)) {
     allPlatforms.push(def.id)
     dirLookup[def.rootDir] = def.id
@@ -406,12 +433,12 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
       aliasLookup[alias.toLowerCase()] = def.id
     }
     
-    // Collect all 'from' patterns from flows
-    if (def.flows && def.flows.length > 0) {
-      for (const flow of def.flows) {
+    // Collect all 'from' patterns from export flows
+    if (def.export && def.export.length > 0) {
+      for (const flow of def.export) {
         // For array patterns, add all patterns
         if (Array.isArray(flow.from)) {
-          flow.from.forEach(p => universalPatterns.add(p));
+          flow.from.forEach((p: string) => universalPatterns.add(p));
         } else {
           universalPatterns.add(flow.from);
         }
@@ -423,12 +450,12 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
     }
   }
 
-  // Add patterns from global flows
-  if (globalFlows && globalFlows.length > 0) {
-    for (const flow of globalFlows) {
+  // Add patterns from global export flows
+  if (globalExportFlows && globalExportFlows.length > 0) {
+    for (const flow of globalExportFlows) {
       // For array patterns, add all patterns
       if (Array.isArray(flow.from)) {
-        flow.from.forEach(p => universalPatterns.add(p));
+        flow.from.forEach((p: string) => universalPatterns.add(p));
       } else {
         universalPatterns.add(flow.from);
       }
@@ -438,11 +465,12 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
   // Derive subdirectories from patterns (backward compatibility)
   const universalSubdirs = extractSubdirectoriesFromPatterns(universalPatterns)
 
-  const enabledPlatforms = allPlatforms.filter(p => defs[p].enabled)
+  const enabledPlatforms = allPlatforms.filter((p: string) => defs[p].enabled)
 
   const state: PlatformsState = {
     config,
-    globalFlows,
+    globalExportFlows,
+    globalImportFlows,
     defs,
     dirLookup,
     aliasLookup,
@@ -464,19 +492,36 @@ export function getPlatformDefinitions(
 }
 
 /**
- * Get global flows that apply to all platforms
+ * Get global export flows that apply to all platforms (install/apply)
  */
-export function getGlobalFlows(cwd?: string): Flow[] | undefined {
-  return getPlatformsState(cwd).globalFlows
+export function getGlobalExportFlows(cwd?: string): Flow[] | undefined {
+  return getPlatformsState(cwd).globalExportFlows
 }
 
 /**
- * Check if a platform uses flow-based configuration
+ * Get global import flows that apply to all platforms (save)
+ */
+export function getGlobalImportFlows(cwd?: string): Flow[] | undefined {
+  return getPlatformsState(cwd).globalImportFlows
+}
+
+/**
+ * @deprecated Use getGlobalExportFlows() for export flows or getGlobalImportFlows() for import flows
+ */
+export function getGlobalFlows(cwd?: string): Flow[] | undefined {
+  // Return export flows for backward compatibility
+  return getPlatformsState(cwd).globalExportFlows
+}
+
+/**
+ * Check if a platform uses flow-based configuration (export or import)
  */
 export function platformUsesFlows(platform: Platform, cwd?: string): boolean {
   try {
     const def = getPlatformDefinition(platform, cwd)
-    return def.flows !== undefined && def.flows.length > 0
+    const hasExport = def.export !== undefined && def.export.length > 0
+    const hasImport = def.import !== undefined && def.import.length > 0
+    return hasExport || hasImport
   } catch (error) {
     // Platform not found - return false
     return false
@@ -663,9 +708,9 @@ function buildDirectoryPaths(
 ): PlatformPaths {
   const subdirsPaths: Record<string, string> = {}
   
-  // Build from flows
-  if (definition.flows && definition.flows.length > 0) {
-    for (const flow of definition.flows) {
+  // Build from export flows (the flows that define workspace structure)
+  if (definition.export && definition.export.length > 0) {
+    for (const flow of definition.export) {
       // Extract universal subdir from 'from' pattern
       // For array patterns, use the first pattern
       const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
@@ -861,11 +906,11 @@ export function getPlatformSubdirExts(
     throw new Error(`Unknown platform: ${platform}`)
   }
   
-  // Check flows
-  if (definition.flows && definition.flows.length > 0) {
+  // Check export flows
+  if (definition.export && definition.export.length > 0) {
     const extensions = new Set<string>()
     
-    for (const flow of definition.flows) {
+    for (const flow of definition.export) {
       // Check if this flow matches the universal subdir
       // For array patterns, use the first pattern
       const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;

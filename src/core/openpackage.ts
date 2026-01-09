@@ -303,11 +303,11 @@ export async function checkExistingPackageInMarkdownFiles(
     for (const platform of platforms) {
       const def = getPlatformDefinition(platform as Platform);
       
-      // Extract directories from flows
-      if (def.flows && def.flows.length > 0) {
+      // Extract directories from export flows (package → workspace)
+      if (def.export && def.export.length > 0) {
         const platformDirs = new Set<string>();
         
-        for (const flow of def.flows) {
+        for (const flow of def.export) {
           const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
           if (toPattern) {
             // Extract directory from pattern

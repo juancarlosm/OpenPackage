@@ -27,8 +27,11 @@ export interface PlatformsFlowsConfig {
  * Global flows configuration
  */
 export interface GlobalFlowsConfig {
-  /** Global flows applied before platform-specific flows */
-  flows?: Flow[];
+  /** Global export flows (package → workspace) applied before platform-specific flows */
+  export?: Flow[];
+
+  /** Global import flows (workspace → package) applied before platform-specific flows */
+  import?: Flow[];
 
   /** Description */
   description?: string;
@@ -53,8 +56,11 @@ export interface PlatformFlowsConfig {
   /** Whether platform is enabled (default: true) */
   enabled?: boolean;
 
-  /** Flow-based transformations (new system) */
-  flows?: Flow[];
+  /** Export flows: Package → Workspace (install, apply) */
+  export?: Flow[];
+
+  /** Import flows: Workspace → Package (save) */
+  import?: Flow[];
 
   /** Legacy subdirs configuration (for backward compatibility) */
   subdirs?: SubdirConfigEntry[];

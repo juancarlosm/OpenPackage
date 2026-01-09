@@ -3,23 +3,30 @@
 
   // Global flows that apply to all platforms
   "global": {
-    "flows": [
+    "export": [
       {
         "from": "AGENTS.md",
         "to": "AGENTS.md",
         "when": { "exists": "AGENTS.md" },
         "merge": "composite"
       }
+    ],
+    "import": [
+      {
+        "from": "AGENTS.md",
+        "to": "AGENTS.md",
+        "merge": "composite"
+      }
     ]
   },
 
   // Platform definitions for all supported AI coding platforms
-  // Each platform defines its flows for transforming universal package format to platform-specific format
+  // Each platform defines export flows (package → workspace) and import flows (workspace → package)
 
   "antigravity": {
     "name": "Google Antigravity",
     "rootDir": ".agent",
-    "flows": [
+    "export": [
       {
         "from": "rules/**/*.md",
         "to": ".agent/rules/**/*.md"
@@ -28,13 +35,23 @@
         "from": "commands/**/*.md",
         "to": ".agent/workflows/**/*.md"
       }
+    ],
+    "import": [
+      {
+        "from": ".agent/rules/**/*.md",
+        "to": "rules/**/*.md"
+      },
+      {
+        "from": ".agent/workflows/**/*.md",
+        "to": "commands/**/*.md"
+      }
     ]
   },
 
   "augment": {
     "name": "Augment Code",
     "rootDir": ".augment",
-    "flows": [
+    "export": [
       {
         "from": "rules/**/*.md",
         "to": ".augment/rules/**/*.md"
@@ -42,6 +59,16 @@
       {
         "from": "commands/**/*.md",
         "to": ".augment/commands/**/*.md"
+      }
+    ],
+    "import": [
+      {
+        "from": ".augment/rules/**/*.md",
+        "to": "rules/**/*.md"
+      },
+      {
+        "from": ".augment/commands/**/*.md",
+        "to": "commands/**/*.md"
       }
     ]
   },
@@ -51,7 +78,7 @@
     "rootDir": ".claude",
     "rootFile": "CLAUDE.md",
     "aliases": ["claudecode"],
-    "flows": [
+    "export": [
       {
         "from": "AGENTS.md",
         "to": "CLAUDE.md",
@@ -113,6 +140,62 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": "CLAUDE.md",
+        "to": "AGENTS.md",
+        "merge": "composite"
+      },
+      {
+        "from": ".claude/rules/**/*.md",
+        "to": "rules/**/*.md"
+      },
+      {
+        "from": ".claude/commands/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": ".claude/agents/**/*.md",
+        "to": "agents/**/*.md",
+        "map": [
+          // Unset added fields
+          { "$unset": "name" },
+          // Reverse model transformation
+          {
+            "$transform": {
+              "field": "model",
+              "steps": [
+                // If NOT "default", add anthropic/ prefix
+                { "replace": { "pattern": "^(?!default)(.*)$", "with": "anthropic/$1" } },
+                // Restore dots in version numbers
+                { "replace": { "pattern": "(-[0-9]+)-([0-9]+)", "with": "$1.$2", "flags": "g" } }
+              ]
+            }
+          },
+          // Reverse tools transformation
+          {
+            "$transform": {
+              "field": "tools",
+              "steps": [
+                { "split": ", " },
+                { "arrayToObject": { "value": true } }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "from": ".claude/skills/**/*",
+        "to": "skills/**/*"
+      },
+      {
+        "from": [".mcp.json", ".mcp.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -121,7 +204,7 @@
     "rootDir": ".codex",
     "rootFile": "AGENTS.md",
     "aliases": ["codexcli"],
-    "flows": [
+    "export": [
       {
         "from": "commands/**/*.md",
         "to": ".codex/prompts/**/*.md"
@@ -135,6 +218,20 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": ".codex/prompts/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": ".codex/mcp-servers.toml",
+        "to": "mcp.jsonc",
+        "pipe": ["toml-to-json"],
+        "map": [
+          { "$rename": { "mcp_servers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -142,7 +239,7 @@
     "name": "Cursor",
     "rootDir": ".cursor",
     "rootFile": "AGENTS.md",
-    "flows": [
+    "export": [
       {
         "from": "rules/**/*.md",
         "to": ".cursor/rules/**/*.mdc"
@@ -164,6 +261,27 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": [".cursor/rules/**/*.mdc", ".cursor/rules/**/*.md"],
+        "to": "rules/**/*.md"
+      },
+      {
+        "from": ".cursor/commands/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": ".cursor/agents/**/*.md",
+        "to": "agents/**/*.md"
+      },
+      {
+        "from": [".cursor/mcp.json", ".cursor/mcp.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -171,7 +289,7 @@
     "name": "Factory AI",
     "rootDir": ".factory",
     "rootFile": "AGENTS.md",
-    "flows": [
+    "export": [
       {
         "from": "commands/**/*.md",
         "to": ".factory/commands/**/*.md"
@@ -189,6 +307,23 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": ".factory/commands/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": ".factory/droids/**/*.md",
+        "to": "agents/**/*.md"
+      },
+      {
+        "from": [".factory/settings/mcp.json", ".factory/settings/mcp.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -197,7 +332,7 @@
     "rootDir": ".kilocode",
     "rootFile": "AGENTS.md",
     "aliases": ["kilocode"],
-    "flows": [
+    "export": [
       {
         "from": "rules/**/*.md",
         "to": ".kilocode/rules/**/*.md"
@@ -215,13 +350,30 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": ".kilocode/rules/**/*.md",
+        "to": "rules/**/*.md"
+      },
+      {
+        "from": ".kilocode/workflows/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": [".kilocode/mcp.json", ".kilocode/mcp.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
   "kiro": {
     "name": "Kiro",
     "rootDir": ".kiro",
-    "flows": [
+    "export": [
       {
         "from": "rules/**/*.md",
         "to": ".kiro/steering/**/*.md"
@@ -235,6 +387,19 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": ".kiro/steering/**/*.md",
+        "to": "rules/**/*.md"
+      },
+      {
+        "from": [".kiro/settings/mcp.json", ".kiro/settings/mcp.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -242,7 +407,7 @@
     "name": "OpenCode",
     "rootDir": ".opencode",
     "rootFile": "AGENTS.md",
-    "flows": [
+    "export": [
       {
         "from": "commands/**/*.md",
         "to": ".opencode/command/**/*.md"
@@ -264,6 +429,27 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": ".opencode/command/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": ".opencode/agent/**/*.md",
+        "to": "agents/**/*.md"
+      },
+      {
+        "from": ".opencode/skill/**/*",
+        "to": "skills/**/*"
+      },
+      {
+        "from": [".opencode/opencode.json", ".opencode/opencode.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcp": "mcpServers" } }
+        ]
+      }
     ]
   },
 
@@ -272,7 +458,7 @@
     "rootDir": ".qwen",
     "rootFile": "QWEN.md",
     "aliases": ["qwencode"],
-    "flows": [
+    "export": [
       {
         "from": "AGENTS.md",
         "to": "QWEN.md",
@@ -291,6 +477,24 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": "QWEN.md",
+        "to": "AGENTS.md",
+        "merge": "composite"
+      },
+      {
+        "from": ".qwen/agents/**/*.md",
+        "to": "agents/**/*.md"
+      },
+      {
+        "from": [".qwen/settings.json", ".qwen/settings.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -298,7 +502,7 @@
     "name": "Roo Code",
     "rootDir": ".roo",
     "rootFile": "AGENTS.md",
-    "flows": [
+    "export": [
       {
         "from": "commands/**/*.md",
         "to": ".roo/commands/**/*.md"
@@ -312,6 +516,19 @@
         ],
         "merge": "deep"
       }
+    ],
+    "import": [
+      {
+        "from": ".roo/commands/**/*.md",
+        "to": "commands/**/*.md"
+      },
+      {
+        "from": [".roo/mcp.json", ".roo/mcp.jsonc"],
+        "to": "mcp.jsonc",
+        "map": [
+          { "$rename": { "mcpServers": "mcp" } }
+        ]
+      }
     ]
   },
 
@@ -319,10 +536,17 @@
     "name": "Warp",
     "rootDir": ".warp",
     "rootFile": "WARP.md",
-    "flows": [
+    "export": [
       {
         "from": "AGENTS.md",
         "to": "WARP.md",
+        "merge": "composite"
+      }
+    ],
+    "import": [
+      {
+        "from": "WARP.md",
+        "to": "AGENTS.md",
         "merge": "composite"
       }
     ]
@@ -331,10 +555,16 @@
   "windsurf": {
     "name": "Windsurf",
     "rootDir": ".windsurf",
-    "flows": [
+    "export": [
       {
         "from": "rules/**/*.md",
         "to": ".windsurf/rules/**/*.md"
+      }
+    ],
+    "import": [
+      {
+        "from": ".windsurf/rules/**/*.md",
+        "to": "rules/**/*.md"
       }
     ]
   }

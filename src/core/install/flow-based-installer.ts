@@ -12,7 +12,7 @@ import type { Platform } from '../platforms.js';
 import type { Flow, FlowContext, FlowResult } from '../../types/flows.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';
 import type { InstallOptions, Package } from '../../types/index.js';
-import { getPlatformDefinition, getGlobalFlows, platformUsesFlows, getAllPlatforms, isPlatformId } from '../platforms.js';
+import { getPlatformDefinition, getGlobalExportFlows, platformUsesFlows, getAllPlatforms, isPlatformId } from '../platforms.js';
 import { createFlowExecutor } from '../flows/flow-executor.js';
 import { exists, ensureDir } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
@@ -148,16 +148,16 @@ function stripPlatformSuffixFromFilename(filename: string): string {
 function getApplicableFlows(platform: Platform, cwd: string): Flow[] {
   const flows: Flow[] = [];
   
-  // Add global flows first (applied before platform-specific)
-  const globalFlows = getGlobalFlows(cwd);
-  if (globalFlows && globalFlows.length > 0) {
-    flows.push(...globalFlows);
+  // Add global export flows first (applied before platform-specific)
+  const globalExportFlows = getGlobalExportFlows(cwd);
+  if (globalExportFlows && globalExportFlows.length > 0) {
+    flows.push(...globalExportFlows);
   }
   
-  // Add platform-specific flows
+  // Add platform-specific export flows
   const definition = getPlatformDefinition(platform, cwd);
-  if (definition.flows && definition.flows.length > 0) {
-    flows.push(...definition.flows);
+  if (definition.export && definition.export.length > 0) {
+    flows.push(...definition.export);
   }
   
   return flows;

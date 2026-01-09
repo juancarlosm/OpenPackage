@@ -9,7 +9,7 @@ import { basename, dirname, join } from 'path';
 import type { Platform } from '../platforms.js';
 import { 
   getPlatformDefinition, 
-  getGlobalFlows,
+  getGlobalImportFlows,
   platformUsesFlows 
 } from '../platforms.js';
 import type { Flow, FlowContext, FlowResult } from '../../types/flows.js';
@@ -67,7 +67,7 @@ function findReverseFlow(
 ): { flow: Flow; registryPath: string } | null {
   try {
     const definition = getPlatformDefinition(platform, cwd);
-    if (!definition.flows || definition.flows.length === 0) {
+    if (!definition.import || definition.import.length === 0) {
       return null;
     }
   } catch (error) {
@@ -78,31 +78,29 @@ function findReverseFlow(
 
   const definition = getPlatformDefinition(platform, cwd);
 
-  // Get all applicable flows (global + platform)
-  const globalFlows = getGlobalFlows(cwd) ?? [];
-  const allFlows = [...globalFlows, ...definition.flows];
+  // Get all applicable import flows (global + platform)
+  const globalImportFlows = getGlobalImportFlows(cwd) ?? [];
+  const allImportFlows = [...globalImportFlows, ...definition.import];
 
   // Normalize workspace path for matching
   const normalizedWorkspacePath = workspaceFilePath.replace(/\\/g, '/');
 
-  for (const flow of allFlows) {
-    // Handle multi-target flows
-    const toPatterns = typeof flow.to === 'string' 
-      ? [flow.to] 
-      : Object.keys(flow.to);
+  for (const flow of allImportFlows) {
+    // Import flows use 'from' to match workspace files
+    // For array patterns in 'from', try each pattern
+    const fromPatterns = Array.isArray(flow.from) ? flow.from : [flow.from];
 
-    for (const toPattern of toPatterns) {
-      // Match the workspace file against the 'to' pattern
-      const match = matchWorkspacePathToPattern(normalizedWorkspacePath, toPattern, definition.rootDir);
+    for (const fromPattern of fromPatterns) {
+      // Match the workspace file against the 'from' pattern
+      const match = matchWorkspacePathToPattern(normalizedWorkspacePath, fromPattern, definition.rootDir);
       
       if (match) {
         // Extract variables from the match (e.g., {name})
         const variables = match.variables;
         
-        // Resolve the 'from' pattern with extracted variables
-        // For array patterns, use the first pattern
-        const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
-        const registryPath = resolvePattern(fromPattern, variables);
+        // Resolve the 'to' pattern with extracted variables (destination in package)
+        const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
+        const registryPath = resolvePattern(toPattern, variables);
         
         return { flow, registryPath };
       }

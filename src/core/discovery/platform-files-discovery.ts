@@ -28,12 +28,12 @@ async function discoverPlatformFiles(
   const definition = getPlatformDefinition(platform);
   const allFiles: DiscoveredFile[] = [];
 
-  // Discover files from flows
-  if (definition.flows && definition.flows.length > 0) {
-    // Extract unique directories from flows 'to' patterns
+  // Discover files from export flows (package → workspace)
+  if (definition.export && definition.export.length > 0) {
+    // Extract unique directories from export flows 'to' patterns
     const platformDirs = new Set<string>();
     
-    for (const flow of definition.flows) {
+    for (const flow of definition.export) {
       const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
       if (toPattern) {
         // Extract directory from pattern (e.g., ".cursor/rules/{name}.mdc" -> "rules")

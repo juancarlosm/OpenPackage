@@ -51,7 +51,7 @@ describe('Dynamic Subdirectories Feature', () => {
         name: 'Test Base',
         rootDir: '.test',
         rootFile: 'TEST.md',
-        flows: [
+        export: [
           { from: 'rules/{name}.md', to: '.test/rules/{name}.md' }
         ]
       }
@@ -59,7 +59,7 @@ describe('Dynamic Subdirectories Feature', () => {
 
     const overrideConfig = {
       testPlat: {
-        flows: [
+        export: [
           { from: 'rules/{name}.md', to: '.test/rules/{name}.mdc' }, // Override
           { from: 'custom/{name}.txt', to: '.test/custom/{name}.txt' } // New flow
         ]
@@ -67,8 +67,8 @@ describe('Dynamic Subdirectories Feature', () => {
     } as any;
 
     const merged = mergePlatformsConfig(baseConfig, overrideConfig);
-    const testFlows = merged.testPlat.flows as any[];
-    assert.equal(testFlows.length, 2, 'Should have 2 flows after merge');
+    const testFlows = merged.testPlat.export as any[];
+    assert.equal(testFlows.length, 2, 'Should have 2 export flows after merge');
     const rulesFlow = testFlows.find(f => f.from === 'rules/{name}.md');
     assert.equal(rulesFlow.to, '.test/rules/{name}.mdc', 'Rules flow should be overridden');
     const customFlow = testFlows.find(f => f.from === 'custom/{name}.txt');
@@ -76,28 +76,28 @@ describe('Dynamic Subdirectories Feature', () => {
   });
 
   it('validatePlatformsConfig detects invalid configs', () => {
-    // Valid config with flows
+    // Valid config with export flows
     const validConfig = { 
       cursor: { 
         name: 'Cursor', 
         rootDir: '.cursor', 
-        flows: [{from: 'rules/{name}.md', to: '.cursor/rules/{name}.mdc'}] 
+        export: [{from: 'rules/{name}.md', to: '.cursor/rules/{name}.mdc'}] 
       } 
     } as any;
     assert.deepStrictEqual(validatePlatformsConfig(validConfig), []);
 
     // Invalid: empty rootDir
-    const invalid1 = { test: { rootDir: '', flows: [{from: 'test.md', to: 'test.md'}] } } as any;
+    const invalid1 = { test: { rootDir: '', export: [{from: 'test.md', to: 'test.md'}] } } as any;
     const errors1 = validatePlatformsConfig(invalid1);
     assert.ok(errors1.some(e => e.includes('rootDir')), 'Detects empty rootDir');
 
-    // Invalid: missing flows and rootFile
+    // Invalid: missing export/import and rootFile
     const invalid2 = { test: { name: 'Test', rootDir: '.test' } } as any;
     const errors2 = validatePlatformsConfig(invalid2);
-    assert.ok(errors2.some(e => e.includes("Must define either 'flows' or 'rootFile'")), 'Detects missing flows/rootFile');
+    assert.ok(errors2.some(e => e.includes("Must define at least one of 'export', 'import', or 'rootFile'")), 'Detects missing export/import/rootFile');
     
     // Invalid: flow missing required fields
-    const invalid3 = { test: { rootDir: '.test', flows: [{from: 'test.md'}] } } as any; // missing 'to'
+    const invalid3 = { test: { rootDir: '.test', export: [{from: 'test.md'}] } } as any; // missing 'to'
     const errors3 = validatePlatformsConfig(invalid3);
     assert.ok(errors3.some(e => e.includes('to')), 'Detects missing flow.to field');
   });

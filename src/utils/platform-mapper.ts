@@ -11,6 +11,7 @@ import {
   type PlatformPaths,
   type PlatformDefinition
 } from '../core/platforms.js';
+import type { Flow } from '../types/flows.js';
 import { logger } from './logger.js';
 import { type UniversalSubdir } from '../constants/index.js';
 import { normalizePathForProcessing, findSubpathIndex } from './path-normalization.js';
@@ -63,13 +64,13 @@ export function mapUniversalToPlatform(
 ): PlatformPathMapping {
   const definition = getPlatformDefinition(platform, cwd);
   
-  // Use flow-based resolution
-  if (definition.flows && definition.flows.length > 0) {
+  // Use export flow-based resolution (package → workspace)
+  if (definition.export && definition.export.length > 0) {
     return mapUniversalToPlatformWithFlows(definition, subdir, relPath);
   }
   
-  // No flows defined - should not happen with flows-only system
-  throw new Error(`Platform ${platform} does not have flows defined for subdir ${subdir}`);
+  // No export flows defined - should not happen with flows-only system
+  throw new Error(`Platform ${platform} does not have export flows defined for subdir ${subdir}`);
 }
 
 /**
@@ -88,9 +89,9 @@ export function mapPlatformFileToUniversal(
     const definition = getPlatformDefinition(platform, cwd);
 
     // TODO: Implement full flow-based reverse mapping
-    // For now, extract subdirs from flows and do basic mapping
-    if (definition.flows && definition.flows.length > 0) {
-      for (const flow of definition.flows) {
+    // For now, extract subdirs from export flows and do basic mapping (package → workspace)
+    if (definition.export && definition.export.length > 0) {
+      for (const flow of definition.export) {
         const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
         if (!toPattern) continue;
         
@@ -204,12 +205,12 @@ function mapUniversalToPlatformWithFlows(
   subdir: string,
   relPath: string
 ): PlatformPathMapping {
-  const flows = definition.flows || [];
+  const flows = definition.export || [];
   
   // Construct the full source path for matching
   const sourcePath = `${subdir}/${relPath}`;
   
-  const candidateFlows = flows.filter(flow => {
+  const candidateFlows = flows.filter((flow: Flow) => {
     const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
     return fromPattern.startsWith(`${subdir}/`);
   });
@@ -218,7 +219,7 @@ function mapUniversalToPlatformWithFlows(
   }
 
   // Find a flow that matches this source path
-  const matchingFlow = candidateFlows.find(flow => {
+  const matchingFlow = candidateFlows.find((flow: Flow) => {
     const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
     
     // Check if the source path matches the pattern
@@ -248,11 +249,11 @@ function mapUniversalToPlatformWithFlows(
     const expectedExts = Array.from(
       new Set(
         candidateFlows
-          .map(flow => {
+          .map((flow: Flow) => {
             const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
             return extname(fromPattern);
           })
-          .filter(ext => typeof ext === 'string' && ext.length > 0)
+          .filter((ext: string) => typeof ext === 'string' && ext.length > 0)
       )
     );
 

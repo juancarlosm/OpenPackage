@@ -1,7 +1,7 @@
 /**
  * Tests for Platform Flows Configuration
  * 
- * Tests the updated platform loader with flow-based configurations,
+ * Tests the updated platform loader with export/import flow-based configurations,
  * including validation, merging, and backward compatibility.
  */
 
@@ -20,16 +20,22 @@ try {
 
 console.log('platform-flows-config tests starting')
 
-// Test 1: Validate flow-based platform configuration
+// Test 1: Validate flow-based platform configuration with export/import
 {
   const config = {
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'rules/*.md',
           to: '.test/rules/*.md'
+        }
+      ],
+      import: [
+        {
+          from: '.test/rules/*.md',
+          to: 'rules/*.md'
         }
       ]
     }
@@ -45,7 +51,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           to: '.test/rules/{name}.md'
         }
@@ -56,7 +62,7 @@ console.log('platform-flows-config tests starting')
   const errors = validatePlatformsConfig(config)
   assert.ok(errors.length > 0, 'should have validation errors')
   assert.ok(
-    errors.some(e => e.includes("Missing or invalid 'from' field")),
+    errors.some(e => e.includes("Missing 'from' field")),
     'should reject missing from field'
   )
 }
@@ -67,7 +73,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'rules/{name}.md'
         }
@@ -89,7 +95,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'rules/{name}.md',
           to: '.test/rules/{name}.md',
@@ -111,7 +117,13 @@ console.log('platform-flows-config tests starting')
 {
   const config = {
     global: {
-      flows: [
+      export: [
+        {
+          from: 'AGENTS.md',
+          to: 'AGENTS.md'
+        }
+      ],
+      import: [
         {
           from: 'AGENTS.md',
           to: 'AGENTS.md'
@@ -122,7 +134,7 @@ console.log('platform-flows-config tests starting')
       name: 'Test Platform',
       rootDir: '.test',
       rootFile: 'TEST.md',  // Need at least rootFile since flows is empty
-      flows: []
+      export: []
     }
   }
   
@@ -130,7 +142,7 @@ console.log('platform-flows-config tests starting')
   assert.equal(errors.length, 0, 'global flows config should be valid')
 }
 
-// Test 6: Reject platform with neither subdirs nor flows (and no rootFile)
+// Test 6: Reject platform with neither export/import flows nor rootFile
 {
   const config = {
     'test-platform': {
@@ -142,41 +154,18 @@ console.log('platform-flows-config tests starting')
   const errors = validatePlatformsConfig(config)
   assert.ok(errors.length > 0, 'should have validation errors')
   assert.ok(
-    errors.some(e => e.includes("Must define either 'flows' or 'rootFile'")),
-    'should reject platform without flows/rootFile'
+    errors.some(e => e.includes("Must define at least one of 'export', 'import', or 'rootFile'")),
+    'should reject platform without export/import/rootFile'
   )
 }
 
-// Test 7: Reject platform with only subdirs (subdirs support removed)
+// Test 7: Accept platform with only export flows
 {
   const config = {
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      subdirs: [
-        {
-          universalDir: 'rules',
-          platformDir: 'rules'
-        }
-      ]
-    }
-  }
-  
-  const errors = validatePlatformsConfig(config)
-  assert.ok(errors.length > 0, 'subdirs without flows/rootFile should be rejected')
-  assert.ok(
-    errors.some(e => e.includes("Must define either 'flows' or 'rootFile'")),
-    'should require flows or rootFile even with subdirs'
-  )
-}
-
-// Test 8: Accept platform with only flows
-{
-  const config = {
-    'test-platform': {
-      name: 'Test Platform',
-      rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'rules/*.md',
           to: '.test/rules/*.md'
@@ -186,7 +175,26 @@ console.log('platform-flows-config tests starting')
   }
   
   const errors = validatePlatformsConfig(config)
-  assert.equal(errors.length, 0, 'flow-only platform should be valid')
+  assert.equal(errors.length, 0, 'export-only platform should be valid')
+}
+
+// Test 8: Accept platform with only import flows
+{
+  const config = {
+    'test-platform': {
+      name: 'Test Platform',
+      rootDir: '.test',
+      import: [
+        {
+          from: '.test/rules/*.md',
+          to: 'rules/*.md'
+        }
+      ]
+    }
+  }
+  
+  const errors = validatePlatformsConfig(config)
+  assert.equal(errors.length, 0, 'import-only platform should be valid')
 }
 
 // Test 9: Accept platform with only rootFile (like Warp)
@@ -195,8 +203,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      rootFile: 'TEST.md',
-      subdirs: []
+      rootFile: 'TEST.md'
     }
   }
   
@@ -204,38 +211,38 @@ console.log('platform-flows-config tests starting')
   assert.equal(errors.length, 0, 'rootFile-only platform should be valid')
 }
 
-// Test 10: Accept platform with both subdirs and flows
+// Test 10: Accept platform with both export and import flows
 {
   const config = {
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      subdirs: [
-        {
-          universalDir: 'rules',
-          platformDir: 'rules'
-        }
-      ],
-      flows: [
+      export: [
         {
           from: 'commands/*.md',
           to: '.test/commands/*.md'
+        }
+      ],
+      import: [
+        {
+          from: '.test/commands/*.md',
+          to: 'commands/*.md'
         }
       ]
     }
   }
   
   const errors = validatePlatformsConfig(config)
-  assert.equal(errors.length, 0, 'platform with both subdirs and flows should be valid')
+  assert.equal(errors.length, 0, 'platform with both export and import should be valid')
 }
 
-// Test 11: Validate pipe transforms array
+// Test 11: Validate pipe transforms array in export
 {
   const config = {
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'config.yaml',
           to: '.test/config.json',
@@ -246,7 +253,7 @@ console.log('platform-flows-config tests starting')
   }
   
   const errors = validatePlatformsConfig(config)
-  assert.equal(errors.length, 0, 'pipe transforms should be valid')
+  assert.equal(errors.length, 0, 'pipe transforms in export should be valid')
 }
 
 // Test 12: Reject invalid pipe transforms
@@ -255,7 +262,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'config.yaml',
           to: '.test/config.json',
@@ -287,7 +294,7 @@ console.log('platform-flows-config tests starting')
         namespace: 'complex',
         priority: 5
       },
-      flows: [
+      export: [
         {
           from: 'agents/*.md',
           to: {
@@ -308,6 +315,12 @@ console.log('platform-flows-config tests starting')
             platform: 'complex'
           }
         }
+      ],
+      import: [
+        {
+          from: '.complex/agents/*.md',
+          to: 'agents/*.md'
+        }
       ]
     }
   }
@@ -322,7 +335,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'old.md',
           to: '.test/old.md'
@@ -335,7 +348,7 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test Platform Updated',
       rootDir: '.test',
-      flows: [
+      export: [
         {
           from: 'new.md',
           to: '.test/new.md'
@@ -346,8 +359,8 @@ console.log('platform-flows-config tests starting')
 
   const merged = mergePlatformsConfig(base, override)
   
-  assert.equal(merged['test-platform'].flows.length, 1, 'should have 1 flow')
-  assert.equal(merged['test-platform'].flows[0].from, 'new.md', 'should use override flow')
+  assert.equal(merged['test-platform'].export.length, 1, 'should have 1 export flow')
+  assert.equal(merged['test-platform'].export[0].from, 'new.md', 'should use override flow')
   assert.equal(merged['test-platform'].name, 'Test Platform Updated', 'should update name')
 }
 
@@ -357,7 +370,7 @@ console.log('platform-flows-config tests starting')
     'platform1': {
       name: 'Platform 1',
       rootDir: '.p1',
-      flows: []
+      export: []
     }
   }
 
@@ -365,7 +378,7 @@ console.log('platform-flows-config tests starting')
     'platform2': {
       name: 'Platform 2',
       rootDir: '.p2',
-      flows: []
+      export: []
     }
   }
 
@@ -379,7 +392,7 @@ console.log('platform-flows-config tests starting')
 {
   const base = {
     global: {
-      flows: [
+      export: [
         {
           from: 'AGENTS.md',
           to: 'AGENTS.md'
@@ -389,14 +402,13 @@ console.log('platform-flows-config tests starting')
     'test-platform': {
       name: 'Test',
       rootDir: '.test',
-      rootFile: 'TEST.md',  // Need at least rootFile since flows is empty
-      flows: []
+      rootFile: 'TEST.md'
     }
   }
 
   const override = {
     global: {
-      flows: [
+      export: [
         {
           from: 'README.md',
           to: 'README.md'
@@ -408,8 +420,8 @@ console.log('platform-flows-config tests starting')
   const merged = mergePlatformsConfig(base, override)
   
   assert.ok('global' in merged, 'should have global config')
-  assert.equal(merged.global.flows.length, 1, 'should have 1 global flow')
-  assert.equal(merged.global.flows[0].from, 'README.md', 'should use override global flow')
+  assert.equal(merged.global.export.length, 1, 'should have 1 global export flow')
+  assert.equal(merged.global.export[0].from, 'README.md', 'should use override global flow')
 }
 
 // Test 17: Allow disabling platform in override
@@ -419,8 +431,7 @@ console.log('platform-flows-config tests starting')
       name: 'Test Platform',
       rootDir: '.test',
       enabled: true,
-      rootFile: 'TEST.md',  // Need at least rootFile since flows is empty
-      flows: []
+      rootFile: 'TEST.md'
     }
   }
 
@@ -429,14 +440,51 @@ console.log('platform-flows-config tests starting')
       name: 'Test Platform',
       rootDir: '.test',
       enabled: false,
-      rootFile: 'TEST.md',
-      flows: []
+      rootFile: 'TEST.md'
     }
   }
 
   const merged = mergePlatformsConfig(base, override)
   
   assert.equal(merged['test-platform'].enabled, false, 'should disable platform')
+}
+
+// Test 18: Validate array patterns in export flows
+{
+  const config = {
+    'test-platform': {
+      name: 'Test Platform',
+      rootDir: '.test',
+      export: [
+        {
+          from: ['mcp.jsonc', 'mcp.json'],
+          to: '.test/mcp.json'
+        }
+      ]
+    }
+  }
+  
+  const errors = validatePlatformsConfig(config)
+  assert.equal(errors.length, 0, 'array patterns in export should be valid')
+}
+
+// Test 19: Validate array patterns in import flows
+{
+  const config = {
+    'test-platform': {
+      name: 'Test Platform',
+      rootDir: '.test',
+      import: [
+        {
+          from: ['.test/mcp.json', '.test/mcp.jsonc'],
+          to: 'mcp.jsonc'
+        }
+      ]
+    }
+  }
+  
+  const errors = validatePlatformsConfig(config)
+  assert.equal(errors.length, 0, 'array patterns in import should be valid')
 }
 
 console.log('✅ All platform-flows-config tests passed!')

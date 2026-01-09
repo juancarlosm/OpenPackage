@@ -80,11 +80,11 @@ async function discoverPlatformForPackages(
   const platformRoot = join(cwd, def.rootDir);
 
   // TODO: Implement flow-based discovery
-  // For now, discover files from flows 'to' patterns
-  if (def.flows && def.flows.length > 0) {
+  // For now, discover files from export flows 'to' patterns (package → workspace)
+  if (def.export && def.export.length > 0) {
     const platformDirs = new Set<string>();
     
-    for (const flow of def.flows) {
+    for (const flow of def.export) {
       const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
       if (toPattern) {
         // Extract directory from pattern

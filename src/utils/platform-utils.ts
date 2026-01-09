@@ -33,9 +33,9 @@ export function getPlatformNameFromSource(sourceDir: string, cwd?: string): stri
   for (const platform of getAllPlatforms({ includeDisabled: true }, cwd)) {
     const definition = getPlatformDefinition(platform, cwd);
     
-    // Check if sourceDir matches any flow 'to' pattern directory
-    if (definition.flows && definition.flows.length > 0) {
-      for (const flow of definition.flows) {
+    // Check if sourceDir matches any export flow 'to' pattern directory (package → workspace)
+    if (definition.export && definition.export.length > 0) {
+      for (const flow of definition.export) {
         const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
         if (toPattern) {
           // Extract directory from 'to' pattern

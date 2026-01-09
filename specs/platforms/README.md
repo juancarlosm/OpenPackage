@@ -11,9 +11,9 @@ The **Platform System** is OpenPackage's declarative transformation engine that 
 
 ### Core Concepts
 
-- **[Flows](./flows.md)** - Declarative transformation system: execution pipeline, format conversion, and merge strategies
+- **[Flows](./flows.md)** - Declarative bidirectional transformation system with explicit export (package → workspace) and import (workspace → package) flows
 - **[Map Pipeline](./map-pipeline.md)** - MongoDB-inspired document transformations: 6 core operations, context variables, and pattern matching
-- **[Universal Converter](./universal-converter.md)** - Cross-platform package conversion system for installing platform-specific packages (e.g., Claude plugins) to any platform
+- **[Universal Converter](./universal-converter.md)** - Cross-platform package conversion system using import flows for platform-to-universal conversion
 - **[Configuration](./configuration.md)** - Structure of `platforms.jsonc`, merge hierarchy, and validation rules
 - **[Flow Reference](./flow-reference.md)** - Complete technical reference for all flow fields, transforms, and options
 
@@ -37,6 +37,7 @@ The **Platform System** is OpenPackage's declarative transformation engine that 
 ## Key Features
 
 - ✅ **Declarative** - JSON configuration, not code
+- ✅ **Bidirectional** - Explicit export (install/apply) and import (save) flows
 - ✅ **Type-safe** - IDE autocomplete + schema validation
 - ✅ **Powerful** - Simple file copies to complex transformations
 - ✅ **Composable** - Multi-package content merging with priority
