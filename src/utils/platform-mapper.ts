@@ -102,7 +102,9 @@ export function mapPlatformFileToUniversal(
         const subdirIndex = findSubpathIndex(normalizedPath, platformSubdirPath);
         if (subdirIndex !== -1) {
           // Extract universal subdir from 'from' pattern
-          const fromParts = flow.from.split('/');
+          // For array patterns, use the first pattern
+          const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+          const fromParts = fromPattern.split('/');
           const subdir = fromParts[0];
           
           // Extract the relative path within the subdir
@@ -118,7 +120,9 @@ export function mapPlatformFileToUniversal(
           // Handle extension transformations from flow
           const workspaceExtMatch = relPath.match(/\.[^.]+$/);
           const toExtMatch = toPattern.match(/\.[^./]+$/);
-          const fromExtMatch = flow.from.match(/\.[^./]+$/);
+          // For array patterns, use the first pattern
+          const fromPatternStr = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+          const fromExtMatch = fromPatternStr.match(/\.[^./]+$/);
           
           if (workspaceExtMatch && toExtMatch && fromExtMatch) {
             const workspaceExt = workspaceExtMatch[0];
@@ -205,14 +209,17 @@ function mapUniversalToPlatformWithFlows(
   // Construct the full source path for matching
   const sourcePath = `${subdir}/${relPath}`;
   
-  const candidateFlows = flows.filter(flow => flow.from.startsWith(`${subdir}/`));
+  const candidateFlows = flows.filter(flow => {
+    const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+    return fromPattern.startsWith(`${subdir}/`);
+  });
   if (candidateFlows.length === 0) {
     throw new Error(`Platform ${definition.id} does not support subdir ${subdir}`);
   }
 
   // Find a flow that matches this source path
   const matchingFlow = candidateFlows.find(flow => {
-    const fromPattern = flow.from;
+    const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
     
     // Check if the source path matches the pattern
     // Handle glob patterns with ** and *
@@ -241,7 +248,10 @@ function mapUniversalToPlatformWithFlows(
     const expectedExts = Array.from(
       new Set(
         candidateFlows
-          .map(flow => extname(flow.from))
+          .map(flow => {
+            const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+            return extname(fromPattern);
+          })
           .filter(ext => typeof ext === 'string' && ext.length > 0)
       )
     );
@@ -278,7 +288,9 @@ function mapUniversalToPlatformWithFlows(
   }
   
   // Resolve the target path from the glob pattern
-  const targetPath = resolveTargetPathFromGlob(sourcePath, fromPattern, targetPathPattern);
+  // For array patterns, use the first pattern
+  const fromPatternStr = Array.isArray(fromPattern) ? fromPattern[0] : fromPattern;
+  const targetPath = resolveTargetPathFromGlob(sourcePath, fromPatternStr, targetPathPattern);
 
   // Normalize: callers expect workspace-relative paths and will join them with `cwd`.
   const workspaceRoot = normalizePathForProcessing(process.cwd());

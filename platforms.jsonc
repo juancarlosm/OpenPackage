@@ -105,7 +105,7 @@
         "to": ".claude/skills/**/*"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".mcp.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -127,7 +127,7 @@
         "to": ".codex/prompts/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".codex/mcp-servers.toml",
         "pipe": ["filter-comments", "json-to-toml"],
         "map": [
@@ -156,7 +156,7 @@
         "to": ".cursor/agents/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".cursor/mcp.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -181,7 +181,7 @@
         "to": ".factory/droids/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".factory/settings/mcp.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -207,7 +207,7 @@
         "to": ".kilocode/workflows/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".kilocode/mcp.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -227,7 +227,7 @@
         "to": ".kiro/steering/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".kiro/settings/mcp.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -256,7 +256,7 @@
         "to": ".opencode/skill/**/*"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".opencode/opencode.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -283,7 +283,7 @@
         "to": ".qwen/agents/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".qwen/settings.json",
         "pipe": ["filter-comments"],
         "map": [
@@ -304,7 +304,7 @@
         "to": ".roo/commands/**/*.md"
       },
       {
-        "from": "mcp.jsonc",
+        "from": ["mcp.jsonc", "mcp.json"],
         "to": ".roo/mcp.json",
         "pipe": ["filter-comments"],
         "map": [

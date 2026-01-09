@@ -16,8 +16,11 @@ import type { MapPipeline } from '../core/flows/map-pipeline/types.js';
  * Flows execute through a pipeline: load → extract → filter → map → transform → embed → merge → write
  */
 export interface Flow {
-  /** Source file pattern (supports glob patterns like *.md) */
-  from: string;
+  /** 
+   * Source file pattern or array of patterns (supports glob patterns like *.md)
+   * When array is provided, first matching pattern is used (priority order)
+   */
+  from: string | string[];
 
   /** Target path or multi-target configuration */
   to: string | MultiTargetFlows;

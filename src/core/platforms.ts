@@ -274,8 +274,14 @@ function validateFlows(flows: Flow[], context: string): string[] {
     const flow = flows[i]
     
     // Required fields
-    if (!flow.from || typeof flow.from !== 'string' || flow.from.trim() === '') {
-      errors.push(`${context}, flows[${i}]: Missing or invalid 'from' field`)
+    if (!flow.from) {
+      errors.push(`${context}, flows[${i}]: Missing 'from' field`)
+    } else if (typeof flow.from !== 'string' && !Array.isArray(flow.from)) {
+      errors.push(`${context}, flows[${i}]: 'from' must be string or array of strings`)
+    } else if (typeof flow.from === 'string' && flow.from.trim() === '') {
+      errors.push(`${context}, flows[${i}]: 'from' cannot be empty`)
+    } else if (Array.isArray(flow.from) && (flow.from.length === 0 || flow.from.some(p => typeof p !== 'string' || p.trim() === ''))) {
+      errors.push(`${context}, flows[${i}]: 'from' array must contain non-empty strings`)
     }
     
     if (!flow.to) {
@@ -403,7 +409,12 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
     // Collect all 'from' patterns from flows
     if (def.flows && def.flows.length > 0) {
       for (const flow of def.flows) {
-        universalPatterns.add(flow.from)
+        // For array patterns, add all patterns
+        if (Array.isArray(flow.from)) {
+          flow.from.forEach(p => universalPatterns.add(p));
+        } else {
+          universalPatterns.add(flow.from);
+        }
       }
     }
     
@@ -415,7 +426,12 @@ function getPlatformsState(cwd?: string | null): PlatformsState {
   // Add patterns from global flows
   if (globalFlows && globalFlows.length > 0) {
     for (const flow of globalFlows) {
-      universalPatterns.add(flow.from)
+      // For array patterns, add all patterns
+      if (Array.isArray(flow.from)) {
+        flow.from.forEach(p => universalPatterns.add(p));
+      } else {
+        universalPatterns.add(flow.from);
+      }
     }
   }
 
@@ -651,7 +667,8 @@ function buildDirectoryPaths(
   if (definition.flows && definition.flows.length > 0) {
     for (const flow of definition.flows) {
       // Extract universal subdir from 'from' pattern
-      const fromPattern = flow.from
+      // For array patterns, use the first pattern
+      const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
       const firstComponent = fromPattern.split('/')[0]
       
       // Skip if it's a file (contains extension) or already exists
@@ -850,9 +867,10 @@ export function getPlatformSubdirExts(
     
     for (const flow of definition.flows) {
       // Check if this flow matches the universal subdir
-      if (flow.from.startsWith(`${universalSubdir}/`)) {
+      // For array patterns, use the first pattern
+      const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+      if (fromPattern.startsWith(`${universalSubdir}/`)) {
         // Extract extension from the 'from' pattern
-        const fromPattern = flow.from
         const extMatch = fromPattern.match(/\.[^./]+$/)
         if (extMatch) {
           extensions.add(extMatch[0])

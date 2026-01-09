@@ -40,10 +40,13 @@ export function invertFlow(flow: Flow, sourcePlatform: Platform): InvertedFlow {
     const firstTarget = Object.keys(flow.to)[0];
     const firstOptions = flow.to[firstTarget];
     
+    // For array patterns, use the first pattern for inversion
+    const invertedTo = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+    
     return {
       ...flow,
       from: firstTarget,
-      to: flow.from,
+      to: invertedTo,
       map: invertMapOperations(flow.map || firstOptions.map),
       pipe: invertPipeTransforms(flow.pipe || firstOptions.pipe),
       embed: undefined,  // Embedding becomes extraction
@@ -55,9 +58,12 @@ export function invertFlow(flow: Flow, sourcePlatform: Platform): InvertedFlow {
   }
   
   // Simple single-target flow inversion
+  // For array patterns, use the first pattern for inversion
+  const invertedTo = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+  
   const inverted: InvertedFlow = {
     from: flow.to as string,
-    to: flow.from,
+    to: invertedTo,
     
     // Invert map operations
     map: invertMapOperations(flow.map),

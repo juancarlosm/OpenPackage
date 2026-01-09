@@ -69,8 +69,20 @@
       "required": ["from", "to"],
       "properties": {
         "from": {
-          "type": "string",
-          "description": "Source file pattern (supports {name} placeholders)"
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Source file pattern (supports glob patterns and {name} placeholders)"
+            },
+            {
+              "type": "array",
+              "description": "Array of source patterns with priority (first match wins)",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ]
         },
         "to": {
           "oneOf": [

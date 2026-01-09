@@ -47,15 +47,18 @@ import {
 } from './flow-key-mapper.js';
 import { extractAllKeys } from './flow-key-extractor.js';
 import { applyMapPipeline, createMapContext, validateMapPipeline } from './map-pipeline/index.js';
+import { SourcePatternResolver } from './source-resolver.js';
 
 /**
  * Default flow executor implementation
  */
 export class DefaultFlowExecutor implements FlowExecutor {
   private transformRegistry: TransformRegistry;
+  private sourceResolver: SourcePatternResolver;
 
   constructor(transformRegistry?: TransformRegistry) {
     this.transformRegistry = transformRegistry || defaultTransformRegistry;
+    this.sourceResolver = new SourcePatternResolver();
   }
 
   /**
@@ -76,7 +79,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
       const validation = this.validateFlow(flow);
       if (!validation.valid) {
         return {
-          source: flow.from,
+          source: this.normalizeFromPattern(flow.from),
           target: flow.to as string,
           success: false,
           transformed: false,
@@ -87,9 +90,10 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
       // Evaluate conditions
       if (flow.when && !this.evaluateCondition(flow.when, context)) {
-        logger.debug(`Flow skipped due to condition: ${flow.from} -> ${flow.to}`);
+        const normalized = this.normalizeFromPattern(flow.from);
+        logger.debug(`Flow skipped due to condition: ${normalized} -> ${flow.to}`);
         return {
-          source: flow.from,
+          source: normalized,
           target: flow.to as string,
           success: true,
           transformed: false,
@@ -99,29 +103,41 @@ export class DefaultFlowExecutor implements FlowExecutor {
       }
 
       // Resolve source paths (may return multiple files for glob patterns)
-      const sourcePaths = await this.resolveSourcePattern(flow.from, context);
+      const resolution = await this.resolveSourcePattern(flow.from, context);
+      const sourcePaths = resolution.paths;
+      const resolutionWarnings = resolution.warnings;
 
       // If no files matched, return success with no files processed
       if (sourcePaths.length === 0) {
         return {
-          source: flow.from,
+          source: this.normalizeFromPattern(flow.from),
           target: flow.to as string,
           success: true,
           transformed: false,
-          warnings: ['No files matched pattern'],
+          warnings: resolutionWarnings.length > 0 ? resolutionWarnings : ['No files matched pattern'],
           executionTime: Date.now() - startTime,
         };
       }
 
       // Execute pipeline for each matched file
       const results: FlowResult[] = [];
+      const firstFromPattern = this.getFirstPattern(flow.from);
+      
       for (const sourcePath of sourcePaths) {
-        const targetPath = this.resolveTargetFromGlob(sourcePath, flow.from, flow.to as string, context);
+        const targetPath = this.resolveTargetFromGlob(sourcePath, firstFromPattern, flow.to as string, context);
         const result = await this.executePipeline(flow, sourcePath, targetPath, context);
         results.push({
           ...result,
           executionTime: Date.now() - startTime,
         });
+      }
+      
+      // Add resolution warnings to first result if any
+      if (resolutionWarnings.length > 0 && results.length > 0) {
+        results[0].warnings = [
+          ...(results[0].warnings || []),
+          ...resolutionWarnings,
+        ];
       }
 
       // If single file, return single result
@@ -133,7 +149,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
       return this.aggregateResults(results, startTime);
     } catch (error) {
       return {
-        source: flow.from,
+        source: this.normalizeFromPattern(flow.from),
         target: typeof flow.to === 'string' ? flow.to : Object.keys(flow.to).join(', '),
         success: false,
         transformed: false,
@@ -166,23 +182,26 @@ export class DefaultFlowExecutor implements FlowExecutor {
     }
 
     const multiTarget = flow.to as MultiTargetFlows;
+    const normalizedFrom = this.normalizeFromPattern(flow.from);
     
     // Resolve source paths (may be multiple files with glob)
-    const sourcePaths = await this.resolveSourcePattern(flow.from, context);
+    const resolution = await this.resolveSourcePattern(flow.from, context);
+    const sourcePaths = resolution.paths;
 
     // If no files matched
     if (sourcePaths.length === 0) {
       return Object.keys(multiTarget).map(target => ({
-        source: flow.from,
+        source: normalizedFrom,
         target,
         success: true,
         transformed: false,
-        warnings: ['No files matched pattern'],
+        warnings: resolution.warnings.length > 0 ? resolution.warnings : ['No files matched pattern'],
       }));
     }
 
     // Execute each source file
     const allResults: FlowResult[] = [];
+    const firstFromPattern = this.getFirstPattern(flow.from);
 
     for (const sourcePath of sourcePaths) {
       // Load and parse source once
@@ -203,9 +222,9 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
           // Evaluate conditions
           if (mergedFlow.when && !this.evaluateCondition(mergedFlow.when, context)) {
-            logger.debug(`Multi-target flow skipped due to condition: ${flow.from} -> ${targetPath}`);
+            logger.debug(`Multi-target flow skipped due to condition: ${normalizedFrom} -> ${targetPath}`);
             allResults.push({
-              source: flow.from,
+              source: normalizedFrom,
               target: targetPath,
               success: true,
               transformed: false,
@@ -215,12 +234,13 @@ export class DefaultFlowExecutor implements FlowExecutor {
             continue;
           }
 
-          const resolvedTargetPath = this.resolveTargetFromGlob(sourcePath, flow.from, targetPath, context);
+          const resolvedTargetPath = this.resolveTargetFromGlob(sourcePath, firstFromPattern, targetPath, context);
 
           // Execute pipeline with pre-loaded content
           const result = await this.executePipelineWithContent(
             mergedFlow,
             sourceContent,
+            sourcePath,
             resolvedTargetPath,
             context
           );
@@ -231,7 +251,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
           });
         } catch (error) {
           allResults.push({
-            source: flow.from,
+            source: normalizedFrom,
             target: targetPath,
             success: false,
             transformed: false,
@@ -325,7 +345,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
     // Step 1: Load source file
     const sourceContent = await this.loadSourceFile(sourcePath, context);
 
-    return this.executePipelineWithContent(flow, sourceContent, targetPath, context);
+    return this.executePipelineWithContent(flow, sourceContent, sourcePath, targetPath, context);
   }
 
   /**
@@ -334,6 +354,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
   private async executePipelineWithContent(
     flow: Flow,
     sourceContent: ParsedContent,
+    sourcePath: string,
     targetPath: string,
     context: FlowContext
   ): Promise<Omit<FlowResult, 'executionTime'>> {
@@ -361,8 +382,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
       // Step 4: Apply map pipeline
       if (flow.map) {
-        // Determine source path from flow.from and context
-        const sourcePath = path.join(context.packageRoot, flow.from);
+        // Use the actual source path for map context
         const mapContext = createMapContext({
           filename: path.basename(sourcePath, path.extname(sourcePath)),
           dirname: path.basename(path.dirname(sourcePath)),
@@ -445,7 +465,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
       }
 
       return {
-        source: flow.from,
+        source: sourcePath,
         target: targetPath,
         success: true,
         transformed,
@@ -457,7 +477,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
       };
     } catch (error) {
       return {
-        source: flow.from,
+        source: sourcePath,
         target: targetPath,
         success: false,
         transformed,
@@ -845,84 +865,22 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
 
   /**
-   * Resolve pattern with glob support
+   * Resolve pattern with glob support and priority-based array matching
    * Returns resolved file paths (glob patterns return multiple files)
    */
-  private async resolveSourcePattern(pattern: string, context: FlowContext): Promise<string[]> {
-    // Check if pattern contains glob wildcard
-    if (pattern.includes('*')) {
-      return this.resolveGlobPattern(pattern, context.packageRoot);
-    }
-    
-    // No glob - return single file path
-    const resolved = path.join(context.packageRoot, pattern);
-    return [resolved];
-  }
+  private async resolveSourcePattern(
+    pattern: string | string[],
+    context: FlowContext
+  ): Promise<{ paths: string[]; warnings: string[] }> {
+    const result = await this.sourceResolver.resolve(pattern, {
+      baseDir: context.packageRoot,
+      logWarnings: true,
+    });
 
-  /**
-   * Resolve glob pattern to matching files
-   */
-  private async resolveGlobPattern(pattern: string, baseDir: string): Promise<string[]> {
-    const matches: string[] = [];
-    
-    // Extract directory and file pattern
-    const parts = pattern.split('/');
-    const globPart = parts.findIndex(p => p.includes('*'));
-    
-    if (globPart === -1) {
-      return [path.join(baseDir, pattern)];
-    }
-    
-    // Build directory path up to first glob
-    const dirPath = path.join(baseDir, ...parts.slice(0, globPart));
-    const filePattern = parts.slice(globPart).join('/');
-    
-    // Check if directory exists
-    if (!await fsUtils.exists(dirPath)) {
-      return [];
-    }
-    
-    // Recursively find matching files
-    await this.findMatchingFiles(dirPath, filePattern, baseDir, matches);
-    
-    return matches;
-  }
-
-  /**
-   * Recursively find files matching glob pattern
-   * Supports ** for recursive directory matching
-   */
-  private async findMatchingFiles(
-    dir: string,
-    pattern: string,
-    baseDir: string,
-    matches: string[]
-  ): Promise<void> {
-    try {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        const relativePath = path.relative(baseDir, fullPath);
-        
-        if (entry.isDirectory()) {
-          // Always recurse for ** patterns
-          if (pattern.startsWith('**') || pattern.includes('/**/')) {
-            await this.findMatchingFiles(fullPath, pattern, baseDir, matches);
-          } else if (pattern.includes('/')) {
-            // For patterns with subdirs, continue searching
-            await this.findMatchingFiles(fullPath, pattern, baseDir, matches);
-          }
-        } else if (entry.isFile()) {
-          // Test file against pattern
-          if (minimatch(relativePath, pattern, { dot: false })) {
-            matches.push(fullPath);
-          }
-        }
-      }
-    } catch (error) {
-      // Ignore errors (directory not accessible, etc.)
-    }
+    return {
+      paths: result.paths,
+      warnings: result.warnings,
+    };
   }
 
   /**
@@ -1007,6 +965,22 @@ export class DefaultFlowExecutor implements FlowExecutor {
     pipeline.push('write');
 
     return pipeline;
+  }
+
+  /**
+   * Normalize from pattern for display in results
+   * Converts array to comma-separated string
+   */
+  private normalizeFromPattern(pattern: string | string[]): string {
+    return Array.isArray(pattern) ? pattern.join(', ') : pattern;
+  }
+
+  /**
+   * Get the first pattern from a pattern or array of patterns
+   * Used for path resolution when multiple sources are specified
+   */
+  private getFirstPattern(pattern: string | string[]): string {
+    return Array.isArray(pattern) ? pattern[0] : pattern;
   }
 
   /**

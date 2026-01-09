@@ -278,9 +278,10 @@ export class PlatformConverter {
    * Discover files matching a glob pattern
    */
   private async discoverMatchingFiles(
-    pattern: string,
+    pattern: string | string[],
     baseDir: string
   ): Promise<string[]> {
+    const patterns = Array.isArray(pattern) ? pattern : [pattern];
     const matches: string[] = [];
     const { minimatch } = await import('minimatch');
     
@@ -299,13 +300,16 @@ export class PlatformConverter {
       }
     }
     
-    // Check each file against the pattern
+    // Check each file against the patterns
     for await (const filePath of walkFiles(baseDir)) {
       const relativePath = relative(baseDir, filePath);
       
-      // Check if file matches pattern
-      if (minimatch(relativePath, pattern, { dot: false })) {
-        matches.push(filePath);
+      // Check if file matches any pattern (with priority - first match wins for arrays)
+      for (const p of patterns) {
+        if (minimatch(relativePath, p, { dot: false })) {
+          matches.push(filePath);
+          break; // Only match once per file
+        }
       }
     }
     

@@ -100,7 +100,9 @@ function findReverseFlow(
         const variables = match.variables;
         
         // Resolve the 'from' pattern with extracted variables
-        const registryPath = resolvePattern(flow.from, variables);
+        // For array patterns, use the first pattern
+        const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+        const registryPath = resolvePattern(fromPattern, variables);
         
         return { flow, registryPath };
       }

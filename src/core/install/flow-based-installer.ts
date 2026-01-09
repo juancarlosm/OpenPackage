@@ -29,6 +29,18 @@ import {
 import { createPlatformConverter } from '../flows/platform-converter.js';
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Get the first pattern from a flow's from field
+ * For array patterns, returns the first pattern; for string, returns as-is
+ */
+function getFirstFromPattern(from: string | string[]): string {
+  return Array.isArray(from) ? from[0] : from;
+}
+
+// ============================================================================
 // Types and Interfaces
 // ============================================================================
 
@@ -162,7 +174,8 @@ async function discoverFlowSources(
 ): Promise<Map<Flow, string[]>> {
   const flowSources = new Map<Flow, string[]>();
   for (const flow of flows) {
-    const sourcePattern = resolvePattern(flow.from, context);
+    const firstPattern = getFirstFromPattern(flow.from);
+    const sourcePattern = resolvePattern(firstPattern, context);
     const sourcePaths = await matchPattern(sourcePattern, packageRoot);
     flowSources.set(flow, sourcePaths);
   }
@@ -573,7 +586,8 @@ export async function installPackageWithFlows(
           const sourceRelForMapping = parsed ? `${parsed.universalSubdir}/${parsed.relPath}` : sourceRel;
           const sourceAbsForMapping = parsed ? join(packageRoot, sourceRelForMapping) : sourceAbs;
           
-          const capturedName = extractCapturedName(sourceRelForMapping, flow.from);
+          const firstPattern = getFirstFromPattern(flow.from);
+          const capturedName = extractCapturedName(sourceRelForMapping, firstPattern);
 
           const sourceContext: FlowContext = {
             ...flowContext,
@@ -590,7 +604,7 @@ export async function installPackageWithFlows(
           // Use the suffix-stripped source path for target resolution
           const rawToPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0] ?? '';
           const resolvedToPattern = resolvePattern(rawToPattern, sourceContext, capturedName);
-          const targetAbs = resolveTargetFromGlob(sourceAbsForMapping, flow.from, resolvedToPattern, sourceContext);
+          const targetAbs = resolveTargetFromGlob(sourceAbsForMapping, firstPattern, resolvedToPattern, sourceContext);
           const targetRel = relative(workspaceRoot, targetAbs);
 
           // Create a concrete flow using the original source path for file reading
@@ -1107,7 +1121,8 @@ async function installWithPathMappingOnly(
           const sourceRelForMapping = parsed ? `${parsed.universalSubdir}/${parsed.relPath}` : sourceRel;
           const sourceAbsForMapping = parsed ? join(packageRoot, sourceRelForMapping) : sourceAbs;
           
-          const capturedName = extractCapturedName(sourceRelForMapping, flow.from);
+          const firstPattern = getFirstFromPattern(flow.from);
+          const capturedName = extractCapturedName(sourceRelForMapping, firstPattern);
           
           const sourceContext: FlowContext = {
             ...flowContext,
@@ -1123,7 +1138,7 @@ async function installWithPathMappingOnly(
           // Resolve target path
           const rawToPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0] ?? '';
           const resolvedToPattern = resolvePattern(rawToPattern, sourceContext, capturedName);
-          const targetAbs = resolveTargetFromGlob(sourceAbsForMapping, flow.from, resolvedToPattern, sourceContext);
+          const targetAbs = resolveTargetFromGlob(sourceAbsForMapping, firstPattern, resolvedToPattern, sourceContext);
           const targetRel = relative(workspaceRoot, targetAbs);
           
           // Create concrete flow

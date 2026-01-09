@@ -102,12 +102,14 @@ export function getPlatformSpecificFilename(universalPath: string, platform: Pla
   if (platformDef.flows && platformDef.flows.length > 0) {
     for (const flow of platformDef.flows) {
       // Check if this flow matches the universal path
-      if (flow.from.includes(universalSubdir)) {
+      // For array patterns, use the first pattern
+      const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+      if (fromPattern.includes(universalSubdir)) {
         const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
         if (toPattern) {
           // Extract extension from 'to' pattern
           const toExtMatch = toPattern.match(/\.[^./]+$/);
-          const fromExtMatch = flow.from.match(/\.[^./]+$/);
+          const fromExtMatch = fromPattern.match(/\.[^./]+$/);
           
           if (toExtMatch && fromExtMatch) {
             // Extension transformation found

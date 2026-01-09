@@ -58,6 +58,30 @@ Source file pattern relative to package root.
 { "from": "skills/**/*" }           // All files recursively
 ```
 
+**Array with priority (first match wins):**
+```jsonc
+{ "from": ["mcp.jsonc", "mcp.json"] }  // Prefer .jsonc, fallback to .json
+```
+
+When an array of patterns is provided:
+- Patterns are tried in order (first = highest priority)
+- First matching pattern is used
+- Subsequent patterns are skipped
+- Warning logged if multiple patterns match
+- Useful for format preferences or platform-specific fallbacks
+
+**Array pattern use cases:**
+```jsonc
+// Format preference
+{ "from": ["mcp.jsonc", "mcp.json"] }
+
+// Platform-specific fallback
+{ "from": ["config.cursor.json", "config.json"] }
+
+// Version fallback
+{ "from": ["config.v2.yaml", "config.yaml"] }
+```
+
 #### `to` (string | object)
 
 Target file path relative to workspace root.
