@@ -1,23 +1,19 @@
 import { dirname, join, sep } from 'path';
 
 import type { CommandResult, PackageFile, InstallOptions } from '../../types/index.js';
-import { DEPENDENCY_ARRAYS, UNVERSIONED } from '../../constants/index.js';
-import { applyPlannedSyncForPackageFiles } from '../../utils/index-based-installer.js';
+import { UNVERSIONED } from '../../constants/index.js';
 import { readPackageFilesForRegistry } from '../../utils/package-copy.js';
 import { PACKAGE_PATHS } from '../../constants/index.js';
 import { printPlatformSyncSummary } from '../sync/platform-sync-summary.js';
-import { getDetectedPlatforms, platformUsesFlows } from '../platforms.js';
-import { readWorkspaceIndex, writeWorkspaceIndex } from '../../utils/workspace-index-yml.js';
+import { getDetectedPlatforms } from '../platforms.js';
+import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { stripRootCopyPrefix, isRootCopyPath } from '../../utils/platform-root-files.js';
 import { ensureDir, writeTextFile } from '../../utils/fs.js';
 import { syncRootFiles } from '../sync/root-files-sync.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
 import { PlatformSyncResult } from '../sync/platform-sync.js';
-import { resolveDeclaredPath, formatPathForWorkspaceIndex } from '../../utils/path-resolution.js';
-import { isRegistryPath } from '../../utils/source-mutability.js';
-import { MUTABILITY, SOURCE_TYPES } from '../../constants/index.js';
-import { installPackageWithFlows } from '../install/flow-based-installer.js';
-import { logger } from '../../utils/logger.js';
+import { resolveDeclaredPath } from '../../utils/path-resolution.js';
+import { installPackageByIndexWithFlows } from '../../utils/flow-index-installer.js';
 
 export interface ApplyPipelineOptions extends InstallOptions {}
 
@@ -79,77 +75,61 @@ async function applySinglePackage(
 
   const resolved = resolveDeclaredPath(entry.path, cwd);
   const absolutePath = join(resolved.absolute, sep);
-  const mutability = isRegistryPath(absolutePath) ? MUTABILITY.IMMUTABLE : MUTABILITY.MUTABLE;
-  const sourceType = isRegistryPath(absolutePath) ? SOURCE_TYPES.REGISTRY : SOURCE_TYPES.PATH;
-
-  const source = {
+  const version = entry.version ?? UNVERSIONED;
+  const platforms = await getDetectedPlatforms(cwd);
+  
+  const installResult = await installPackageByIndexWithFlows(
+    cwd,
     packageName,
-    absolutePath,
-    declaredPath: resolved.declared,
-    mutability,
-    version: entry.version,
-    sourceType
-  };
-  const packageFiles = (await readPackageFilesForRegistry(source.absolutePath)).filter(
+    version,
+    platforms,
+    {
+      ...options,
+      // Apply should behave like reinstall - no prompts, just overwrite
+      force: true,
+      dryRun: options.dryRun ?? false
+    },
+    undefined, // includePaths
+    absolutePath, // contentRoot
+    undefined // packageFormat
+  );
+
+  // Read package files for summary display
+  const packageFiles = (await readPackageFilesForRegistry(absolutePath)).filter(
     file => file.path !== PACKAGE_PATHS.INDEX_RELATIVE
   );
 
-  const version = source.version ?? UNVERSIONED;
-  const conflictStrategy = options.force ? 'overwrite' : options.conflictStrategy ?? 'ask';
-  const platforms = await getDetectedPlatforms(cwd);
-  // NOTE: Apply must produce a correct file mapping in the workspace index.
-  // The flow-based installer integration does not yet build index mappings, so apply
-  // always uses the index-based installer path (which is mapping-aware).
-  logger.debug(`Applying ${packageName} using index-based installer`);
-  const syncOutcome = await applyPlannedSyncForPackageFiles(
-    cwd,
-    source.packageName,
-    version,
-    packageFiles,
-    platforms,
-    { ...options, conflictStrategy },
-    'nested'
-  );
-
-  // Handle root files and root/** copy-to-root content.
-  const rootSyncResult = await syncRootFiles(cwd, packageFiles, source.packageName, platforms);
+  // Handle root files and root/** copy-to-root content
+  const rootSyncResult = await syncRootFiles(cwd, packageFiles, packageName, platforms);
   await syncRootCopyContent(cwd, packageFiles, options);
-
-  // Persist unified workspace index entry.
-  await upsertWorkspaceIndexEntry(cwd, {
-    name: source.packageName,
-    path: source.declaredPath,
-    version: source.version,
-    files: syncOutcome.mapping
-  });
 
   printPlatformSyncSummary({
     actionLabel: 'Applied',
     packageContext: {
-      config: { name: source.packageName, version: source.version },
+      config: { name: packageName, version },
       location: 'nested',
-      packageDir: source.absolutePath,
+      packageDir: absolutePath,
       packageYmlPath: '',
       isCwdPackage: false
     } as any, // legacy summary shape; minimal fields for printing
     version,
     packageFiles,
     syncResult: {
-      created: syncOutcome.operation.installedFiles.concat(rootSyncResult.created),
-      updated: syncOutcome.operation.updatedFiles.concat(rootSyncResult.updated),
-      deleted: syncOutcome.operation.deletedFiles
+      created: installResult.installedFiles.concat(rootSyncResult.created),
+      updated: installResult.updatedFiles.concat(rootSyncResult.updated),
+      deleted: installResult.deletedFiles
     }
   });
 
   return {
     success: true,
     data: {
-      config: { name: source.packageName, version },
+      config: { name: packageName, version },
       packageFiles,
       syncResult: {
-        created: syncOutcome.operation.installedFiles.concat(rootSyncResult.created),
-        updated: syncOutcome.operation.updatedFiles.concat(rootSyncResult.updated),
-        deleted: syncOutcome.operation.deletedFiles
+        created: installResult.installedFiles.concat(rootSyncResult.created),
+        updated: installResult.updatedFiles.concat(rootSyncResult.updated),
+        deleted: installResult.deletedFiles
       }
     }
   };
@@ -169,28 +149,4 @@ async function syncRootCopyContent(
     await ensureDir(dirname(absTarget));
     await writeTextFile(absTarget, file.content, (file.encoding as BufferEncoding) ?? 'utf8');
   }
-}
-
-interface WorkspaceIndexUpdate {
-  name: string;
-  path: string;
-  version?: string;
-  files: Record<string, string[]>;
-}
-
-async function upsertWorkspaceIndexEntry(
-  cwd: string,
-  update: WorkspaceIndexUpdate
-): Promise<void> {
-  const record = await readWorkspaceIndex(cwd);
-  
-  // Convert to workspace-relative path if under workspace, then apply tilde notation for global paths
-  const pathToWrite = formatPathForWorkspaceIndex(update.path, cwd);
-  
-  record.index.packages[update.name] = {
-    path: pathToWrite,
-    version: update.version,
-    files: update.files
-  };
-  await writeWorkspaceIndex(record);
 }

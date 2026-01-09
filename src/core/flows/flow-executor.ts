@@ -419,13 +419,17 @@ export class DefaultFlowExecutor implements FlowExecutor {
 
       const targetExists = await fsUtils.exists(targetPath);
 
-      let targetKeysBeforeMerge: Set<string> | undefined;
+      // Track keys for merged files (for precise uninstall)
+      // Extract keys from SOURCE data BEFORE merging with target
+      // This represents what THIS package contributes, regardless of target state
+      let contributedKeys: string[] | undefined;
+      if (shouldTrackKeys) {
+        contributedKeys = extractAllKeys(data);
+      }
 
       // Step 7: Merge with existing target (if needed)
       if (targetExists) {
         const targetContent = await this.loadSourceFile(targetPath, context);
-        const targetKeys = shouldTrackKeys ? extractAllKeys(targetContent.data) : undefined;
-        targetKeysBeforeMerge = targetKeys ? new Set(targetKeys) : undefined;
         
         // Special handling for composite merge - works with raw text
         if (flow.merge === 'composite') {
@@ -453,15 +457,6 @@ export class DefaultFlowExecutor implements FlowExecutor {
       // Step 8: Write to target file
       if (!context.dryRun) {
         await this.writeTargetFile(targetPath, data, sourceContent.format);
-      }
-
-      // Track keys for merged files (for precise uninstall)
-      let contributedKeys: string[] | undefined;
-      if (shouldTrackKeys) {
-        const postMergeKeys = extractAllKeys(data);
-        contributedKeys = targetKeysBeforeMerge
-          ? postMergeKeys.filter(key => !targetKeysBeforeMerge.has(key))
-          : postMergeKeys;
       }
 
       return {
