@@ -68,6 +68,30 @@ npm
 npm install -g opkg 
 ```
 
+### Install packages
+```bash title="Terminal"
+opkg install <package>
+```  
+Installs all files from a package into the codebase at cwd, formatted and converted to per platform conventions and into their respective dirs.
+
+The install command supports various package sources:
+```bash title="Terminal"
+opkg install essentials               # Local/remote registry
+opkg install ../packages/essentials/  # Local path
+opkg install git:https://github.com/enulus/awesome-openpackage.git                # GitHub package repo
+opkg install github:anthropics/claude-code                                        # GitHub Claude Code Plugins marketplace
+opkg install github:anthropics/claude-code#subdirectory=plugins/commit-commands   # GitHub Claude Code Plugin
+```  
+
+### Uninstall packages
+```bash title="Terminal"
+opkg uninstall <package>
+```  
+Removes all files for a package from the codebase at cwd.
+
+> [!TIP]  
+> Learn more by heading over to the [official docs](https://openpackage.dev/docs).
+
 ### Compose a package
 
 ```bash title="Terminal"
@@ -105,31 +129,6 @@ opkg remove <package> commands/clean.md         # Removes file or dir from packa
 
 > [!TIP]  
 > Learn more about packages from the [packages doc](https://openpackage.dev/docs/packages) on our official docs.
-
-### Install packages
-```bash title="Terminal"
-opkg install <package>
-```  
-Installs all files from a package into the codebase at cwd, formatted and converted to per platform conventions and into their respective dirs.
-
-The install command supports various package sources:
-```bash title="Terminal"
-opkg install essentials               # Local/remote registry
-opkg install ../packages/essentials/  # Local path
-opkg install git:https://github.com/enulus/awesome-openpackage.git                # GitHub package repo
-opkg install github:anthropics/claude-code                                        # GitHub Claude Code Plugins marketplace
-opkg install github:anthropics/claude-code#subdirectory=plugins/commit-commands   # GitHub Claude Code Plugin
-```  
-
-
-### Uninstall packages
-```bash title="Terminal"
-opkg uninstall <package>
-```  
-Removes all files for a package from the codebase at cwd.
-
-> [!TIP]  
-> Learn more by heading over to the [official docs](https://openpackage.dev/docs).
 
 ## Supported Platforms
 
