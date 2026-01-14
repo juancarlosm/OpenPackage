@@ -174,10 +174,6 @@ export async function installPackageByIndexWithFlows(
         // Normalize source key to canonical form
         const normalizedSource = await normalizeSourceKey(source);
         
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-index-installer.ts:116',message:'aggregating fileMapping from platform',data:{source,normalizedSource,targets,platform,existingKeys:Object.keys(fileMapping)},timestamp:Date.now(),sessionId:'debug-session',runId:'install-postfix',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        
         const existing = fileMapping[normalizedSource] ?? [];
         // Merge while deduping by target path; prefer complex mapping over string.
         const byTarget = new Map<string, string | WorkspaceIndexFileMapping>();
@@ -250,10 +246,6 @@ export async function installPackageByIndexWithFlows(
 
   // Update workspace index if not dry-run
   if (!options.dryRun) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-index-installer.ts:188',message:'final fileMapping before index update',data:{fileMappingKeys:Object.keys(fileMapping),fileMapping},timestamp:Date.now(),sessionId:'debug-session',runId:'install',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    
     await updateWorkspaceIndexForFlows(
       cwd,
       packageName,

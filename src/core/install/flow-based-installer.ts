@@ -556,12 +556,6 @@ export async function installPackageWithFlows(
     
     // Discover source files for each flow
     const flowSources = await discoverFlowSources(flows, packageRoot, flowContext);
-    
-    // #region agent log
-    for (const [flow, sources] of flowSources) {
-      fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-based-installer.ts:535',message:'discovered flow sources',data:{flowFrom:flow.from,sources,platform},timestamp:Date.now(),sessionId:'debug-session',runId:'install',hypothesisId:'B'})}).catch(()=>{});
-    }
-    // #endregion
 
     // Build a map of base paths to platforms that have override files
     // This allows universal files to exclude platforms that have platform-specific overrides
@@ -723,10 +717,6 @@ export async function installPackageWithFlows(
                   }
                 }
               }
-              
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-based-installer.ts:657',message:'fileMapping key assignment',data:{sourceRel,canonicalSourceRel,sourceRelForMapping,target:normalizedTargetRel,platform,flowFrom:flow.from},timestamp:Date.now(),sessionId:'debug-session',runId:'install-postfix',hypothesisId:'A'})}).catch(()=>{});
-              // #endregion
               
               if (!result.fileMapping[canonicalSourceRel]) result.fileMapping[canonicalSourceRel] = [];
               const isKeyTrackedMerge =
