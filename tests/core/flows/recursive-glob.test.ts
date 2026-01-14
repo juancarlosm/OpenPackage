@@ -208,6 +208,34 @@ describe('Recursive Glob Patterns (**)', () => {
       assert.strictEqual(await fileExists('.claude/skills/testing/test.ts'), true);
       assert.strictEqual(await fileExists('.claude/skills/testing/docs/README.md'), true);
     });
+
+    it('should preserve nested subdirs when from is concrete and to has **', async () => {
+      await cleanupBetweenTests();
+
+      await createPackageFile('skills/testing/docs/README.md', '# Testing Docs');
+
+      const flow: Flow = {
+        from: 'skills/testing/docs/README.md',
+        to: '.claude/skills/**/*',
+      };
+
+      const context: FlowContext = {
+        packageRoot,
+        workspaceRoot,
+        platform: 'claude',
+        packageName: '@test/concrete-from',
+        direction: 'install',
+        variables: {},
+      };
+
+      const result = await executor.executeFlow(flow, context);
+
+      assert.strictEqual(result.success, true, `Expected success but got error: ${result.error?.message}`);
+
+      // Should not duplicate the "skills" segment (".claude/skills/skills/...")
+      assert.strictEqual(await fileExists('.claude/skills/testing/docs/README.md'), true);
+      assert.strictEqual(await fileExists('.claude/skills/skills/testing/docs/README.md'), false);
+    });
   });
   
   describe('Directory Mapping', () => {

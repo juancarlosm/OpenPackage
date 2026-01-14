@@ -322,7 +322,15 @@ function validateFlows(flows: Flow[], context: string): string[] {
       }
     }
     
-    // Note: pipe transforms are now handled within map pipeline via $pipe operation
+    // Validate legacy 'pipe' (still supported in platforms.jsonc for compatibility)
+    const pipe = (flow as any).pipe
+    if (pipe !== undefined) {
+      if (!Array.isArray(pipe)) {
+        errors.push(`${context}, flows[${i}]: 'pipe' must be array`)
+      } else if (pipe.some((p: any) => typeof p !== 'string' || p.trim() === '')) {
+        errors.push(`${context}, flows[${i}]: 'pipe' must be array of strings`)
+      }
+    }
     
     // Validate map pipeline (must be array)
     if (flow.map !== undefined && !Array.isArray(flow.map)) {

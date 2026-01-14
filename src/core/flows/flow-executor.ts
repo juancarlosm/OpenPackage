@@ -22,6 +22,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { minimatch } from 'minimatch';
 import * as fsUtils from '../../utils/fs.js';
 import { mergePackageContentIntoRootFile } from '../../utils/root-file-merger.js';
+import { resolveRecursiveGlobTargetRelativePath } from '../../utils/glob-target-mapping.js';
 import type {
   Flow,
   FlowContext,
@@ -958,69 +959,12 @@ export class DefaultFlowExecutor implements FlowExecutor {
     if (toPattern.includes('*')) {
       // Handle ** recursive patterns
       if (toPattern.includes('**')) {
-        // Extract the base directories before **
-        const toParts = toPattern.split('**');
-        const toBase = toParts[0].replace(/\/$/, '');
-        const toSuffix = toParts[1] || '';
-        
-        let relativeSubpath: string;
-        
-        if (fromPattern.includes('**')) {
-          // Both patterns have ** - use original logic
-          const fromParts = fromPattern.split('**');
-          const fromBase = fromParts[0].replace(/\/$/, '');
-          const fromSuffix = fromParts[1] || '';
-          
-          // Extract the relative path after the base directory
-          relativeSubpath = relativePath;
-          if (fromBase) {
-            relativeSubpath = relativePath.startsWith(fromBase + '/') 
-              ? relativePath.slice(fromBase.length + 1)
-              : relativePath;
-          }
-          
-          // Handle extension mapping if suffixes specify extensions
-          // e.g., /**/*.md -> /**/*.mdc
-          if (fromSuffix && toSuffix) {
-            const fromExt = fromSuffix.replace(/^\/?\*+/, '');
-            const toExt = toSuffix.replace(/^\/?\*+/, '');
-            if (fromExt && toExt && fromExt !== toExt) {
-              relativeSubpath = relativeSubpath.replace(new RegExp(fromExt.replace('.', '\\.') + '$'), toExt);
-            }
-          }
-        } else {
-          // fromPattern is a concrete path (no **), but toPattern has **
-          // Extract the relative subpath by matching the base directory from toPattern
-          if (toBase) {
-            // Extract everything after the base directory
-            // e.g., if toBase is "skills" and relativePath is "skills/frontend-design/SKILL.md",
-            // extract "frontend-design/SKILL.md"
-            if (relativePath.startsWith(toBase + '/')) {
-              relativeSubpath = relativePath.slice(toBase.length + 1);
-            } else {
-              // Fallback: use full relative path if it doesn't start with toBase
-              relativeSubpath = relativePath;
-            }
-          } else {
-            // No base in toPattern, use full relative path
-            relativeSubpath = relativePath;
-          }
-          
-          // Handle extension mapping if toSuffix specifies an extension
-          if (toSuffix) {
-            const toExt = toSuffix.replace(/^\/?\*+/, '');
-            if (toExt && toExt.startsWith('.')) {
-              const currentExt = path.extname(relativeSubpath);
-              if (currentExt && currentExt !== toExt) {
-                relativeSubpath = relativeSubpath.slice(0, -currentExt.length) + toExt;
-              }
-            }
-          }
-        }
-        
-        // Build target path
-        const targetPath = toBase ? path.join(toBase, relativeSubpath) : relativeSubpath;
-        return path.join(context.workspaceRoot, targetPath);
+        const targetRel = resolveRecursiveGlobTargetRelativePath(
+          relativePath,
+          fromPattern,
+          toPattern
+        );
+        return path.join(context.workspaceRoot, targetRel);
       }
       
       // Handle single-level * patterns
