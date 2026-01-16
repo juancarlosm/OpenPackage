@@ -156,6 +156,25 @@ setupLogoutCommand(program);
 
 program.hook('preAction', async (thisCommand) => {
   const opts = program.opts();
+  const cmdOpts = thisCommand.opts();
+  
+  // Global option trumps --cwd: change to home directory
+  if (cmdOpts.global) {
+    const { homedir } = await import('os');
+    const homeDir = homedir();
+    
+    if (opts.cwd) {
+      logger.info('--global option present, ignoring --cwd');
+    }
+    
+    console.log(`[DEBUG] Before chdir: ${process.cwd()}, target: ${homeDir}`);
+    process.chdir(homeDir);
+    console.log(`[DEBUG] After chdir: ${process.cwd()}`);
+    logger.info(`Changed working directory to home: ${homeDir}`);
+    return;
+  }
+  
+  // Handle --cwd normally if --global is not set
   if (opts.cwd) {
     const resolvedCwd = path.resolve(process.cwd(), opts.cwd);
     try {

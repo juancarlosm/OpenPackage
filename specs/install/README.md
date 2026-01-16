@@ -3,7 +3,8 @@
 This directory contains specifications for the `install` command, with a focus on:
 
 - **Latest-in-range resolution from local + remote registries**
-- **Workspace context**: Installs target effective cwd (shell or global --cwd; see [../../cli-options.md])
+- **Workspace context**: Installs target effective cwd (shell, global --cwd, or home directory with --global; see [../../cli-options.md])
+- **Global installation mode**: Install to home directory (`~/`) with `-g, --global` flag
 - **`openpackage.yml` as the canonical source of dependency intent**
 - **Consistent, minimal, npm-inspired UX**
 - **Git sources with subdirectory support** for monorepos and Claude Code plugins

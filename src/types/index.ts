@@ -153,11 +153,13 @@ export interface InstallOptions {
   conflictStrategy?: 'ask' | 'keep-both' | 'overwrite' | 'skip';
   conflictDecisions?: Record<string, 'keep-both' | 'overwrite' | 'skip'>;
   resolutionMode?: 'default' | 'remote-primary' | 'local-only';
+  global?: boolean;
 }
 
 export interface UninstallOptions {
   dryRun?: boolean;
   recursive?: boolean;
+  global?: boolean;
 }
 
 export interface PushOptions {

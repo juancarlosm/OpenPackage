@@ -105,8 +105,10 @@ Resolve/install from registry/git/path to workspace.
 - Partial via `files:` supported.
 - **Claude Code plugin support**: Automatically detects and transforms plugins from git sources (individual plugins or marketplaces with interactive selection).
 - Subdirectory support: `git:url#ref&subdirectory=path` for monorepos and plugin marketplaces.
+- **Global mode**: `-g, --global` installs to home directory (`~/`) instead of current workspace.
 - Example: 
   - `opkg install community-pkg@^1.0.0` (registry)
+  - `opkg install -g shared-rules` (global install)
   - `opkg install github:anthropics/claude-code#subdirectory=plugins/commit-commands` (plugin)
   - `opkg install github:anthropics/claude-code` (marketplace with interactive selection)
 - See [Install](install/).
@@ -124,7 +126,10 @@ Check package states.
 Remove package from workspace.
 
 - Flow: Read index → Delete mapped files (not source) → Remove sections from root files → Update index/yml.
-- Example: `opkg uninstall my-pkg`.
+- **Global mode**: `-g, --global` uninstalls from home directory (`~/`) instead of current workspace.
+- Example: 
+  - `opkg uninstall my-pkg` (workspace)
+  - `opkg uninstall -g shared-rules` (global)
 - See [Uninstall](uninstall/).
 
 ### `show`
