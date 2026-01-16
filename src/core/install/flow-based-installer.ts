@@ -23,7 +23,7 @@ import {
   type FlowInstallResult,
   type FlowConflictReport,
   type FlowInstallError
-} from './flow-installation-strategies.js';
+} from './strategies/index.js';
 import { discoverFlowSources } from '../flows/flow-source-discovery.js';
 import { resolvePattern } from '../flows/flow-source-discovery.js';
 import { getGlobalExportFlows, getPlatformDefinition } from '../platforms.js';

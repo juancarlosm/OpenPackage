@@ -1,0 +1,66 @@
+/**
+ * Temp Directory Helpers Module
+ * 
+ * Utilities for managing temporary directories during package conversion.
+ */
+
+import { join, dirname } from 'path';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { ensureDir, writeTextFile } from '../../../../utils/fs.js';
+import { logger } from '../../../../utils/logger.js';
+
+/**
+ * Create a temporary directory for package conversion
+ * 
+ * @param prefix - Prefix for temp directory name
+ * @returns Absolute path to created temp directory
+ */
+export async function createTempPackageDirectory(prefix: string = 'opkg-converted-'): Promise<string> {
+  const tempDir = await mkdtemp(join(tmpdir(), prefix));
+  logger.debug('Created temporary directory', { tempDir });
+  return tempDir;
+}
+
+/**
+ * Write package files to temporary directory
+ * 
+ * @param files - Array of files to write
+ * @param tempDir - Temporary directory path
+ */
+export async function writeTempPackageFiles(
+  files: Array<{ path: string; content: string }>,
+  tempDir: string
+): Promise<void> {
+  for (const file of files) {
+    const filePath = join(tempDir, file.path);
+    await ensureDir(dirname(filePath));
+    await writeTextFile(filePath, file.content);
+  }
+  
+  logger.debug(
+    `Wrote ${files.length} converted files to temp directory`,
+    { tempDir }
+  );
+}
+
+/**
+ * Cleanup temporary directory with error handling
+ * 
+ * @param tempDir - Directory to cleanup
+ */
+export async function cleanupTempDirectory(tempDir: string | null): Promise<void> {
+  if (!tempDir) {
+    return;
+  }
+  
+  try {
+    await rm(tempDir, { recursive: true, force: true });
+    logger.debug('Cleaned up temporary directory', { tempDir });
+  } catch (error) {
+    logger.warn('Failed to cleanup temp directory', {
+      tempDir,
+      error
+    });
+  }
+}
