@@ -16,14 +16,15 @@ export class PathSourceLoader implements PackageSourceLoader {
   
   async load(
     source: PackageSource,
-    options: InstallOptions
+    options: InstallOptions,
+    cwd: string
   ): Promise<LoadedPackage> {
     if (!source.localPath) {
       throw new SourceLoadError(source, 'Local path is required for path sources');
     }
     
     try {
-      const resolvedPath = resolve(process.cwd(), source.localPath);
+      const resolvedPath = resolve(cwd, source.localPath);
       
       // Detect if this is a Claude Code plugin
       const pluginDetection = await detectPluginType(resolvedPath);

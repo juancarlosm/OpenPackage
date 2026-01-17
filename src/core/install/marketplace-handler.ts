@@ -174,6 +174,7 @@ export async function promptPluginSelection(
  * @param marketplaceGitUrl - Git URL of the marketplace repository
  * @param marketplaceGitRef - Git ref (branch/tag/sha) if specified
  * @param options - Install options
+ * @param cwd - Current working directory for installation
  */
 export async function installMarketplacePlugins(
   marketplaceDir: string,
@@ -181,7 +182,8 @@ export async function installMarketplacePlugins(
   selectedNames: string[],
   marketplaceGitUrl: string,
   marketplaceGitRef: string | undefined,
-  options: InstallOptions
+  options: InstallOptions,
+  cwd: string
 ): Promise<CommandResult> {
   logger.info('Installing marketplace plugins', { 
     marketplace: marketplace.name,
@@ -237,14 +239,16 @@ export async function installMarketplacePlugins(
           normalizedSource,
           marketplaceGitUrl,
           marketplaceGitRef,
-          options
+          options,
+          cwd
         );
       } else if (isGitSource(normalizedSource)) {
         installResult = await installGitPlugin(
           marketplace,
           pluginEntry,
           normalizedSource,
-          options
+          options,
+          cwd
         );
       } else {
         throw new Error(`Unsupported source type: ${normalizedSource.type}`);
@@ -299,7 +303,8 @@ async function installRelativePathPlugin(
   normalizedSource: NormalizedPluginSource,
   marketplaceGitUrl: string,
   marketplaceGitRef: string | undefined,
-  options: InstallOptions
+  options: InstallOptions,
+  cwd: string
 ): Promise<CommandResult> {
   const pluginSubdir = normalizedSource.relativePath!;
   const pluginDir = join(marketplaceDir, pluginSubdir);
@@ -355,7 +360,7 @@ async function installRelativePathPlugin(
   
   // Build git context with subdirectory to properly track git source
   const ctx = await buildGitInstallContext(
-    process.cwd(),
+    cwd,
     marketplaceGitUrl,
     {
       ...options,
@@ -385,7 +390,8 @@ async function installGitPlugin(
   marketplace: MarketplaceManifest,
   pluginEntry: MarketplacePluginEntry,
   normalizedSource: NormalizedPluginSource,
-  options: InstallOptions
+  options: InstallOptions,
+  cwd: string
 ): Promise<CommandResult> {
   const gitUrl = normalizedSource.gitUrl!;
   const gitRef = normalizedSource.gitRef;
@@ -410,7 +416,7 @@ async function installGitPlugin(
   
   // Build git context
   const ctx = await buildGitInstallContext(
-    process.cwd(),
+    cwd,
     gitUrl,
     {
       ...options,

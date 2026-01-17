@@ -563,6 +563,25 @@ export class DefaultFlowExecutor implements FlowExecutor {
    * Parse source content based on format
    */
   parseSourceContent(content: string, format: FileFormat): any {
+    // Handle empty content gracefully for structured formats
+    if (!content.trim()) {
+      switch (format) {
+        case 'json':
+        case 'jsonc':
+        case 'yaml':
+        case 'yml':
+        case 'toml':
+          return {};
+        case 'markdown':
+        case 'md':
+          return { body: '' };
+        case 'text':
+        case 'txt':
+        default:
+          return content;
+      }
+    }
+
     try {
       switch (format) {
         case 'json':

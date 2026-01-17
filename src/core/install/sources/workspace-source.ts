@@ -17,7 +17,8 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
   
   async load(
     source: PackageSource,
-    options: InstallOptions
+    options: InstallOptions,
+    cwd: string
   ): Promise<LoadedPackage> {
     if (!source.packageName) {
       throw new SourceLoadError(source, 'Package name is required for workspace sources');
@@ -25,7 +26,7 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
     
     try {
       // Read workspace index
-      const { index } = await readWorkspaceIndex(process.cwd());
+      const { index } = await readWorkspaceIndex(cwd);
       const entry = index.packages?.[source.packageName];
       
       if (!entry?.path) {
@@ -37,7 +38,7 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
       }
       
       // Resolve package path
-      const resolved = resolveDeclaredPath(entry.path, process.cwd());
+      const resolved = resolveDeclaredPath(entry.path, cwd);
       const contentRoot = join(resolved.absolute, '/');
       
       // Load package metadata

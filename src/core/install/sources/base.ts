@@ -53,7 +53,8 @@ export interface PackageSourceLoader {
    */
   load(
     source: PackageSource,
-    options: InstallOptions
+    options: InstallOptions,
+    cwd: string
   ): Promise<LoadedPackage>;
   
   /**

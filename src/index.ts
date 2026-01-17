@@ -44,6 +44,7 @@ program
   .description('OpenPackage - The Package Manager for AI Coding')
   .version(getVersion())
   .option('--cwd <dir>', 'set working directory')
+  .option('-g, --global', 'install to home directory (~/) instead of current workspace')
   .configureHelp({
     sortSubcommands: true,
     // Customize help to be concise
@@ -156,10 +157,9 @@ setupLogoutCommand(program);
 
 program.hook('preAction', async (thisCommand) => {
   const opts = program.opts();
-  const cmdOpts = thisCommand.opts();
   
   // Global option trumps --cwd: change to home directory
-  if (cmdOpts.global) {
+  if (opts.global) {
     const { homedir } = await import('os');
     const homeDir = homedir();
     
@@ -167,9 +167,7 @@ program.hook('preAction', async (thisCommand) => {
       logger.info('--global option present, ignoring --cwd');
     }
     
-    console.log(`[DEBUG] Before chdir: ${process.cwd()}, target: ${homeDir}`);
     process.chdir(homeDir);
-    console.log(`[DEBUG] After chdir: ${process.cwd()}`);
     logger.info(`Changed working directory to home: ${homeDir}`);
     return;
   }

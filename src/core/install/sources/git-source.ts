@@ -15,7 +15,8 @@ export class GitSourceLoader implements PackageSourceLoader {
   
   async load(
     source: PackageSource,
-    options: InstallOptions
+    options: InstallOptions,
+    cwd: string
   ): Promise<LoadedPackage> {
     if (!source.gitUrl) {
       throw new SourceLoadError(source, 'Git URL is required for git sources');

@@ -71,7 +71,7 @@ async function installCommand(
   if (contexts.source.type === 'git') {
     // Load package to detect marketplace
     const loader = getLoaderForSource(contexts.source);
-    const loaded = await loader.load(contexts.source, options);
+    const loaded = await loader.load(contexts.source, options, cwd);
     
     // Update context with loaded info
     contexts.source.packageName = loaded.packageName;
@@ -117,7 +117,7 @@ async function handleMarketplaceInstallation(
   
   // Load the marketplace package
   const loader = getLoaderForSource(context.source);
-  const loaded: LoadedPackage = await loader.load(context.source, options);
+  const loaded: LoadedPackage = await loader.load(context.source, options, cwd);
   
   if (!loaded.pluginMetadata?.manifestPath) {
     throw new Error('Marketplace manifest not found');
@@ -148,7 +148,8 @@ async function handleMarketplaceInstallation(
     selectedPlugins,
     context.source.gitUrl,
     context.source.gitRef,
-    options
+    options,
+    cwd
   );
 }
 
@@ -222,7 +223,6 @@ export function setupInstallCommand(program: Command): void {
     .option('--platforms <platforms...>', 'prepare specific platforms (e.g., cursor claudecode opencode)')
     .option('--remote', 'pull and install from remote registry, ignoring local versions')
     .option('--local', 'resolve and install using only local registry versions, skipping remote metadata and pulls')
-    .option('-g, --global', 'install to home directory (~/) instead of current workspace')
     .option('--profile <profile>', 'profile to use for authentication')
     .option('--api-key <key>', 'API key for authentication (overrides profile)')
     .action(withErrorHandling(async (packageName: string | undefined, options: InstallOptions) => {

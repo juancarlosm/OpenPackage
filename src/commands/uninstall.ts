@@ -30,7 +30,6 @@ export function setupUninstallCommand(program: Command): void {
     .description('Remove installed package files')
     .argument('<package-name>', 'name of the package to uninstall')
     .option('--dry-run', 'preview changes without applying them')
-    .option('-g, --global', 'uninstall from home directory (~/) instead of current workspace')
     .action(withErrorHandling(async (packageName: string, options: UninstallOptions) => {
       await uninstallPackageCommand(packageName, options);
     }));

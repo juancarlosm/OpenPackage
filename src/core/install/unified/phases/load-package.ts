@@ -23,7 +23,7 @@ export async function loadPackagePhase(ctx: InstallationContext): Promise<void> 
     console.log(`\n📦 Loading ${displayName}...`);
     
     // Load package
-    const loaded = await loader.load(ctx.source, ctx.options);
+    const loaded = await loader.load(ctx.source, ctx.options, ctx.cwd);
     
     // Update context
     ctx.source.packageName = loaded.packageName;

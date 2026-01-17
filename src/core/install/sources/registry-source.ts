@@ -16,7 +16,8 @@ export class RegistrySourceLoader implements PackageSourceLoader {
   
   async load(
     source: PackageSource,
-    options: InstallOptions
+    options: InstallOptions,
+    cwd: string
   ): Promise<LoadedPackage> {
     if (!source.packageName) {
       throw new SourceLoadError(source, 'Package name is required for registry sources');
@@ -29,7 +30,7 @@ export class RegistrySourceLoader implements PackageSourceLoader {
     try {
       // Resolve content root
       const contentRoot = await resolvePackageContentRoot({
-        cwd: process.cwd(),
+        cwd,
         packageName: source.packageName,
         version: source.version
       });
