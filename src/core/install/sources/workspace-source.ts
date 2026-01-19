@@ -5,7 +5,7 @@ import type { InstallOptions } from '../../../types/index.js';
 import { SourceLoadError } from './base.js';
 import { readWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
 import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
-import { parsePackageYml } from '../../../utils/package-yml.js';
+import { loadPackageFromPath } from '../path-package-loader.js';
 import { logger } from '../../../utils/logger.js';
 
 /**
@@ -30,9 +30,10 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
       if (source.contentRoot) {
         logger.debug(`Loading workspace root package from ${source.contentRoot}`);
         
-        // Load package metadata from workspace root
-        const manifestPath = join(source.contentRoot, 'openpackage.yml');
-        const metadata = await parsePackageYml(manifestPath);
+        const pkg = await loadPackageFromPath(source.contentRoot, {
+          packageName: source.packageName
+        });
+        const metadata = pkg.metadata;
         const version = source.version || metadata.version || '0.0.0';
         
         return {
@@ -40,7 +41,12 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
           packageName: source.packageName,
           version,
           contentRoot: join(source.contentRoot, '/'),
-          source: 'workspace'
+          source: 'workspace',
+          pluginMetadata: (pkg as any)._format ? {
+            isPlugin: true,
+            pluginType: 'individual',
+            format: (pkg as any)._format
+          } : undefined
         };
       }
       
@@ -61,9 +67,13 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
       const resolved = resolveDeclaredPath(entry.path, cwd);
       const contentRoot = join(resolved.absolute, '/');
       
-      // Load package metadata
-      const manifestPath = join(contentRoot, 'openpackage.yml');
-      const metadata = await parsePackageYml(manifestPath);
+      // Load package metadata (handles regular packages and plugins)
+      const pkg = await loadPackageFromPath(contentRoot, {
+        packageName: source.packageName,
+        gitUrl: source.gitUrl,
+        subdirectory: source.gitSubdirectory
+      });
+      const metadata = pkg.metadata;
       
       const version = entry.version || metadata.version || '0.0.0';
       
@@ -72,7 +82,12 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
         packageName: source.packageName,
         version,
         contentRoot,
-        source: 'workspace'
+        source: 'workspace',
+        pluginMetadata: (pkg as any)._format ? {
+          isPlugin: true,
+          pluginType: 'individual',
+          format: (pkg as any)._format
+        } : undefined
       };
     } catch (error) {
       if (error instanceof SourceLoadError) {

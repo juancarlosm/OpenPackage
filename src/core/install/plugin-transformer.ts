@@ -71,6 +71,7 @@ export interface PluginTransformContext {
   gitUrl?: string;
   subdirectory?: string;
   repoPath?: string;
+  packageName?: string;
 }
 
 /**
@@ -103,7 +104,7 @@ export async function transformPluginToPackage(
   }
   
   // Generate scoped name if GitHub context is provided
-  const packageName = generatePluginName({
+  const packageName = context?.packageName || generatePluginName({
     gitUrl: context?.gitUrl,
     subdirectory: context?.subdirectory,
     pluginManifestName: pluginManifest.name,

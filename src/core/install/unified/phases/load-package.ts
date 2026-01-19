@@ -58,7 +58,7 @@ export async function loadPackagePhase(ctx: InstallationContext): Promise<void> 
     ctx.resolvedPackages = [{
       name: loaded.packageName,
       version: loaded.version,
-      pkg: { metadata: loaded.metadata, files: [], _format: undefined },
+      pkg: { metadata: loaded.metadata, files: [], _format: (loaded.metadata as any)._format || ctx.source.pluginMetadata?.format },
       isRoot: true,
       source: resolvedSource,
       contentRoot: loaded.contentRoot

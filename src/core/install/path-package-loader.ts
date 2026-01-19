@@ -21,6 +21,7 @@ export interface PackageLoadContext {
   gitUrl?: string;
   subdirectory?: string;
   repoPath?: string;
+  packageName?: string;
 }
 
 /**
