@@ -18,6 +18,7 @@ import {
 } from './flow-source-discovery.js';
 import { resolveRecursiveGlobTargetRelativePath } from '../../utils/glob-target-mapping.js';
 import { logger } from '../../utils/logger.js';
+import { stripPlatformSuffixFromFilename } from './platform-suffix-handler.js';
 
 /**
  * Execution result with enhanced metadata
@@ -283,6 +284,7 @@ async function processSourceFile(
 
 /**
  * Resolve target path from glob patterns
+ * Strips platform suffixes from filenames (e.g. read-specs.claude.md -> read-specs.md)
  * 
  * @param sourceAbsPath - Absolute source path
  * @param fromPattern - Source pattern from flow
@@ -320,7 +322,11 @@ export function resolveTargetFromGlob(
     
     const targetExt = toSuffix.startsWith('.') ? toSuffix : (sourceExt + toSuffix);
     const targetFileName = sourceBase + targetExt;
-    return join(context.workspaceRoot, toPrefix + targetFileName);
+    
+    // Strip platform suffix from the final target filename
+    const strippedTargetFileName = stripPlatformSuffixFromFilename(targetFileName);
+    
+    return join(context.workspaceRoot, toPrefix + strippedTargetFileName);
   }
   
   // No glob in target - use as-is

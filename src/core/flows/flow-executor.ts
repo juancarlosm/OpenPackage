@@ -50,6 +50,7 @@ import { extractAllKeys } from './flow-key-extractor.js';
 import { applyMapPipeline, createMapContext, validateMapPipeline } from './map-pipeline/index.js';
 import { SourcePatternResolver } from './source-resolver.js';
 import { smartEquals, smartNotEquals } from '../../utils/path-comparison.js';
+import { stripPlatformSuffixFromFilename } from './platform-suffix-handler.js';
 
 /**
  * Default flow executor implementation
@@ -991,6 +992,7 @@ export class DefaultFlowExecutor implements FlowExecutor {
   /**
    * Resolve target path from source path and patterns
    * Handles single-level (*) and recursive (**) globs
+   * Strips platform suffixes from filenames (e.g. read-specs.claude.md -> read-specs.md)
    */
   private resolveTargetFromGlob(sourcePath: string, fromPattern: string, toPattern: string, context: FlowContext): string {
     // Get relative path from package root
@@ -1020,7 +1022,10 @@ export class DefaultFlowExecutor implements FlowExecutor {
       const targetExt = toSuffix.startsWith('.') ? toSuffix : (sourceExt + toSuffix);
       const targetFileName = sourceBase + targetExt;
       
-      const resolvedTo = toPrefix + targetFileName;
+      // Strip platform suffix from the final target filename
+      const strippedTargetFileName = stripPlatformSuffixFromFilename(targetFileName);
+      
+      const resolvedTo = toPrefix + strippedTargetFileName;
       return path.join(context.workspaceRoot, resolvedTo);
     }
     
