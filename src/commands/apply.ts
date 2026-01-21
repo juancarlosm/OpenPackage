@@ -39,7 +39,7 @@ async function applyBulk(contexts: InstallationContext[]): Promise<CommandResult
     };
   }
   
-  console.log(`✓ Applying ${contexts.length} package${contexts.length === 1 ? '' : 's'}\n`);
+  console.log(`✓ Applying ${contexts.length} package${contexts.length === 1 ? '' : 's'}`);
   
   for (const ctx of contexts) {
     const result = await runUnifiedInstallPipeline(ctx);

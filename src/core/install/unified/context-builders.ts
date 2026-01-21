@@ -338,15 +338,13 @@ async function buildBulkApplyContexts(
   
   const contexts: InstallationContext[] = [];
   
-  // First, try to build workspace root context if it exists in index
+  // First, try to build workspace root context if it exists
+  // Note: We include the workspace context even if it's not in the index yet.
+  // The pipeline will upsert it to the index during execution (apply command updates index).
+  // This allows 'opkg add' followed by 'opkg apply' to work without requiring 'opkg install' first.
   const workspaceContext = await buildWorkspaceRootInstallContext(cwd, options, 'apply');
   if (workspaceContext) {
-    const workspacePackageName = workspaceContext.source.packageName;
-    
-    // Check if workspace package is in index (has been installed)
-    if (index.packages?.[workspacePackageName]) {
-      contexts.push(workspaceContext);
-    }
+    contexts.push(workspaceContext);
   }
   
   // Then apply all other installed packages
