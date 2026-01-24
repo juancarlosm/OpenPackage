@@ -297,7 +297,7 @@ export function getNoPackageDetectedMessage(packageName?: string): string {
       `Checked locations:\n` +
       `  • Root package: openpackage.yml\n` +
       `  • Cached packages: .openpackage/packages/${packageName}/\n\n` +
-      `💡 To create a new package, run: opkg save ${packageName}`
+      `💡 To install a package, run: opkg install ${packageName}`
     );
   }
 
@@ -305,8 +305,7 @@ export function getNoPackageDetectedMessage(packageName?: string): string {
     `No package detected at current directory.\n\n` +
     `A valid package requires openpackage.yml to exist.\n\n` +
     `💡 To create a package:\n` +
-    `   • Run 'opkg new' to create a new package\n` +
-    `   • Or specify a package name: 'opkg save <package-name>'`
+    `   • Run 'opkg new' to create a new package`
   );
 }
 

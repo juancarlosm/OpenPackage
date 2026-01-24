@@ -431,7 +431,7 @@ opkg set my-package --ver 1.0.0 --description "Initial version"
 | `opkg new` | Create new package | ✅ Yes | ✅ Initial | ✅ Yes |
 | `opkg set` | Update existing package | ❌ No | ✅ Update | ✅ Yes |
 | `opkg pack` | Snapshot to registry | ✅ Registry copy | ❌ No | ❌ No |
-| `opkg save` | Sync workspace edits | ❌ No | ❌ No | ❌ No |
+| `opkg add` | Add files to package | ❌ No | ❌ No | ❌ No |
 
 ## Technical Implementation
 

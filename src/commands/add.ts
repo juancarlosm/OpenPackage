@@ -35,7 +35,7 @@ function displayAddResults(data: AddToSourceResult, options: AddToSourceOptions)
   }
   
   // Show hints only for non-workspace-root adds
-  if (!options.apply && !isWorkspaceRoot) {
+  if (!isWorkspaceRoot) {
     // Check if package is installed in workspace
     readWorkspaceIndex(cwd).then(workspaceIndexRecord => {
       const isInstalled = !!workspaceIndexRecord.index.packages[resolvedName];
@@ -43,7 +43,7 @@ function displayAddResults(data: AddToSourceResult, options: AddToSourceOptions)
       if (isInstalled) {
         console.log(`\n💡 Changes not synced to workspace.`);
         console.log(`   To sync changes, run:`);
-        console.log(`     opkg apply ${resolvedName}`);
+        console.log(`     opkg install ${resolvedName}`);
       } else {
         console.log(`\n💡 Package not installed in workspace.`);
         console.log(`   To install and sync, run:`);
@@ -62,7 +62,6 @@ export function setupAddCommand(program: Command): void {
     .argument('[path]', 'file or directory to add')
     .description('Add files to a mutable package source or workspace package')
     .option('--platform-specific', 'Save platform-specific variants for platform subdir inputs')
-    .option('--apply', 'Apply changes to workspace immediately (requires package to be installed)')
     .action(
       withErrorHandling(async (packageName: string | undefined, pathArg: string | undefined, options: AddToSourceOptions) => {
         const result = await runAddToSourcePipeline(packageName, pathArg, options);

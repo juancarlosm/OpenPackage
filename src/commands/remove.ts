@@ -12,7 +12,6 @@ export function setupRemoveCommand(program: Command): void {
     .argument('[package-name]', 'package name (optional - defaults to workspace package)')
     .argument('[path]', 'file or directory to remove')
     .description('Remove files from a mutable package source or workspace package')
-    .option('--apply', 'Apply changes to workspace immediately (requires package to be installed)')
     .option('--force', 'Skip confirmation prompts')
     .option('--dry-run', 'Preview what would be removed without actually deleting')
     .action(
@@ -65,7 +64,7 @@ export function setupRemoveCommand(program: Command): void {
             }
           }
           
-          if (!options.apply && !options.dryRun && !isWorkspaceRoot) {
+          if (!options.dryRun && !isWorkspaceRoot) {
             // Check if package is installed in workspace
             const workspaceIndexRecord = await readWorkspaceIndex(cwd);
             const isInstalled = !!workspaceIndexRecord.index.packages[resolvedName];
@@ -73,7 +72,7 @@ export function setupRemoveCommand(program: Command): void {
             if (isInstalled) {
               console.log(`\n💡 Deletions not synced to workspace.`);
               console.log(`   To sync deletions, run:`);
-              console.log(`     opkg apply ${resolvedName}`);
+              console.log(`     opkg install ${resolvedName}`);
             } else {
               console.log(`\n💡 Package not installed in workspace.`);
               console.log(`   If you install this package later, the removed files won't be included.`);

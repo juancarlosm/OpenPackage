@@ -143,27 +143,26 @@ For git dependencies:
 ### 4.2 Mutations by other commands
 
 - `install` assumes that:
-  - `save` / `pack` and any future `upgrade`-like commands are responsible for:
+  - `pack` and any future `upgrade`-like commands are responsible for:
     - Intentionally changing version lines.
     - Bumping base versions for stable lines.
   - Therefore, `install` **never auto-bumps** the declared ranges in `openpackage.yml`.
 
-- **Auto-tracking of workspace-owned packages (`save` / `pack`)**:
+- **Auto-tracking of workspace-owned packages (`pack`)**:
   - When a package developed in the current workspace is first added as a dependency:
-    - `save` / `pack` persist a **default caret range** derived from the new stable, e.g. `^1.2.3`.
-  - On subsequent `save` / `pack` operations for that same package:
+    - `pack` persists a **default caret range** derived from the new stable, e.g. `^1.2.3`.
+  - On subsequent `pack` operations for that same package:
     - Let `R_pkg` be the existing range in `openpackage.yml` and `S_new` the new stable base version (e.g. `2.0.0`).
     - **Special case: Prerelease-to-stable transition during `pack`**:
       - If `R_pkg` includes explicit prerelease intent (e.g. `^1.0.0-0`) and `S_new` is a stable version on the same base line (e.g. `1.0.0`):
         - Then `pack` **updates** `R_pkg` to a stable range (e.g. `^1.0.0`) to reflect the transition from prerelease to stable.
       - This exception **only applies** when transitioning from a prerelease-intent constraint to a stable target; subsequent stable version changes within the stable range do not update `R_pkg`.
-      - For prerelease-intent ranges, `save` operations (which produce prerelease versions) **never** update the constraint, preserving the prerelease intent.
     - If `S_new` **already satisfies** `R_pkg` (e.g. `R_pkg = ^1.0.0`, `S_new = 1.0.1`):
-      - **The constraint is left unchanged**; `save` / `pack` do not rewrite `R_pkg`.
+      - **The constraint is left unchanged**; `pack` does not rewrite `R_pkg`.
     - If `S_new` is **outside** `R_pkg` (e.g. `R_pkg = ^1.0.0`, `S_new = 2.0.0`):
-      - `save` / `pack` may **auto-update** the dependency line in `openpackage.yml` to a new caret range `^S_new` to keep the workspace tracking the new stable line.
+      - `pack` may **auto-update** the dependency line in `openpackage.yml` to a new caret range `^S_new` to keep the workspace tracking the new stable line.
   - This auto-tracking behavior:
-    - Applies only to dependencies managed via `save` / `pack` for workspace-owned packages.
+    - Applies only to dependencies managed via `pack` for workspace-owned packages.
     - Never changes constraints that already include the new stable version (except for the prerelease-to-stable transition exception above).
 
 ---
@@ -192,7 +191,7 @@ For git dependencies:
   - Treat the new `^2.0.0` as **canonical**.
   - Compute latest-in-range from local+remote under `^2.0.0`.
   - Install or upgrade to that version, even if it requires pulling from remote.
-  - Optionally log a message noting that the base line changed, similar to the save/pack reset messages (but this is informational only).
+  - Optionally log a message noting that the base line changed, similar to the pack reset messages (but this is informational only).
 
 ### 5.3 Dependency removed from `openpackage.yml`
 
@@ -242,7 +241,7 @@ For git dependencies:
 
 - **I3 – Explicit edits for semantic changes**:
   - To change which major version line a dependency tracks, the user **edits `openpackage.yml`**, not `install` flags.
-  - This mirrors the mental model from the save/pack specs:
+  - This mirrors the mental model from the pack specs:
     - “`openpackage.yml` version is what I’m working toward; commands operate relative to that declaration.”
 
 

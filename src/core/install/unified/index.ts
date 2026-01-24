@@ -17,7 +17,6 @@ export {
   buildRegistryInstallContext,
   buildPathInstallContext,
   buildGitInstallContext,
-  buildApplyContext,
   buildInstallContext
 } from './context-builders.js';
 

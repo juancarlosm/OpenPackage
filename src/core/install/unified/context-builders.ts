@@ -153,58 +153,7 @@ export async function buildWorkspaceRootInstallContext(
   };
 }
 
-/**
- * Build context for apply command (single package)
- */
-export async function buildApplyContext(
-  cwd: string,
-  packageName: string,
-  options: InstallOptions
-): Promise<InstallationContext>;
 
-/**
- * Build context for apply command (bulk apply when no package specified)
- */
-export async function buildApplyContext(
-  cwd: string,
-  packageName: undefined,
-  options: InstallOptions
-): Promise<InstallationContext[]>;
-
-/**
- * Build context for apply command
- */
-export async function buildApplyContext(
-  cwd: string,
-  packageName: string | undefined,
-  options: InstallOptions
-): Promise<InstallationContext | InstallationContext[]> {
-  // No package name = apply workspace root + all installed packages
-  if (!packageName) {
-    return buildBulkApplyContexts(cwd, options);
-  }
-  
-  const source: PackageSource = {
-    type: 'workspace',
-    packageName
-    // version and contentRoot will be populated from workspace index
-  };
-  
-  return {
-    source,
-    mode: 'apply',
-    options: {
-      ...options,
-      force: true // Apply always overwrites
-    },
-    platforms: [], // Will be populated from detected platforms
-    cwd,
-    targetDir: '.',
-    resolvedPackages: [],
-    warnings: [],
-    errors: []
-  };
-}
 
 /**
  * Build context from package input (auto-detect type)
@@ -326,58 +275,4 @@ async function buildBulkInstallContexts(
   return contexts;
 }
 
-/**
- * Build contexts for bulk apply
- */
-async function buildBulkApplyContexts(
-  cwd: string,
-  options: InstallOptions
-): Promise<InstallationContext[]> {
-  const { readWorkspaceIndex } = await import('../../../utils/workspace-index-yml.js');
-  const { index } = await readWorkspaceIndex(cwd);
-  
-  const contexts: InstallationContext[] = [];
-  
-  // First, try to build workspace root context if it exists
-  // Note: We include the workspace context even if it's not in the index yet.
-  // The pipeline will upsert it to the index during execution (apply command updates index).
-  // This allows 'opkg add' followed by 'opkg apply' to work without requiring 'opkg install' first.
-  const workspaceContext = await buildWorkspaceRootInstallContext(cwd, options, 'apply');
-  if (workspaceContext) {
-    contexts.push(workspaceContext);
-  }
-  
-  // Then apply all other installed packages
-  const packageNames = Object.keys(index.packages ?? {}).sort();
-  const workspacePackageName = workspaceContext?.source.packageName;
-  
-  for (const name of packageNames) {
-    // Skip workspace package (already added)
-    if (workspacePackageName && name === workspacePackageName) {
-      continue;
-    }
-    
-    const source: PackageSource = {
-      type: 'workspace',
-      packageName: name
-      // version and contentRoot will be populated from workspace index
-    };
-    
-    contexts.push({
-      source,
-      mode: 'apply',
-      options: {
-        ...options,
-        force: true // Apply always overwrites
-      },
-      platforms: [], // Will be populated from detected platforms
-      cwd,
-      targetDir: '.',
-      resolvedPackages: [],
-      warnings: [],
-      errors: []
-    });
-  }
-  
-  return contexts;
-}
+

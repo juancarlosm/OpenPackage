@@ -114,40 +114,7 @@ async function testAddToGlobalPackageFromAnyDirectory(): Promise<void> {
   }
 }
 
-/**
- * Test: Add --apply requires package to be installed in current workspace
- */
-async function testAddApplyRequiresInstallation(): Promise<void> {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'opkg-add-apply-'));
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(tmp);
 
-    const pkgName = 'uninstalled-pkg';
-    const pkgDir = path.join(tmp, '.openpackage', 'packages', pkgName);
-
-    // Create package without installing
-    writePackageManifest(pkgDir, pkgName);
-
-    const fileToAdd = path.join(tmp, 'test.md');
-    writeFile(fileToAdd, '# Test');
-
-    // Add with --apply should fail gracefully
-    const result = await runAddToSourcePipeline(pkgName, 'test.md', { apply: true });
-    assert.ok(!result.success, 'Should fail when --apply used with uninstalled package');
-    assert.ok(result.error?.includes('not installed in this workspace'), 'Should explain why apply failed');
-    assert.ok(result.error?.includes('opkg install'), 'Should suggest installation');
-
-    // But file should still be added to source
-    const addedFile = path.join(pkgDir, 'root', 'test.md');
-    assert.ok(fs.existsSync(addedFile), 'File should still be added to source despite apply failure');
-
-    console.log('✓ Add --apply correctly requires installation');
-  } finally {
-    process.chdir(originalCwd);
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-}
 
 /**
  * Test: Add rejects registry packages (immutable)
@@ -193,7 +160,6 @@ async function testAddRejectsRegistryPackages(): Promise<void> {
 // Run all tests
 await testAddToWorkspacePackageWithoutIndex();
 await testAddToGlobalPackageFromAnyDirectory();
-await testAddApplyRequiresInstallation();
 await testAddRejectsRegistryPackages();
 
 console.log('\n✓ All add-without-installation tests passed');

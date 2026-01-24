@@ -79,12 +79,11 @@ opkg new my-package
 
 # Add content
 cd .openpackage/packages/my-package/
-mkdir -p .cursor/rules
-echo "# Rule" > .cursor/rules/rule1.md
+mkdir -p rules
+echo "# Rule" > rules/rule1.md
 
-# Save and apply
-opkg save my-package
-opkg apply my-package
+# Install to sync to workspace
+opkg install my-package
 ```
 
 ### Global Package Usage
@@ -137,11 +136,10 @@ echo "# Rule" > .cursor/rules/rule1.md
 ### After Creation
 
 ```bash
-# Create → Add content → Save → Apply
+# Create → Add content → Install
 opkg new my-pkg
-# ... add files ...
-opkg save my-pkg
-opkg apply my-pkg
+# ... add files to package source ...
+opkg install my-pkg
 ```
 
 ### With Install

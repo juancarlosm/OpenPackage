@@ -12,8 +12,6 @@ import { getVersion } from './utils/package.js';
 import { setupNewCommand } from './commands/new.js';
 import { setupAddCommand } from './commands/add.js';
 import { setupRemoveCommand } from './commands/remove.js';
-import { setupApplyCommand } from './commands/apply.js';
-import { setupSaveCommand } from './commands/save.js';
 import { setupInstallCommand } from './commands/install.js';
 import { setupUninstallCommand } from './commands/uninstall.js';
 import { setupStatusCommand } from './commands/status.js';
@@ -97,7 +95,6 @@ program
       output += 'opkg install           install packages from openpackage.yml\n';
       output += 'opkg install <pkg>     install a specific package\n';
       output += 'opkg new               create a new package\n';
-      output += 'opkg save <pkg>        save workspace edits back to package\n';
       output += 'opkg <command> -h      help on <command>\n\n';
       
       // Global options (must stay visible even with custom root help)
@@ -106,7 +103,7 @@ program
       
       // All commands section - ultra compact
       output += 'All commands:\n\n';
-      output += '    new, add, remove, save, set, apply, status,\n';
+      output += '    new, add, remove, set, status,\n';
       output += '    install, uninstall, configure, login, logout\n\n';
       
       // Version
@@ -123,8 +120,6 @@ program
 setupNewCommand(program);
 setupAddCommand(program);
 setupRemoveCommand(program);
-setupApplyCommand(program);
-setupSaveCommand(program);
 setupSetCommand(program);
 setupInstallCommand(program);
 setupUninstallCommand(program);

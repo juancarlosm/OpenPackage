@@ -68,20 +68,14 @@ opkg pack <name>  # Copies source to registry/<name>/<version>/
 - Options: `--output <path>` (direct copy, no <name>/<ver>); `--dry-run`.
 - See [Pack](pack/).
 
-### Consumption (install, apply)
+### Consumption (install)
 ```bash
 opkg install <name>@<ver>  # Resolves, copies from registry/<name>/<ver>/ to workspace
-opkg apply <name>          # Syncs from inferred path
 ```
 
 - Direct file access.
 - Updates index/yml.
-- See [Install](install/), [Apply](apply/).
-
-### Listing
-```bash
-opkg list <name>  # Versions from dir names
-```
+- See [Install](install/).
 
 ### Git Clones in Registry
 Git deps cloned here → treated immutable (current behavior).

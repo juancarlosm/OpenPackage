@@ -124,45 +124,7 @@ async function testRemoveFromGlobalPackageFromAnyDirectory(): Promise<void> {
   }
 }
 
-/**
- * Test: Remove --apply requires installation
- */
-async function testRemoveApplyRequiresInstallation(): Promise<void> {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'opkg-remove-apply-'));
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(tmp);
 
-    const pkgName = 'uninstalled-pkg';
-    const pkgDir = path.join(tmp, '.openpackage', 'packages', pkgName);
-
-    // Create package without installing
-    writePackageManifest(pkgDir, pkgName);
-
-    // Add a file first
-    const fileToAdd = path.join(tmp, 'test.md');
-    writeFile(fileToAdd, '# Test');
-    
-    await runAddToSourcePipeline(pkgName, 'test.md', { apply: false });
-
-    const addedFile = path.join(pkgDir, 'root', 'test.md');
-    assert.ok(fs.existsSync(addedFile), 'File should exist before removal');
-
-    // Remove with --apply should fail gracefully
-    const result = await runRemoveFromSourcePipeline(pkgName, 'root/test.md', { apply: true, force: true });
-    assert.ok(!result.success, 'Should fail when --apply used with uninstalled package');
-    assert.ok(result.error?.includes('not installed in this workspace'), 'Should explain why apply failed');
-    assert.ok(result.error?.includes('opkg install'), 'Should suggest installation');
-
-    // But file should still be removed from source
-    assert.ok(!fs.existsSync(addedFile), 'File should still be removed from source despite apply failure');
-
-    console.log('✓ Remove --apply correctly requires installation');
-  } finally {
-    process.chdir(originalCwd);
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-}
 
 /**
  * Test: Remove rejects registry packages (immutable)
@@ -366,7 +328,6 @@ async function runTests() {
   try {
     await testRemoveFromWorkspacePackageWithoutIndex();
     await testRemoveFromGlobalPackageFromAnyDirectory();
-    await testRemoveApplyRequiresInstallation();
     await testRemoveRejectsRegistryPackages();
     await testRemoveDirectoryRemovesAllFiles();
     await testRemoveDryRunShowsPreview();

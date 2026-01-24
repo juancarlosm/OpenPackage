@@ -4,21 +4,17 @@ import { readdir } from 'fs/promises';
 import type { CommandResult } from '../../types/index.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
-import { resolvePackageSource } from '../source-resolution/resolve-package-source.js';
 import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
 import { collectRemovalEntries, type RemovalEntry } from './removal-collector.js';
 import { confirmRemoval } from './removal-confirmation.js';
 import { exists, remove } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { UserCancellationError } from '../../utils/errors.js';
-import { buildApplyContext } from '../install/unified/context-builders.js';
-import { runUnifiedInstallPipeline } from '../install/unified/pipeline.js';
 import { ensureLocalOpenPackageStructure, createWorkspacePackageYml } from '../../utils/package-management.js';
 import { getLocalOpenPackageDir } from '../../utils/paths.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 
 export interface RemoveFromSourceOptions {
-  apply?: boolean;
   force?: boolean;
   dryRun?: boolean;
 }
@@ -168,40 +164,6 @@ export async function runRemoveFromSourcePipeline(
     packageName: resolvedName,
     filesRemoved: removedPaths.length
   });
-
-  // Handle --apply flag: requires package to be installed in current workspace
-  if (options.apply) {
-    logger.info('Applying changes to workspace (--apply flag)', { packageName: resolvedName });
-    
-    try {
-      // Check if package is installed in current workspace
-      await resolvePackageSource(cwd, resolvedName);
-
-      // Build apply context and run unified pipeline
-      const applyCtx = await buildApplyContext(cwd, resolvedName, {});
-      const applyResult = await runUnifiedInstallPipeline(applyCtx);
-      
-      if (!applyResult.success) {
-        return {
-          success: false,
-          error: `Files removed from package source, but apply failed:\n${applyResult.error}`
-        };
-      }
-      
-      logger.info('Changes applied to workspace', { packageName: resolvedName });
-    } catch (error) {
-      return {
-        success: false,
-        error: 
-          `Files removed from package source at: ${packageRootDir}\n\n` +
-          `However, --apply failed because package '${resolvedName}' is not installed in this workspace.\n\n` +
-          `To sync deletions to your workspace:\n` +
-          `  1. Ensure package is installed: opkg install ${resolvedName}\n` +
-          `  2. Apply the changes: opkg apply ${resolvedName}\n\n` +
-          `Or run 'opkg remove' without --apply flag to skip workspace sync.`
-      };
-    }
-  }
 
   return {
     success: true,

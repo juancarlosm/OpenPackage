@@ -7,10 +7,6 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 
 const testFiles: string[] = [
-  // Core - Save
-  'tests/core/save/versioning.test.ts',
-  'tests/core/save/package-index-root-save.test.ts',
-  
   // Core - Install
   'tests/core/install/plugin-sources.test.ts',
   'tests/core/install/marketplace-parsing.test.ts',
@@ -38,21 +34,13 @@ const testFiles: string[] = [
   
   // Core - Flows
   'tests/core/flows/integration/flow-install-pipeline.test.ts',
-  'tests/core/flows/integration/flow-save-apply-pipeline.test.ts',
-  
-  // Commands
-  'tests/commands/status.test.ts',
   
   // Utils
   'tests/utils/version-selection.test.ts',
   'tests/utils/path-resolution.test.ts',
   
   // Integration
-  'tests/integration/cwd-global.test.ts',
-  'tests/integration/apply-mutable-source.test.ts',
-  'tests/integration/save-and-add-mutable-source.test.ts',
-  'tests/integration/immutable-save-add-errors.test.ts',
-  'tests/integration/save-apply-flows.test.ts'
+  'tests/integration/cwd-global.test.ts'
 ];
 
 function runTestFile(relPath: string): void {

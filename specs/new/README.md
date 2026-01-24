@@ -475,8 +475,7 @@ $ opkg new my-tools
 
 💡 Next steps:
    1. Add files to your package in current directory
-   2. Use `opkg save` to save changes
-   3. Install in other workspaces: opkg install my-tools
+   2. Install in other workspaces: opkg install my-tools
 ```
 
 ### Create Local Package (Explicit Scope)
@@ -519,8 +518,7 @@ $ opkg new my-package --scope root
 
 💡 Next steps:
    1. Add files to your package in current directory
-   2. Use `opkg save` to save changes
-   3. Install in other workspaces: opkg install my-package
+   2. Install in other workspaces: opkg install my-package
 ```
 
 ### Create with Force Overwrite
@@ -651,7 +649,7 @@ opkg new my-package               # Create package
 cd .openpackage/packages/my-package/
 # Add files (rules, commands, etc.)
 opkg install my-package           # Install to workspace
-opkg save my-package              # Save changes back to package
+# Edit package source directly, then re-install to sync changes
 ```
 
 **Global Package Workflow:**

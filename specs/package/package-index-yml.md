@@ -152,14 +152,11 @@ The unified workspace index is updated differently depending on the operation:
 
 | Operation | Behavior |
 |-----------|----------|
-| **Add** | Does **not** update the index. Add operates on package sources independently of workspace installation state. To sync added files to workspace and update the index, run `install` + `apply` or use `add --apply`. |
-| **Apply** | Writes/updates `packages[<name>].files` based on what was actually written during apply. |
+| **Add** | Does **not** update the index. Add operates on package sources independently of workspace installation state. To sync added files to workspace and update the index, run `install`. |
 | **Install** | Writes/updates `packages[<name>].files` based on what was installed. |
-| **Save** | Uses `packages[<name>].files` as the authoritative mapping when syncing workspace edits back to the package source. Requires package to be installed (reads from index). |
+| **Remove** | Does **not** update the index. Remove operates on package sources independently of workspace installation state. To sync deletions to workspace and update the index, run `install`. |
 
 This ensures the index reflects the **current state** of the workspace, not hypothetical future states.
 
-**Key principle**: The index is a record of what exists in the workspace, not what exists in package sources. Commands that materialize content to the workspace (`install`, `apply`) update the index. Commands that only modify sources (`add`) do not.
-
-See `../apply/index-effects.md` for concrete before/after examples.
+**Key principle**: The index is a record of what exists in the workspace, not what exists in package sources. Commands that materialize content to the workspace (`install`) update the index. Commands that only modify sources (`add`, `remove`) do not.
 

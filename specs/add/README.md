@@ -1,12 +1,12 @@
 # Add Command
 
-`opkg add` copies new files from anywhere on the filesystem into a mutable package source. Unlike `save` (which syncs workspace edits based on index mappings), `add` operates independently of workspace installation state.
+`opkg add` copies new files from anywhere on the filesystem into a mutable package source. It operates independently of workspace installation state.
 
 ## Purpose & Direction
 - **Filesystem → Package Source**: Copy new files from any location to a mutable package.
 - **Independence**: Works with any mutable package (workspace or global), regardless of installation status.
-- **Source-only operation**: Modifies package source only; workspace sync requires explicit `install` + `apply` or `--apply` flag.
-- Complements `save` (edits) for initial/new content addition.
+- **Source-only operation**: Modifies package source only; workspace sync requires explicit `install`.
+- Used for initial/new content addition to packages.
 
 ## Preconditions
 - Target package must exist as a mutable source:
@@ -36,15 +36,9 @@
 
 5. **Index updates**:
    - `add` does **not** update `openpackage.index.yml`.
-   - Index updates happen via `install` or `apply`.
-
-6. **Optional --apply**:
-   - Triggers `apply` pipeline immediately after add.
-   - Requires package to be installed in current workspace.
-   - Updates workspace index via `apply`.
+   - Index updates happen via `install`.
 
 ## Options
-- `--apply`: Apply changes to workspace immediately (requires package installation in current workspace).
 - `--platform-specific`: Save platform-specific variants for platform subdir inputs.
 - Input: `opkg add <pkg> <path>`.
 - Global flags: [CLI Options](../cli-options.md).
@@ -61,23 +55,13 @@ cd ~/projects/other-repo
 opkg add shared-utils ./config.yml
 ```
 
-### Add with immediate apply
-```bash
-# Add and sync to workspace in one step
-# (requires my-pkg to be installed in current workspace)
-opkg add my-pkg .cursor/rules/example.md --apply
-```
-
-### Workflow: Add → Install → Apply
+### Workflow: Add → Install
 ```bash
 # 1. Add files to package source
 opkg add my-pkg ./docs/guide.md
 
-# 2. Install package to current workspace
+# 2. Install package to sync changes to workspace
 opkg install my-pkg
-
-# 3. Apply to sync changes to workspace platforms
-opkg apply my-pkg
 ```
 
 ## Flow-Based Mapping
@@ -85,8 +69,8 @@ opkg apply my-pkg
 The `add` command uses **IMPORT flows** from `platforms.jsonc` to correctly map workspace files to their universal package structure. This is the reverse of install/apply, which use **EXPORT flows**.
 
 ### Flow Directions
-- **EXPORT flows**: Package → Workspace (used by `install`, `apply`)
-- **IMPORT flows**: Workspace → Package (used by `add`, `save`)
+- **EXPORT flows**: Package → Workspace (used by `install`)
+- **IMPORT flows**: Workspace → Package (used by `add`)
 
 ### Mapping Process
 
@@ -182,8 +166,8 @@ opkg add config.json
 ### Current behavior (v2)
 - Works with any mutable package (workspace or global).
 - Does **not** update workspace index (separation of concerns).
-- Users explicitly control workspace sync via `install` + `apply` or `--apply` flag.
-- Clearer mental model: `add` = modify source, `apply`/`install` = sync to workspace.
+- Users explicitly control workspace sync via `install`.
+- Clearer mental model: `add` = modify source, `install` = sync to workspace.
 - **Uses flow-based mapping** from `platforms.jsonc` for accurate file placement.
 
 ## Errors
@@ -208,18 +192,7 @@ Registry packages cannot be modified via add command.
 Path: ~/.openpackage/registry/my-pkg/1.0.0/
 ```
 
-### --apply flag with uninstalled package
-```
-Files added to package source at: ~/.openpackage/packages/my-pkg/
 
-However, --apply failed because package 'my-pkg' is not installed in this workspace.
-
-To sync changes to your workspace:
-  1. Install the package: opkg install my-pkg
-  2. Apply the changes: opkg apply my-pkg
-
-Or run 'opkg add' without --apply flag to skip workspace sync.
-```
 
 ### Copy conflicts
 - Prompts user to resolve (overwrite/skip/rename).
@@ -228,35 +201,27 @@ Or run 'opkg add' without --apply flag to skip workspace sync.
 ## Integration
 
 ### Relationship to other commands
-- **`save`**: Syncs workspace → source based on index mappings (requires installation).
 - **`add`**: Copies filesystem → source independently (no installation required).
-- **`apply`**: Syncs source → workspace platforms + updates index.
 - **`install`**: Materializes package to workspace + updates index.
+- **`remove`**: Deletes files from source.
 - **`pack`**: Creates registry snapshot from source (no workspace interaction).
 
 ### Workflows
 1. **Adding new content**:
    ```bash
    opkg add pkg ./new-files/   # Add to source
-   opkg install pkg             # Ensure installed
-   opkg apply pkg               # Sync to workspace
+   opkg install pkg             # Sync to workspace
    ```
 
-2. **Quick add + sync**:
+2. **Editing existing content**:
    ```bash
-   opkg add pkg ./file.md --apply  # Add and sync (requires installation)
-   ```
-
-3. **Editing existing content**:
-   ```bash
-   # Edit files in workspace, then:
-   opkg save pkg  # Uses index to sync changes back
+   # Edit files in package source directly, then:
+   opkg install pkg  # Re-install to sync changes
    ```
 
 ## See Also
-- [Save](../save/) – Workspace → source sync for installed packages
-- [Apply](../apply/) – Source → workspace platform sync
 - [Install](../install/) – Package materialization and dependency resolution
+- [Remove](../remove/) – Remove files from package sources
 - [Package Index](../package/package-index-yml.md) – Workspace installation state
 - [Commands Overview](../commands-overview.md) – All command relationships
 

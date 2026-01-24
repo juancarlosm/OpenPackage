@@ -11,7 +11,7 @@ export function buildNoVersionFoundError(
   const prereleaseList = formatVersionList(selection.availablePrerelease);
   const suggestions = [
     'Edit .openpackage/openpackage.yml or adjust the CLI range, then retry.',
-    'Use opkg save/pack to create a compatible version in the local registry.'
+    'Create a new package version locally using opkg new.'
   ];
 
   if (mode === 'local-only') {

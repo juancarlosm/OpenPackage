@@ -207,12 +207,11 @@ opkg new project-rules
 
 # Develop rules
 cd .openpackage/packages/project-rules/
-mkdir -p .cursor/rules
-echo "# Project-specific rule" > .cursor/rules/style-guide.md
+mkdir -p rules
+echo "# Project-specific rule" > rules/style-guide.md
 
-# Save and apply
-opkg save project-rules
-opkg apply project-rules
+# Install to workspace
+opkg install project-rules
 ```
 
 #### Temporary Development Package
@@ -227,8 +226,8 @@ opkg new experimental-feature
 cd .openpackage/packages/experimental-feature/
 # Add content
 
-# Test in workspace
-opkg apply experimental-feature
+# Install to test in workspace
+opkg install experimental-feature
 
 # When ready, pack and publish
 opkg pack experimental-feature
@@ -257,7 +256,7 @@ opkg new shared-prompts
 Local packages are **automatically integrated**:
 - Workspace manifest auto-created if needed
 - Package added with relative path
-- Available for `opkg install`, `opkg apply`, etc.
+- Available for `opkg install`, etc.
 
 ### Advantages
 - ✅ Automatic workspace integration
@@ -391,8 +390,7 @@ opkg pack project-template
 # Use in new projects
 cd ~/new-project/
 # Add template to manifest
-opkg install
-opkg apply project-template
+opkg install project-template
 ```
 
 ### Workspace Integration

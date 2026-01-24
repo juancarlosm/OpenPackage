@@ -2,7 +2,7 @@
 
 This document defines the **user-facing behavior** of the `install` command, assuming:
 
-- Versioning semantics from `save` / `pack` specs are already in place.
+- Versioning semantics from `pack` specs are already in place.
 - `openpackage.yml` is the **canonical declaration of direct dependencies** (see `package-yml-canonical.md`).
 - Version selection obeys **“latest in range”**, with **local-first defaults for fresh installs without an explicit version** and **automatic fallback to remote when local cannot satisfy** (see `version-resolution.md`).
 
@@ -106,7 +106,7 @@ Resolving <name>...
   • Registry: 0.5.0 (stable)
 ✓ Using <name>@0.5.0 from registry (newer version)
 ⚠️  Global packages has older version (0.2.0)
-💡 To update global: cd ~/.openpackage/packages/<name> && opkg save
+💡 To update global: edit ~/.openpackage/packages/<name>/ and re-install
 ```
 
 **User Feedback** (tie-breaker):
@@ -244,7 +244,7 @@ Other flags (`--dev`, `--remote`, `--platforms`, `--dry-run`, conflicts) keep th
       - In **default mode** (no `--local`), `install` MUST:
         - Attempt resolution again including **remote versions**, following the rules in `version-resolution.md` (local+remote union).
         - Only fail if **neither local nor remote** provide a satisfying version, or remote metadata is unavailable.
-      - In **`--local` mode**, this remote fallback is **disabled** and the command fails with a clear “not available locally” style error that may suggest re-running without `--local` or using `save` / `pack`.
+      - In **`--local` mode**, this remote fallback is **disabled** and the command fails with a clear “not available locally” style error that may suggest re-running without `--local` or using `pack`.
     - **Install `<name>@<selectedVersion>`**.
     - **Add to `openpackage.yml`**:
       - Default range is **caret based on the stable base** of the selected version (e.g. `^1.0.1` for `1.0.1-000fz8.a3k`), unless later overridden by a global policy.
@@ -545,7 +545,7 @@ This section ties pre-release version selection to **how content is loaded** whe
       - Treat this data exactly as it would for a stable registry copy for the purposes of installation and dependency resolution.
   - If the registry directory is missing or malformed for a selected version:
     - Install MUST **fail clearly**, indicating the broken registry copy and suggesting:
-      - Re-saving the package source with `opkg save` (or re-pulling from remote) to regenerate the version, or
+      - Re-running `opkg pack` on the package source (or re-pulling from remote) to regenerate the version, or
       - Using a different available version instead.
 
 - **Remote considerations**:

@@ -8,7 +8,7 @@ This document specifies behavior for global CLI flags available across all `opkg
 The `--cwd` global option overrides the effective working directory for the entire command execution. It simulates running the CLI from `<dir>` instead of the shell's current directory, affecting:
 - Path resolutions (relative files, globs).
 - Package/workspace detection (e.g., `openpackage.yml` lookup at effective cwd).
-- File operations (install/save/add/pack/apply/uninstall/status target the specified dir's context).
+- File operations (install/add/uninstall/status target the specified dir's context).
 - Any code using `process.cwd()` (captured post-`--cwd` processing).
 
 This enables monorepo workflows without `cd` (e.g., `opkg install --cwd ./packages/web some-dep` installs into `./packages/web` from root).
@@ -32,16 +32,16 @@ This enables monorepo workflows without `cd` (e.g., `opkg install --cwd ./packag
    - Relative: `--cwd ../sibling` → resolves vs original.
    - Invalid: Early exit, no action run.
    - No-op: Omitted → uses shell cwd.
-   - Globals: Applies (harmless for login/list; may affect utils like prompts for rel paths).
+   - Globals: Applies (harmless for login/logout; may affect utils like prompts for rel paths).
    - Subprocesses: Inherit new cwd (if spawned).
 7. **Limitations**: Doesn't re-parse other args vs new cwd (resolved early). User scripts via exec may need own handling.
 
 ### Usage Patterns
 - Monorepos: Target sub-packages without cd.
-- Scripts: `opkg save --cwd $PROJ_DIR`.
+- Scripts: `opkg install --cwd $PROJ_DIR`.
 - Validation fails prevent ops (safety).
 
-Cross-refs: [install-behavior.md] (installs to effective cwd), [save-modes-inputs.md] (saves from effective cwd), [package-root-layout.md] (root = effective cwd).
+Cross-refs: [install-behavior.md] (installs to effective cwd), [package-root-layout.md] (root = effective cwd).
 
 ---
 
@@ -129,5 +129,6 @@ See [Flow Reference](./platforms/flow-reference.md) for details on `$$targetRoot
 
 This document primarily defines global flags, but some global-option-sensitive behavior is worth calling out:
 
-- **`opkg save`**: sync workspace edits back to a **mutable package source** based on `.openpackage/openpackage.index.yml` mappings. Save does not modify platform workspaces unless combined with `--apply`.
-- **`opkg apply`**: applies/syncs the current/root package to detected platforms from the effective cwd. Supports `--dry-run` and `--force`.
+- **`opkg install`**: installs packages to the effective working directory (or home directory when using `--global`).
+- **`opkg add`**: adds files to mutable package sources. To sync changes to workspace, use `opkg install`.
+- **`opkg remove`**: removes files from mutable package sources. To sync deletions to workspace, use `opkg install`.

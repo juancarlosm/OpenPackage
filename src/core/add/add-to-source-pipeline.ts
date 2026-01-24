@@ -3,7 +3,6 @@ import { resolve as resolvePath, join, basename } from 'path';
 import type { CommandResult } from '../../types/index.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
-import { resolvePackageSource } from '../source-resolution/resolve-package-source.js';
 import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
 import { collectSourceEntries } from './source-collector.js';
 import { copyFilesWithConflictResolution } from './add-conflict-handler.js';
@@ -11,13 +10,10 @@ import type { AddPackageContext } from './add-context.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 import { exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
-import { buildApplyContext } from '../install/unified/context-builders.js';
-import { runUnifiedInstallPipeline } from '../install/unified/pipeline.js';
 import { ensureLocalOpenPackageStructure, createWorkspacePackageYml } from '../../utils/package-management.js';
 import { getLocalOpenPackageDir } from '../../utils/paths.js';
 
 export interface AddToSourceOptions {
-  apply?: boolean;
   platformSpecific?: boolean;
 }
 
@@ -95,40 +91,6 @@ export async function runAddToSourcePipeline(
     packageName: packageContext.name,
     filesAdded: changed.length
   });
-
-  // Handle --apply flag: requires package to be installed in current workspace
-  if (options.apply) {
-    logger.info('Applying changes to workspace (--apply flag)', { packageName: packageContext.name });
-    
-    try {
-      // Check if package is installed in current workspace
-      await resolvePackageSource(cwd, packageContext.name);
-
-      // Build apply context and run unified pipeline
-      const applyCtx = await buildApplyContext(cwd, packageContext.name, {});
-      const applyResult = await runUnifiedInstallPipeline(applyCtx);
-      
-      if (!applyResult.success) {
-        return {
-          success: false,
-          error: `Files added to package source, but apply failed:\n${applyResult.error}`
-        };
-      }
-      
-      logger.info('Changes applied to workspace', { packageName: packageContext.name });
-    } catch (error) {
-      return {
-        success: false,
-        error: 
-          `Files added to package source at: ${packageContext.packageRootDir}\n\n` +
-          `However, --apply failed because package '${packageContext.name}' is not installed in this workspace.\n\n` +
-          `To sync changes to your workspace:\n` +
-          `  1. Install the package: opkg install ${packageContext.name}\n` +
-          `  2. Apply the changes: opkg apply ${packageContext.name}\n\n` +
-          `Or run 'opkg add' without --apply flag to skip workspace sync.`
-      };
-    }
-  }
 
   // Build array of added file paths (package-root-relative paths)
   const addedFilePaths = changed.map(file => join(packageContext.packageRootDir, file.path));

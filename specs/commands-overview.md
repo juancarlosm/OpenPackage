@@ -1,6 +1,6 @@
 # Commands Overview
 
-This file provides high-level semantics for core commands in the path-based model. Detailed behaviors in subdirs (e.g., [Save](save/), [Install](install/)). Commands enforce mutability (e.g., save/add require mutable sources).
+This file provides high-level semantics for core commands in the path-based model. Detailed behaviors in subdirs (e.g., [Install](install/)). Commands enforce mutability (e.g., add/remove require mutable sources).
 
 ## Command Summary
 
@@ -9,9 +9,7 @@ This file provides high-level semantics for core commands in the path-based mode
 | `new` | N/A | Create package manifest | N/A | N/A |
 | `add` | Filesystem → Source | Add new files (source-only, path-only for workspace root) | ✅ | ❌ Error |
 | `remove` | Source → Deletion | Remove files from source (source-only, path-only for workspace root) | ✅ | ❌ Error |
-| `save` | Workspace → Source | Sync edits back (requires install) | ✅ | ❌ Error |
 | `set` | N/A | Update manifest metadata | ✅ | ❌ Error |
-| `apply` | Source/Registry → Workspace | Sync content to platforms + update index | ✅ | ✅ |
 | `install` | Registry → Workspace | Install version (git/path too) + update index | N/A | ✅ |
 | `status` | N/A | Report sync state | ✅ | ✅ |
 | `uninstall` | Workspace | Remove package files/mappings | ✅ | ✅ |
@@ -21,27 +19,17 @@ Other: `login`/`logout` in subdocs or future.
 
 ## Detailed Semantics
 
-### `save`
-
-Sync workspace changes to mutable source via index mappings.
-
-- Preconditions: Mutable source; fails on registry.
-- Flow: Read index → Collect/resolve conflicts (mtime, platforms) → Write to source.
-- Versioning: Computes WIP prerelease.
-- Example: `opkg save my-pkg` (or `opkg save <path>` for add-like).
-- See [Save](save/) and [Save Versioning](save/save-versioning.md).
-
 ### `add`
 
 Add new files from anywhere to mutable source (workspace or global packages).
 
 - Preconditions: Mutable package source (workspace or global); **does not require installation**.
 - Flow: Resolve mutable source → Collect input → Map (platform→universal, root→root, other→root/<rel>) → Copy to source.
-- **No index updates**: `add` only modifies package source. To sync to workspace, use `install` + `apply` or `--apply` flag.
-- Options: `--apply` (sync to workspace immediately; requires package to be installed in current workspace).
+- **No index updates**: `add` only modifies package source. To sync to workspace, use `install`.
 - Example: 
   - `opkg add my-pkg ./new-files/` (source-only)
-  - `opkg add my-pkg ./file.md --apply` (source + workspace sync)
+  - `opkg add my-pkg ./file.md` (adds to source)
+  - `opkg install my-pkg` (to sync to workspace)
 - Works from any directory with any mutable package.
 - See [Add](add/).
 
@@ -54,13 +42,14 @@ Remove files from mutable source or workspace root.
 - **Argument modes**: 
   - Two-arg: `opkg remove <pkg> <path>` (named package)
   - One-arg: `opkg remove <path>` (workspace root)
-- **No index updates**: `remove` only modifies package source. To sync deletions to workspace, use `apply` or `--apply` flag.
-- Options: `--apply` (sync to workspace immediately; requires package to be installed in current workspace), `--force` (skip confirmation), `--dry-run` (preview).
+- **No index updates**: `remove` only modifies package source. To sync deletions to workspace, use `install`.
+- Options: `--force` (skip confirmation), `--dry-run` (preview).
 - Example:
   - `opkg remove commands/deprecated.md` (workspace root, path-only)
   - `opkg remove my-pkg commands/deprecated.md` (named package, source-only)
-  - `opkg remove my-pkg rules/old/ --apply` (source + workspace sync)
+  - `opkg remove my-pkg rules/old/` (removes from source)
   - `opkg remove commands/ --dry-run` (preview workspace root)
+  - `opkg install my-pkg` (to sync deletions to workspace)
 - Works from any directory with any mutable package.
 - Opposite of `add` command.
 - See [Remove](remove/).
@@ -79,16 +68,6 @@ Update manifest metadata fields in openpackage.yml for mutable packages.
   - `opkg set my-pkg` (interactive mode)
   - `opkg set --ver 2.0.0 --description "Updated"` (CWD package)
 - See [Set](set/).
-
-
-### `apply`
-
-Sync from source/registry to workspace platforms/root.
-
-- Flow: Resolve path → Map files → Write/update → Update index.
-- Handles universal/platform variants, conflicts.
-- Example: `opkg apply my-pkg`.
-- See [Apply](apply/).
 
 ### `install`
 
@@ -141,11 +120,9 @@ Create a new package with manifest.
 | Command | Mutable Source | Immutable Source | Creates Files In |
 |---------|----------------|------------------|------------------|
 | `new` | N/A | N/A | Package location (scope-dependent) |
-| `save` | ✅ Syncs to source | ❌ Error | Source path |
 | `add` | ✅ Adds to source | ❌ Error | Source path |
 | `remove` | ✅ Removes from source | ❌ Error | N/A (deletes) |
 | `set` | ✅ Updates manifest | ❌ Error | Source path |
-| `apply` | ✅ Syncs to workspace | ✅ Syncs to workspace | Workspace |
 | `install` | N/A | ✅ Syncs to workspace | Workspace |
 | `status` | ✅ Shows status | ✅ Shows status | N/A |
 | `uninstall` | ✅ Removes | ✅ Removes | N/A (deletes) |

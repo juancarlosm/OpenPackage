@@ -5,8 +5,8 @@
 **Flows** are declarative transformation rules that define bidirectional mappings between universal package content and platform-specific formats. 
 
 **Two types of flows:**
-- **Export flows** (`export`): Package → Workspace (used by `install` and `apply`)
-- **Import flows** (`import`): Workspace → Package (used by `save`)
+- **Export flows** (`export`): Package → Workspace (used by `install`)
+- **Import flows** (`import`): Workspace → Package (used by `add`)
 
 **Core concept:** Explicit bidirectional transformations without automatic inversion.
 
@@ -16,7 +16,7 @@
 
 Transform package files into workspace files (Package → Workspace).
 
-**Used by:** `opkg install`, `opkg apply`
+**Used by:** `opkg install`
 
 **Schema:**
 ```typescript
@@ -42,7 +42,7 @@ interface ExportFlow {
 
 Transform workspace files back into package files (Workspace → Package).
 
-**Used by:** `opkg save`, `opkg add`
+**Used by:** `opkg add`
 
 **Schema:**
 ```typescript
@@ -64,8 +64,7 @@ interface ImportFlow {
 }
 ```
 
-**Key differences by command:**
-- **`save`**: Only processes files tracked in workspace index (files previously exported)
+**Key difference:**
 - **`add`**: Processes any workspace file matching the pattern, regardless of index state
 
 **Example:**
