@@ -769,11 +769,11 @@
     "export": [
       {
         "from": "commands/**/*.md",
-        "to": ".opencode/command/**/*.md"
+        "to": ".opencode/commands/**/*.md"
       },
       {
         "from": "agents/**/*.md",
-        "to": ".opencode/agent/**/*.md",
+        "to": ".opencode/agents/**/*.md",
         "map": [
           // 1. Transform tools: [read, write, bash] → { read: true, write: true, bash: true }
           {
@@ -792,7 +792,7 @@
       },
       {
         "from": "skills/**/*",
-        "to": ".opencode/skill/**/*"
+        "to": ".opencode/skills/**/*"
       },
       {
         "from": ["mcp.jsonc", "mcp.json"],
@@ -802,11 +802,11 @@
     ],
     "import": [
       {
-        "from": ".opencode/command/**/*.md",
+        "from": ".opencode/commands/**/*.md",
         "to": "commands/**/*.md"
       },
       {
-        "from": ".opencode/agent/**/*.md",
+        "from": ".opencode/agents/**/*.md",
         "to": "agents/**/*.md",
         "map": [
           // 1. Reverse tools transformation: { read: true, write: false, bash: true } → [read, bash]
@@ -827,7 +827,7 @@
         ]
       },
       {
-        "from": ".opencode/skill/**/*",
+        "from": ".opencode/skills/**/*",
         "to": "skills/**/*"
       },
       {
