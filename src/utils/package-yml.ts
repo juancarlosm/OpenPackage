@@ -21,32 +21,52 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
     }
     
     // Auto-migrate old plugin naming format
-    let needsMigration = false;
-    const { detectOldPluginNaming } = await import('./plugin-naming.js');
+    let needsPluginMigration = false;
+    let needsGitHubMigration = false;
+    const { detectOldPluginNaming, detectOldGitHubNaming } = await import('./plugin-naming.js');
     
     if (parsed.dependencies) {
       for (const dep of parsed.dependencies) {
-        const newName = detectOldPluginNaming(dep);
-        if (newName) {
-          dep.name = newName;
-          needsMigration = true;
+        // Check for old plugin naming (marketplace name vs repo name)
+        const newPluginName = detectOldPluginNaming(dep);
+        if (newPluginName) {
+          dep.name = newPluginName;
+          needsPluginMigration = true;
+        }
+        
+        // Check for old GitHub naming (@username/repo vs gh@username/repo)
+        const newGitHubName = detectOldGitHubNaming(dep);
+        if (newGitHubName) {
+          dep.name = newGitHubName;
+          needsGitHubMigration = true;
         }
       }
     }
     
     if (parsed['dev-dependencies']) {
       for (const dep of parsed['dev-dependencies']) {
-        const newName = detectOldPluginNaming(dep);
-        if (newName) {
-          dep.name = newName;
-          needsMigration = true;
+        // Check for old plugin naming (marketplace name vs repo name)
+        const newPluginName = detectOldPluginNaming(dep);
+        if (newPluginName) {
+          dep.name = newPluginName;
+          needsPluginMigration = true;
+        }
+        
+        // Check for old GitHub naming (@username/repo vs gh@username/repo)
+        const newGitHubName = detectOldGitHubNaming(dep);
+        if (newGitHubName) {
+          dep.name = newGitHubName;
+          needsGitHubMigration = true;
         }
       }
     }
     
     // Mark for logging on write
-    if (needsMigration) {
-      (parsed as any)._needsMigration = true;
+    if (needsPluginMigration) {
+      (parsed as any)._needsPluginMigration = true;
+    }
+    if (needsGitHubMigration) {
+      (parsed as any)._needsGitHubMigration = true;
     }
     
     const validateDependencies = (deps: PackageDependency[] | undefined, section: string): void => {
@@ -102,7 +122,7 @@ export function serializePackageYml(config: PackageYml): string {
     lineWidth: -1, // Disable line wrapping to prevent folded scalar style (>-)
   });
 
-  // Ensure scoped names (starting with @) are quoted
+  // Ensure scoped names (starting with @ or gh@) are quoted
   const scoped = isScopedName(config.name);
   if (scoped) {
     const lines = content.split('\n');
@@ -173,10 +193,17 @@ export async function writePackageYml(packageYmlPath: string, config: PackageYml
   delete migratedConfig['dev-packages'];
   
   // Log if plugin naming was migrated
-  if ((config as any)._needsMigration) {
+  if ((config as any)._needsPluginMigration) {
     const { logger } = await import('./logger.js');
     logger.info('✓ Migrated plugin naming to new format');
-    delete (migratedConfig as any)._needsMigration;
+    delete (migratedConfig as any)._needsPluginMigration;
+  }
+  
+  // Log if GitHub naming was migrated
+  if ((config as any)._needsGitHubMigration) {
+    const { logger } = await import('./logger.js');
+    logger.info('✓ Migrated GitHub package names to new format');
+    delete (migratedConfig as any)._needsGitHubMigration;
   }
   
   const content = serializePackageYml(migratedConfig);

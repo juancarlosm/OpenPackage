@@ -165,11 +165,54 @@ export async function readWorkspaceIndex(cwd: string): Promise<WorkspaceIndexRec
       logger.warn(`Invalid workspace index detected at ${indexPath}, returning empty.`);
       return { path: indexPath, index: { packages: {} } };
     }
-    return { path: indexPath, index: sanitized };
+    
+    // Auto-migrate old GitHub naming format (@username/repo -> gh@username/repo)
+    const migrated = migrateGitHubPackageNames(sanitized);
+    
+    return { path: indexPath, index: migrated };
   } catch (error) {
     logger.warn(`Failed to read workspace index at ${indexPath}: ${error}`);
     return { path: indexPath, index: { packages: {} } };
   }
+}
+
+/**
+ * Migrate old GitHub package names to new format.
+ * Converts @username/repo to gh@username/repo for GitHub sources.
+ */
+function migrateGitHubPackageNames(index: WorkspaceIndex): WorkspaceIndex {
+  const migratedPackages: Record<string, WorkspaceIndexPackage> = {};
+  
+  for (const [pkgName, pkgData] of Object.entries(index.packages)) {
+    // Skip if already using new format
+    if (pkgName.startsWith('gh@')) {
+      migratedPackages[pkgName] = pkgData;
+      continue;
+    }
+    
+    // Check if this is an old GitHub format (@username/...)
+    if (pkgName.startsWith('@')) {
+      // Detect if this is a GitHub source by checking:
+      // 1. No version field (git sources don't have semver versions)
+      // 2. Path contains git cache location marker
+      const isGitSource = !pkgData.version;
+      const normalizedPath = pkgData.path.replace(/\\/g, '/');
+      const isGitCache = normalizedPath.includes('/.openpackage/cache/git/') || 
+                         normalizedPath.includes('.openpackage/cache/git/');
+      
+      if (isGitSource || isGitCache) {
+        // Migrate to new format: @username/... -> gh@username/...
+        const newName = 'gh' + pkgName;
+        migratedPackages[newName] = pkgData;
+        continue;
+      }
+    }
+    
+    // Keep as-is (non-GitHub or already migrated)
+    migratedPackages[pkgName] = pkgData;
+  }
+  
+  return { packages: migratedPackages };
 }
 
 export async function writeWorkspaceIndex(record: WorkspaceIndexRecord): Promise<void> {

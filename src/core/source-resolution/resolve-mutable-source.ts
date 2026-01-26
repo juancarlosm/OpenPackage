@@ -15,7 +15,7 @@ import path from 'path';
 import { resolvePackageByName, type PackageSourceType } from '../../utils/package-name-resolution.js';
 import { isRegistryPath } from '../../utils/source-mutability.js';
 import { MUTABILITY, SOURCE_TYPES, type SourceType } from '../../constants/index.js';
-import { normalizePackageName } from '../../utils/package-name.js';
+import { normalizePackageNameForLookup } from '../../utils/package-name.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import type { ResolvedPackageSource } from './types.js';
@@ -42,7 +42,8 @@ export async function resolveMutableSource(
   options: ResolveMutableSourceOptions
 ): Promise<ResolvedPackageSource> {
   const { cwd, packageName } = options;
-  const normalizedName = normalizePackageName(packageName);
+  // Use lookup normalization for backward compatibility with old format
+  const normalizedName = normalizePackageNameForLookup(packageName);
 
   // Search workspace and global packages only (exclude registry)
   const resolution = await resolvePackageByName({

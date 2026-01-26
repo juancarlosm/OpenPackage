@@ -16,8 +16,8 @@ export interface PluginNamingContext {
  * Generate a scoped name for a Claude Code plugin.
  * 
  * Format:
- * - GitHub repo with subdirectory: @username/repo/plugin-name
- * - GitHub repo (plugin is the repo): @username/repo
+ * - GitHub repo with subdirectory: gh@username/repo/plugin-name
+ * - GitHub repo (plugin is the repo): gh@username/repo
  * - Non-GitHub or local: plugin-name (no scoping)
  * 
  * Fallback behavior:
@@ -72,13 +72,13 @@ export function generatePluginName(
       pluginName = repo;
     }
     
-    // Format: @username/repo/plugin-name
+    // Format: gh@username/repo/plugin-name
     const plugin = pluginName.toLowerCase();
-    const generated = `@${username}/${repo}/${plugin}`;
+    const generated = `gh@${username}/${repo}/${plugin}`;
     return generated;
   } else {
-    // Format: @username/repo
-    const generated = `@${username}/${repo}`;
+    // Format: gh@username/repo
+    const generated = `gh@${username}/${repo}`;
     return generated;
   }
 }
@@ -87,7 +87,7 @@ export function generatePluginName(
  * Generate a scoped name for a marketplace.
  * 
  * Format:
- * - GitHub: @username/repo
+ * - GitHub: gh@username/repo
  * - Non-GitHub: marketplace-name
  */
 export function generateMarketplaceName(
@@ -113,39 +113,59 @@ export function generateMarketplaceName(
   // GitHub URL - generate scoped name using repo name
   const { username, repo } = githubInfo;
   
-  return `@${username}/${repo}`;
+  return `gh@${username}/${repo}`;
 }
 
 /**
  * Parse a scoped plugin name into its components.
+ * Supports both new (gh@username/...) and old (@username/...) formats.
  * Returns null if the name is not scoped.
  */
 export function parseScopedPluginName(name: string): {
   username: string;
   marketplace?: string;
   plugin: string;
+  isGitHub: boolean;
 } | null {
-  // Format: @username/marketplace/plugin or @username/plugin
-  const match = name.match(/^@([^\/]+)\/(?:([^\/]+)\/)?([^\/]+)$/);
-  
-  if (!match) {
-    return null;
+  // New format: gh@username/marketplace/plugin or gh@username/plugin
+  const ghMatch = name.match(/^gh@([^\/]+)\/(?:([^\/]+)\/)?([^\/]+)$/);
+  if (ghMatch) {
+    const [, username, marketplace, plugin] = ghMatch;
+    return {
+      username,
+      marketplace,
+      plugin,
+      isGitHub: true
+    };
   }
   
-  const [, username, marketplace, plugin] = match;
+  // Old format: @username/marketplace/plugin or @username/plugin
+  const oldMatch = name.match(/^@([^\/]+)\/(?:([^\/]+)\/)?([^\/]+)$/);
+  if (oldMatch) {
+    const [, username, marketplace, plugin] = oldMatch;
+    return {
+      username,
+      marketplace,
+      plugin,
+      isGitHub: false
+    };
+  }
   
-  return {
-    username,
-    marketplace,
-    plugin
-  };
+  return null;
 }
 
 /**
- * Check if a name is a scoped plugin name.
+ * Check if a name is a scoped plugin name (either new gh@ format or old @ format).
  */
 export function isScopedPluginName(name: string): boolean {
   return parseScopedPluginName(name) !== null;
+}
+
+/**
+ * Check if a name uses the new GitHub format (gh@username/...).
+ */
+export function isGitHubPluginName(name: string): boolean {
+  return name.startsWith('gh@');
 }
 
 /**
@@ -201,4 +221,31 @@ export function detectOldPluginNaming(dep: { name: string; git?: string; subdire
   }
   
   return null;
+}
+
+/**
+ * Detect if a plugin dependency uses old GitHub naming format without gh@ prefix.
+ * Returns the correct new name if migration needed, null otherwise.
+ * 
+ * Old format: @username/repo or @username/repo/plugin
+ * New format: gh@username/repo or gh@username/repo/plugin
+ */
+export function detectOldGitHubNaming(dep: { name: string; git?: string; subdirectory?: string }): string | null {
+  // Skip if already using new format
+  if (dep.name.startsWith('gh@')) {
+    return null;
+  }
+  
+  // Only check GitHub git sources with @ prefix (but not gh@)
+  if (!dep.git || !dep.name.startsWith('@')) {
+    return null;
+  }
+  
+  const githubInfo = extractGitHubInfo(dep.git);
+  if (!githubInfo) {
+    return null;
+  }
+  
+  // Old format detected - prepend gh to create new format
+  return 'gh' + dep.name;
 }

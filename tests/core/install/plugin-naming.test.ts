@@ -4,7 +4,8 @@ import {
   generatePluginName,
   generateMarketplaceName,
   parseScopedPluginName,
-  isScopedPluginName
+  isScopedPluginName,
+  detectOldGitHubNaming
 } from '../../../src/utils/plugin-naming.js';
 
 describe('Plugin Naming', () => {
@@ -16,7 +17,7 @@ describe('Plugin Naming', () => {
         pluginManifestName: 'commit-commands'
       });
       
-      assert.strictEqual(name, '@anthropics/claude-code/commit-commands');
+      assert.strictEqual(name, 'gh@anthropics/claude-code/commit-commands');
     });
     
     it('should generate scoped name for GitHub plugin without subdirectory', () => {
@@ -25,7 +26,7 @@ describe('Plugin Naming', () => {
         pluginManifestName: 'my-plugin'
       });
       
-      assert.strictEqual(name, '@anthropics/my-plugin');
+      assert.strictEqual(name, 'gh@anthropics/my-plugin');
     });
     
     it('should generate scoped name using repo name for standalone plugin', () => {
@@ -33,7 +34,7 @@ describe('Plugin Naming', () => {
         gitUrl: 'https://github.com/anthropics/awesome-plugin.git'
       });
       
-      assert.strictEqual(name, '@anthropics/awesome-plugin');
+      assert.strictEqual(name, 'gh@anthropics/awesome-plugin');
     });
     
     it('should use repo name as fallback when plugin manifest name is undefined', () => {
@@ -42,7 +43,7 @@ describe('Plugin Naming', () => {
         pluginManifestName: undefined
       });
       
-      assert.strictEqual(name, '@user/awesome-plugin');
+      assert.strictEqual(name, 'gh@user/awesome-plugin');
     });
     
     it('should use subdirectory basename as fallback when plugin manifest name is undefined', () => {
@@ -52,7 +53,7 @@ describe('Plugin Naming', () => {
         pluginManifestName: undefined
       });
       
-      assert.strictEqual(name, '@user/repo-name/cool-plugin');
+      assert.strictEqual(name, 'gh@user/repo-name/cool-plugin');
     });
     
     it('should always use repo name for marketplace plugins', () => {
@@ -62,7 +63,7 @@ describe('Plugin Naming', () => {
         pluginManifestName: 'plugin-a'
       });
       
-      assert.strictEqual(name, '@user/actual-repo/plugin-a');
+      assert.strictEqual(name, 'gh@user/actual-repo/plugin-a');
     });
     
     it('should use repo name even when marketplace has different name', () => {
@@ -72,7 +73,7 @@ describe('Plugin Naming', () => {
         pluginManifestName: 'my-plugin'
       });
       
-      assert.strictEqual(name, '@anthropics/claude-code-plugins/my-plugin');
+      assert.strictEqual(name, 'gh@anthropics/claude-code-plugins/my-plugin');
     });
     
     it('should return plain name for non-GitHub URLs', () => {
@@ -109,7 +110,7 @@ describe('Plugin Naming', () => {
         'claude-code'
       );
       
-      assert.strictEqual(name, '@anthropics/claude-code');
+      assert.strictEqual(name, 'gh@anthropics/claude-code');
     });
     
     it('should always use repo name for GitHub marketplaces', () => {
@@ -118,7 +119,7 @@ describe('Plugin Naming', () => {
         'different-marketplace-name'
       );
       
-      assert.strictEqual(name, '@user/actual-repo-name');
+      assert.strictEqual(name, 'gh@user/actual-repo-name');
     });
     
     it('should use repo name as fallback when marketplace name is undefined', () => {
@@ -127,7 +128,7 @@ describe('Plugin Naming', () => {
         undefined
       );
       
-      assert.strictEqual(name, '@user/my-marketplace');
+      assert.strictEqual(name, 'gh@user/my-marketplace');
     });
     
     it('should return plain name for non-GitHub URLs', () => {
@@ -150,22 +151,44 @@ describe('Plugin Naming', () => {
   });
   
   describe('parseScopedPluginName', () => {
-    it('should parse marketplace plugin name', () => {
+    it('should parse marketplace plugin name (new format)', () => {
+      const parsed = parseScopedPluginName('gh@anthropics/claude-code/commit-commands');
+      
+      assert.ok(parsed);
+      assert.strictEqual(parsed.username, 'anthropics');
+      assert.strictEqual(parsed.marketplace, 'claude-code');
+      assert.strictEqual(parsed.plugin, 'commit-commands');
+      assert.strictEqual(parsed.isGitHub, true);
+    });
+    
+    it('should parse standalone plugin name (new format)', () => {
+      const parsed = parseScopedPluginName('gh@anthropics/my-plugin');
+      
+      assert.ok(parsed);
+      assert.strictEqual(parsed.username, 'anthropics');
+      assert.strictEqual(parsed.marketplace, undefined);
+      assert.strictEqual(parsed.plugin, 'my-plugin');
+      assert.strictEqual(parsed.isGitHub, true);
+    });
+    
+    it('should parse old format marketplace plugin name', () => {
       const parsed = parseScopedPluginName('@anthropics/claude-code/commit-commands');
       
       assert.ok(parsed);
       assert.strictEqual(parsed.username, 'anthropics');
       assert.strictEqual(parsed.marketplace, 'claude-code');
       assert.strictEqual(parsed.plugin, 'commit-commands');
+      assert.strictEqual(parsed.isGitHub, false);
     });
     
-    it('should parse standalone plugin name', () => {
+    it('should parse old format standalone plugin name', () => {
       const parsed = parseScopedPluginName('@anthropics/my-plugin');
       
       assert.ok(parsed);
       assert.strictEqual(parsed.username, 'anthropics');
       assert.strictEqual(parsed.marketplace, undefined);
       assert.strictEqual(parsed.plugin, 'my-plugin');
+      assert.strictEqual(parsed.isGitHub, false);
     });
     
     it('should return null for non-scoped names', () => {
@@ -182,7 +205,12 @@ describe('Plugin Naming', () => {
   });
   
   describe('isScopedPluginName', () => {
-    it('should return true for scoped names', () => {
+    it('should return true for new GitHub format', () => {
+      assert.strictEqual(isScopedPluginName('gh@user/plugin'), true);
+      assert.strictEqual(isScopedPluginName('gh@user/marketplace/plugin'), true);
+    });
+    
+    it('should return true for old scoped format', () => {
       assert.strictEqual(isScopedPluginName('@user/plugin'), true);
       assert.strictEqual(isScopedPluginName('@user/marketplace/plugin'), true);
     });
@@ -190,6 +218,53 @@ describe('Plugin Naming', () => {
     it('should return false for non-scoped names', () => {
       assert.strictEqual(isScopedPluginName('plain-name'), false);
       assert.strictEqual(isScopedPluginName('@username'), false);
+    });
+  });
+  
+  describe('detectOldGitHubNaming', () => {
+    it('should detect old GitHub format and return new format', () => {
+      const newName = detectOldGitHubNaming({
+        name: '@anthropics/claude-code',
+        git: 'https://github.com/anthropics/claude-code.git'
+      });
+      
+      assert.strictEqual(newName, 'gh@anthropics/claude-code');
+    });
+    
+    it('should detect old marketplace plugin format', () => {
+      const newName = detectOldGitHubNaming({
+        name: '@anthropics/claude-code/commit-commands',
+        git: 'https://github.com/anthropics/claude-code.git',
+        subdirectory: 'plugins/commit-commands'
+      });
+      
+      assert.strictEqual(newName, 'gh@anthropics/claude-code/commit-commands');
+    });
+    
+    it('should return null for new format', () => {
+      const newName = detectOldGitHubNaming({
+        name: 'gh@anthropics/claude-code',
+        git: 'https://github.com/anthropics/claude-code.git'
+      });
+      
+      assert.strictEqual(newName, null);
+    });
+    
+    it('should return null for non-GitHub sources', () => {
+      const newName = detectOldGitHubNaming({
+        name: '@user/plugin',
+        git: 'https://gitlab.com/user/plugin.git'
+      });
+      
+      assert.strictEqual(newName, null);
+    });
+    
+    it('should return null for packages without git source', () => {
+      const newName = detectOldGitHubNaming({
+        name: '@user/plugin'
+      });
+      
+      assert.strictEqual(newName, null);
     });
   });
 });

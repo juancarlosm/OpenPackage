@@ -8,6 +8,11 @@ import { PackageDependency } from '../types/index.js';
 export const SCOPED_PACKAGE_REGEX = /^@([^\/]+)\/(.+)$/;
 
 /**
+ * Regex pattern for GitHub-prefixed package names (gh@username/repo or gh@username/repo/plugin)
+ */
+export const GITHUB_PACKAGE_REGEX = /^gh@([^\/]+)\/(.+)$/;
+
+/**
  * Validate package name according to naming rules
  * @param name - The package name to validate
  * @throws ValidationError if the name is invalid
@@ -25,6 +30,20 @@ export function validatePackageName(name: string): void {
   // Check for leading/trailing spaces
   if (name.trim() !== name) {
     throw new ValidationError(`Package name '${name}' cannot have leading or trailing spaces`);
+  }
+
+  // Check if it's a GitHub-prefixed name (gh@username/repo format)
+  const githubMatch = name.match(GITHUB_PACKAGE_REGEX);
+  if (githubMatch) {
+    const [, username, rest] = githubMatch;
+
+    // Validate username part
+    validatePackageNamePart(username, name, 'username');
+
+    // Validate rest (repo/plugin path)
+    validatePackageNamePart(rest, name, 'name');
+
+    return;
   }
 
   // Check if it's a scoped name (@scope/name format)
@@ -89,9 +108,48 @@ function validatePackageNamePart(part: string, fullName: string, partType: strin
 /**
  * Parse package input supporting both scoped names (@scope/name) and version specifications (name@version)
  * Returns normalized name and optional version
+ * 
+ * Special handling for gh@username/repo format:
+ * - gh@username/repo -> name: gh@username/repo, no version
+ * - gh@username/repo@1.0.0 -> name: gh@username/repo, version: 1.0.0
  */
 export function parsePackageInput(packageInput: string): { name: string; version?: string } {
-  // Package name with optional version
+  // Special handling for GitHub format (gh@...)
+  if (packageInput.startsWith('gh@')) {
+    // Find the last @ that's not the one at position 2
+    let versionAtIndex = -1;
+    for (let i = packageInput.length - 1; i >= 0; i--) {
+      if (packageInput[i] === '@' && i !== 2) {
+        versionAtIndex = i;
+        break;
+      }
+    }
+    
+    if (versionAtIndex === -1) {
+      // No version specified
+      validatePackageName(packageInput);
+      return {
+        name: normalizePackageName(packageInput)
+      };
+    }
+    
+    // Version specified
+    const name = packageInput.substring(0, versionAtIndex);
+    const version = packageInput.substring(versionAtIndex + 1);
+    
+    if (!name || !version) {
+      throw new ValidationError(`Invalid package syntax: ${packageInput}. Use 'package' or 'package@version'`);
+    }
+    
+    validatePackageName(name);
+    
+    return {
+      name: normalizePackageName(name),
+      version
+    };
+  }
+  
+  // Standard parsing for non-GitHub packages
   const atIndex = packageInput.lastIndexOf('@');
 
   if (atIndex === -1 || atIndex === 0) {
@@ -199,6 +257,30 @@ export function normalizePackageName(name: string): string {
   return name.toLowerCase();
 }
 
+/**
+ * Normalize package name for lookup/resolution with backward compatibility.
+ * Converts old GitHub format (@username/...) to new format (gh@username/...).
+ * This allows commands to accept old format names and still match workspace entries.
+ * 
+ * @param name - Package name to normalize
+ * @returns Normalized name in new format if applicable
+ */
+export function normalizePackageNameForLookup(name: string): string {
+  const normalized = normalizePackageName(name);
+  
+  // If already using new format, return as-is
+  if (normalized.startsWith('gh@')) {
+    return normalized;
+  }
+  
+  // If using old GitHub format (@username/...), convert to new format
+  if (normalized.startsWith('@') && normalized.match(/^@([^\/]+)\/(.+)$/)) {
+    return 'gh' + normalized;
+  }
+  
+  // Otherwise return normalized as-is
+  return normalized;
+}
 
 /**
  * Check if two package names are equivalent (case-insensitive).

@@ -145,8 +145,8 @@ Detection happens automatically after cloning, before attempting to load as an O
 When an individual plugin is detected:
 1. Plugin manifest (`.claude-plugin/plugin.json`) is read and validated.
 2. **Plugin name is generated with scoping**:
-   - **GitHub plugins (standalone)**: Use scoped format `@<username>/<repo>`
-   - **GitHub plugins from subdirectory**: Use `@<username>/<repo>/<plugin-name>`
+   - **GitHub plugins (standalone)**: Use scoped format `gh@<username>/<repo>`
+   - **GitHub plugins from subdirectory**: Use `gh@<username>/<repo>/<plugin-name>`
    - **Non-GitHub sources**: Use original plugin name (no scoping)
    - **Fallback behavior**: If `plugin.json` has no `name` field:
      - Use subdirectory basename if installing from subdirectory
@@ -178,7 +178,7 @@ opkg install github:anthropics/claude-code#subdirectory=plugins/commit-commands
 Result in `openpackage.yml`:
 ```yaml
 packages:
-  - name: "@anthropics/claude-code/commit-commands"  # Scoped name
+  - name: "gh@anthropics/claude-code/commit-commands"  # Scoped name
     git: https://github.com/anthropics/claude-code.git
     subdirectory: plugins/commit-commands
 ```
@@ -196,7 +196,7 @@ When a plugin marketplace is detected:
 2. An interactive multiselect prompt is displayed listing all available plugins.
 3. User selects which plugin(s) to install (space to select, enter to confirm).
 4. Each selected plugin is installed individually:
-   - **Scoped name is generated**: `@<username>/<repo>/<plugin-name>`
+   - **Scoped name is generated**: `gh@<username>/<repo>/<plugin-name>`
    - Plugin subdirectory is resolved within the cloned repository.
    - Plugin is validated (must have `.claude-plugin/plugin.json`).
    - Plugin is installed following the individual plugin flow (§4.2).
@@ -221,10 +221,10 @@ Select plugins to install (space to select, enter to confirm):
 Result in `openpackage.yml` (if user selected commit-commands and pr-review-toolkit):
 ```yaml
 packages:
-  - name: "@anthropics/claude-code/commit-commands"  # Scoped name
+  - name: "gh@anthropics/claude-code/commit-commands"  # Scoped name
     git: https://github.com/anthropics/claude-code.git
     subdirectory: plugins/commit-commands
-  - name: "@anthropics/claude-code/pr-review-toolkit"  # Scoped name
+  - name: "gh@anthropics/claude-code/pr-review-toolkit"  # Scoped name
     git: https://github.com/anthropics/claude-code.git
     subdirectory: plugins/pr-review-toolkit
 ```
@@ -240,15 +240,15 @@ Installed to cache:
 **Scoped naming for GitHub plugins**: Plugins installed from GitHub repositories use scoped names to provide clear provenance and prevent naming conflicts.
 
 **Naming formats**:
-- **Marketplace plugin**: `@<username>/<repo>/<plugin-name>`
-- **Standalone plugin**: `@<username>/<repo>`
+- **Marketplace plugin**: `gh@<username>/<repo>/<plugin-name>`
+- **Standalone plugin**: `gh@<username>/<repo>`
 - **Non-GitHub source**: `<plugin-name>` (no scoping)
 
 **Examples**:
 | Source | Plugin Name | Scoped Name |
 |--------|-------------|-------------|
-| `github:anthropics/claude-code#subdirectory=plugins/commit-commands` | `commit-commands` | `@anthropics/claude-code/commit-commands` |
-| `github:anthropics/my-plugin` | `my-plugin` | `@anthropics/my-plugin` |
+| `github:anthropics/claude-code#subdirectory=plugins/commit-commands` | `commit-commands` | `gh@anthropics/claude-code/commit-commands` |
+| `github:anthropics/my-plugin` | `my-plugin` | `gh@anthropics/my-plugin` |
 | `git:https://gitlab.com/user/plugin.git` | `cool-plugin` | `cool-plugin` (no scoping) |
 | `./local-plugin/` | `local-plugin` | `local-plugin` (no scoping) |
 
@@ -256,7 +256,9 @@ Installed to cache:
 1. **Plugin name missing**: Uses subdirectory basename → repo name → "unnamed-plugin"
 2. **Repository name is always used for GitHub plugins** (marketplace name in `marketplace.json` is display-only)
 
-**Automatic migration**: If an existing installation uses the old naming format (e.g., `@username/marketplace-name/plugin` where marketplace name differs from repo name), the system will automatically migrate to the new format when the manifest is read and written.
+**Automatic migration**: 
+- **Marketplace name migration**: If an existing installation uses the old naming format (e.g., `@username/marketplace-name/plugin` where marketplace name differs from repo name), the system will automatically migrate to use the repo name when the manifest is read and written.
+- **GitHub prefix migration**: If an existing installation uses the old format without the `gh` prefix (e.g., `@username/repo`), the system will automatically migrate to the new format (`gh@username/repo`) when the manifest is read and written.
 
 **Benefits**:
 - Clear GitHub provenance at a glance

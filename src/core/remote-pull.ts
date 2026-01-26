@@ -172,7 +172,19 @@ export function buildPullEndpoint(
 export function parseDownloadIdentifier(
   downloadName: string
 ): { packageName: string; version: string; registryPath?: string } {
-  const atIndex = downloadName.lastIndexOf('@');
+  // Special handling for gh@ prefix - find version @ that's not at position 2
+  let atIndex = -1;
+  if (downloadName.startsWith('gh@')) {
+    // Find the last @ that's not the one in gh@
+    for (let i = downloadName.length - 1; i >= 0; i--) {
+      if (downloadName[i] === '@' && i !== 2) {
+        atIndex = i;
+        break;
+      }
+    }
+  } else {
+    atIndex = downloadName.lastIndexOf('@');
+  }
 
   if (atIndex <= 0 || atIndex === downloadName.length - 1) {
     throw new Error(`Invalid download name '${downloadName}'. Expected format '<package>@<version>'.`);
@@ -184,7 +196,17 @@ export function parseDownloadIdentifier(
   // Parse package name and optional path from the name portion
   let packageName: string;
   let namePath: string | undefined;
-  if (rawName.startsWith('@')) {
+  if (rawName.startsWith('gh@')) {
+    // GitHub format: gh@username/repo or gh@username/repo/plugin
+    const segments = rawName.split('/');
+    if (segments.length < 2) {
+      throw new Error(`Invalid GitHub package in download name '${downloadName}'.`);
+    }
+    // Take first two segments: gh@username/repo
+    packageName = segments.slice(0, 2).join('/');
+    namePath = segments.length > 2 ? segments.slice(2).join('/') : undefined;
+  } else if (rawName.startsWith('@')) {
+    // Scoped format: @scope/pkg
     const segments = rawName.split('/');
     if (segments.length < 2) {
       throw new Error(`Invalid scoped package in download name '${downloadName}'.`);
@@ -192,6 +214,7 @@ export function parseDownloadIdentifier(
     packageName = segments.slice(0, 2).join('/'); // @scope/pkg
     namePath = segments.length > 2 ? segments.slice(2).join('/') : undefined;
   } else {
+    // Unscoped format
     const segments = rawName.split('/');
     packageName = segments[0];
     namePath = segments.length > 1 ? segments.slice(1).join('/') : undefined;

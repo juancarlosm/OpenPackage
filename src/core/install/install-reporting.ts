@@ -7,7 +7,10 @@ export function formatSelectionSummary(
   packageName: string,
   version: string
 ): string {
-  const packageSpecifier = packageName.startsWith('@') ? packageName : `@${packageName}`;
+  // Don't add @ prefix if name already starts with @ or gh@
+  const packageSpecifier = (packageName.startsWith('@') || packageName.startsWith('gh@')) 
+    ? packageName 
+    : `@${packageName}`;
   const sourceLabel = source === 'path' ? 'local path' : source;
   return `✓ Selected ${sourceLabel} ${packageSpecifier}@${version}`;
 }
@@ -73,8 +76,9 @@ export function displayInstallationResults(
   if (dependencyPackages.length > 0) {
     console.log(`✓ Installed dependencies: ${dependencyPackages.length}`);
     for (const dep of dependencyPackages) {
+      // Don't add @ prefix if name already starts with @ or gh@
       const packageSpecifier =
-        typeof dep.name === 'string' && dep.name.startsWith('@')
+        typeof dep.name === 'string' && (dep.name.startsWith('@') || dep.name.startsWith('gh@'))
           ? dep.name
           : `@${dep.name}`;
       console.log(`   ├── ${packageSpecifier}@${dep.version}`);
