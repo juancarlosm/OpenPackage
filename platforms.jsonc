@@ -148,9 +148,6 @@
           "$ne": ["$$platform", "claude"]
         },
         "map": [
-          // Remove the name field added during export
-          { "$unset": "name" },
-          
           // Reverse model transformation
           {
             "$pipeline": {
@@ -379,10 +376,7 @@
         "from": ".claude/agents/**/*.md",
         "to": "agents/**/*.md",
         "map": [
-          // 1. Remove name field (derived from filename in universal)
-          { "$unset": "name" },
-          
-          // 2. Reverse model transformation: Claude short names → "anthropic/model-id"
+          // Reverse model transformation: Claude short names → "anthropic/model-id"
           {
             "$pipeline": {
               "field": "model",
@@ -397,7 +391,7 @@
             }
           },
           
-          // 3. Reverse tools transformation: "Read, Write, Bash" → [read, write, bash]
+          // Reverse tools transformation: "Read, Write, Bash" → [read, write, bash]
           {
             "$pipeline": {
               "field": "tools",
@@ -418,7 +412,7 @@
             }
           },
           
-          // 4. Transform permissionMode → permissions object (best effort)
+          // Transform permissionMode → permissions object (best effort)
           // Only transform if permissionMode field exists
           {
             "$switch": {
@@ -775,6 +769,9 @@
         "from": "agents/**/*.md",
         "to": ".opencode/agent/**/*.md",
         "map": [
+          // Remove name field (derived from filename)
+          { "$unset": "name" },
+
           // 1. Transform tools: [read, write, bash] → { read: true, write: true, bash: true }
           {
             "$pipeline": {

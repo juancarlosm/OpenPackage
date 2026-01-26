@@ -47,10 +47,11 @@ import {
   deleteNestedValue
 } from './flow-key-mapper.js';
 import { extractAllKeys } from './flow-key-extractor.js';
-import { applyMapPipeline, createMapContext, validateMapPipeline } from './map-pipeline/index.js';
+import { applyMapPipeline, createMapContext, splitMapPipeline, validateMapPipeline } from './map-pipeline/index.js';
 import { SourcePatternResolver } from './source-resolver.js';
 import { smartEquals, smartNotEquals } from '../../utils/path-comparison.js';
 import { stripPlatformSuffixFromFilename } from './platform-suffix-handler.js';
+import { parseMarkdownDocument, serializeMarkdownDocument } from './markdown.js';
 
 /**
  * Default flow executor implementation
@@ -384,14 +385,9 @@ export class DefaultFlowExecutor implements FlowExecutor {
       let pipeOps: any[] = [];
       
       if (flow.map) {
-        // Separate schema operations from pipe operations
-        for (const op of flow.map) {
-          if ('$pipe' in op) {
-            pipeOps.push(op);
-          } else {
-            schemaOps.push(op);
-          }
-        }
+        const split = splitMapPipeline(flow.map);
+        schemaOps = split.schemaOps;
+        pipeOps = split.pipeOps;
         
         // Apply schema operations first (before merge)
         if (schemaOps.length > 0) {
@@ -1101,31 +1097,14 @@ export class DefaultFlowExecutor implements FlowExecutor {
    * Parse markdown with frontmatter
    */
   private parseMarkdown(content: string): any {
-    const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
-    const match = content.match(frontmatterRegex);
-
-    if (match) {
-      const frontmatter = yaml.load(match[1]);
-      const body = match[2];
-      return { frontmatter, body };
-    }
-
-    return { body: content };
+    return parseMarkdownDocument(content);
   }
 
   /**
    * Serialize markdown with frontmatter
    */
   private serializeMarkdown(content: any): string {
-    if (typeof content === 'string') {
-      return content;
-    }
-    if (content.frontmatter) {
-      const frontmatterStr = yaml.dump(content.frontmatter, { indent: 2, flowLevel: 1, lineWidth: -1 });
-      return `---\n${frontmatterStr}---\n${content.body || ''}`;
-    }
-
-    return content.body || '';
+    return serializeMarkdownDocument(content);
   }
 
   /**

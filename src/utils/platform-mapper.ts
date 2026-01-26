@@ -158,7 +158,7 @@ export function mapPlatformFileToUniversal(
 export function mapWorkspaceFileToUniversal(
   workspaceFilePath: string,
   cwd = process.cwd()
-): { platform: Platform; subdir: string; relPath: string } | null {
+): { platform: Platform; subdir: string; relPath: string; flow: Flow } | null {
   // Resolve symlinks to get real paths for consistent comparison
   const absolutePath = realpathSync(workspaceFilePath);
   const absoluteCwd = realpathSync(cwd);
@@ -191,7 +191,7 @@ export function mapWorkspaceFileToUniversal(
         const relPath = mapPathUsingFlowPattern(relativePath, fromPattern, toPattern);
         
         if (relPath) {
-          return { platform, subdir, relPath };
+          return { platform, subdir, relPath, flow };
         }
       }
     }
