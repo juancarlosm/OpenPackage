@@ -13,8 +13,7 @@ describe('Plugin Naming', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/anthropics/claude-code.git',
         subdirectory: 'plugins/commit-commands',
-        pluginManifestName: 'commit-commands',
-        marketplaceName: 'claude-code'
+        pluginManifestName: 'commit-commands'
       });
       
       assert.strictEqual(name, '@anthropics/claude-code/commit-commands');
@@ -29,6 +28,14 @@ describe('Plugin Naming', () => {
       assert.strictEqual(name, '@anthropics/my-plugin');
     });
     
+    it('should generate scoped name using repo name for standalone plugin', () => {
+      const name = generatePluginName({
+        gitUrl: 'https://github.com/anthropics/awesome-plugin.git'
+      });
+      
+      assert.strictEqual(name, '@anthropics/awesome-plugin');
+    });
+    
     it('should use repo name as fallback when plugin manifest name is undefined', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/user/awesome-plugin.git',
@@ -40,24 +47,32 @@ describe('Plugin Naming', () => {
     
     it('should use subdirectory basename as fallback when plugin manifest name is undefined', () => {
       const name = generatePluginName({
-        gitUrl: 'https://github.com/user/marketplace.git',
+        gitUrl: 'https://github.com/user/repo-name.git',
         subdirectory: 'plugins/cool-plugin',
-        pluginManifestName: undefined,
-        marketplaceName: 'marketplace'
+        pluginManifestName: undefined
       });
       
-      assert.strictEqual(name, '@user/marketplace/cool-plugin');
+      assert.strictEqual(name, '@user/repo-name/cool-plugin');
     });
     
-    it('should use repo name as marketplace fallback when marketplace name is undefined', () => {
+    it('should always use repo name for marketplace plugins', () => {
       const name = generatePluginName({
-        gitUrl: 'https://github.com/user/my-marketplace.git',
+        gitUrl: 'https://github.com/user/actual-repo.git',
         subdirectory: 'plugins/plugin-a',
-        pluginManifestName: 'plugin-a',
-        marketplaceName: undefined
+        pluginManifestName: 'plugin-a'
       });
       
-      assert.strictEqual(name, '@user/my-marketplace/plugin-a');
+      assert.strictEqual(name, '@user/actual-repo/plugin-a');
+    });
+    
+    it('should use repo name even when marketplace has different name', () => {
+      const name = generatePluginName({
+        gitUrl: 'https://github.com/anthropics/claude-code-plugins.git',
+        subdirectory: 'packages/my-plugin',
+        pluginManifestName: 'my-plugin'
+      });
+      
+      assert.strictEqual(name, '@anthropics/claude-code-plugins/my-plugin');
     });
     
     it('should return plain name for non-GitHub URLs', () => {
@@ -88,13 +103,22 @@ describe('Plugin Naming', () => {
   });
   
   describe('generateMarketplaceName', () => {
-    it('should generate scoped name for GitHub marketplace', () => {
+    it('should generate scoped name using repo name for GitHub marketplace', () => {
       const name = generateMarketplaceName(
         'https://github.com/anthropics/claude-code.git',
         'claude-code'
       );
       
       assert.strictEqual(name, '@anthropics/claude-code');
+    });
+    
+    it('should always use repo name for GitHub marketplaces', () => {
+      const name = generateMarketplaceName(
+        'https://github.com/user/actual-repo-name.git',
+        'different-marketplace-name'
+      );
+      
+      assert.strictEqual(name, '@user/actual-repo-name');
     });
     
     it('should use repo name as fallback when marketplace name is undefined', () => {

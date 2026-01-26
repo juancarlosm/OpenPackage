@@ -411,14 +411,13 @@ async function installRelativePathPlugin(
   };
   
   // Add marketplace metadata to context for passing to loader and workspace index
-  // This will be used by the path source loader to pass marketplace entry and marketplace name
+  // This will be used by the path source loader to pass marketplace entry
   // to plugin transformer for proper scoped naming
   ctx.source.pluginMetadata = {
     isPlugin: true,
     pluginType: detection.type as any,
     manifestPath: detection.manifestPath,
     marketplaceEntry: pluginEntry,
-    marketplaceName: marketplace.name,
     marketplaceSource: {
       url: marketplaceGitUrl,
       commitSha: marketplaceCommitSha,
@@ -484,8 +483,7 @@ async function installGitPlugin(
   // Add marketplace metadata for proper scoping
   ctx.source.pluginMetadata = {
     isPlugin: true,
-    marketplaceEntry: pluginEntry,
-    marketplaceName: marketplace.name
+    marketplaceEntry: pluginEntry
   };
   
   // Stop spinner before pipeline (which has its own output)

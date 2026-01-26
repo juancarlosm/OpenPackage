@@ -33,8 +33,7 @@ export class PathSourceLoader implements PackageSourceLoader {
       // If gitSourceOverride exists, use it for proper git-based naming
       const loadContext: any = {
         repoPath: resolvedPath,
-        marketplaceEntry: source.pluginMetadata?.marketplaceEntry,
-        marketplaceName: source.pluginMetadata?.marketplaceName
+        marketplaceEntry: source.pluginMetadata?.marketplaceEntry
       };
       
       if (source.gitSourceOverride) {

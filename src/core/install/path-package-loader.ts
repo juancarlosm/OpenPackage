@@ -24,7 +24,6 @@ export interface PackageLoadContext {
   repoPath?: string;
   packageName?: string;  // Optional override (avoid using - let transformer generate)
   marketplaceEntry?: MarketplacePluginEntry;
-  marketplaceName?: string;
 }
 
 /**

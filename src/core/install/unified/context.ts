@@ -57,9 +57,6 @@ export interface PackageSource {
     /** Marketplace entry for marketplace-defined plugins */
     marketplaceEntry?: any; // Will be MarketplacePluginEntry but avoiding circular dependency
     
-    /** Marketplace name (for proper scoping of marketplace plugins) */
-    marketplaceName?: string;
-    
     /** Marketplace source info (for workspace index) */
     marketplaceSource?: {
       url: string;

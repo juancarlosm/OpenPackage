@@ -54,7 +54,6 @@ export interface PluginTransformContext {
   subdirectory?: string;
   repoPath?: string;
   marketplaceEntry?: MarketplacePluginEntry;
-  marketplaceName?: string;  // Name of the marketplace (for proper scoping)
 }
 
 /**
@@ -92,7 +91,6 @@ export async function transformPluginToPackage(
     gitUrl: context?.gitUrl,
     subdirectory: context?.subdirectory,
     pluginManifestName: pluginManifest.name,
-    marketplaceName: context?.marketplaceName,
     repoPath: context?.repoPath
   });
   
@@ -100,8 +98,7 @@ export async function transformPluginToPackage(
     original: pluginManifest.name, 
     scoped: packageName,
     hasGitContext: !!context?.gitUrl,
-    hasSubdirectory: !!context?.subdirectory,
-    hasMarketplaceName: !!context?.marketplaceName
+    hasSubdirectory: !!context?.subdirectory
   });
   
   // Transform to OpenPackage metadata

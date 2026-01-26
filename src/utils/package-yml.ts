@@ -20,6 +20,35 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
       parsed['dev-dependencies'] = parsed['dev-packages'];
     }
     
+    // Auto-migrate old plugin naming format
+    let needsMigration = false;
+    const { detectOldPluginNaming } = await import('./plugin-naming.js');
+    
+    if (parsed.dependencies) {
+      for (const dep of parsed.dependencies) {
+        const newName = detectOldPluginNaming(dep);
+        if (newName) {
+          dep.name = newName;
+          needsMigration = true;
+        }
+      }
+    }
+    
+    if (parsed['dev-dependencies']) {
+      for (const dep of parsed['dev-dependencies']) {
+        const newName = detectOldPluginNaming(dep);
+        if (newName) {
+          dep.name = newName;
+          needsMigration = true;
+        }
+      }
+    }
+    
+    // Mark for logging on write
+    if (needsMigration) {
+      (parsed as any)._needsMigration = true;
+    }
+    
     const validateDependencies = (deps: PackageDependency[] | undefined, section: string): void => {
       if (!deps) return;
       for (const dep of deps) {
@@ -142,6 +171,13 @@ export async function writePackageYml(packageYmlPath: string, config: PackageYml
     migratedConfig['dev-dependencies'] = migratedConfig['dev-packages'];
   }
   delete migratedConfig['dev-packages'];
+  
+  // Log if plugin naming was migrated
+  if ((config as any)._needsMigration) {
+    const { logger } = await import('./logger.js');
+    logger.info('✓ Migrated plugin naming to new format');
+    delete (migratedConfig as any)._needsMigration;
+  }
   
   const content = serializePackageYml(migratedConfig);
   await writeTextFile(packageYmlPath, content);

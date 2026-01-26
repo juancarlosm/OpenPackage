@@ -58,8 +58,7 @@ export class GitSourceLoader implements PackageSourceLoader {
         gitUrl: source.gitUrl,
         subdirectory: source.gitSubdirectory,
         repoPath: result.sourcePath,
-        marketplaceEntry: source.pluginMetadata?.marketplaceEntry,
-        marketplaceName: source.pluginMetadata?.marketplaceName
+        marketplaceEntry: source.pluginMetadata?.marketplaceEntry
       });
       
       // Detect plugin type

@@ -9,7 +9,6 @@ export interface PluginNamingContext {
   gitUrl?: string;              // Git URL (for extracting GitHub info)
   subdirectory?: string;        // Subdirectory within repo
   pluginManifestName?: string;  // Name from plugin.json (may be undefined)
-  marketplaceName?: string;     // Name from marketplace.json (may be undefined)
   repoPath?: string;            // Path to repository root (for fallback)
 }
 
@@ -18,12 +17,11 @@ export interface PluginNamingContext {
  * 
  * Format:
  * - GitHub repo with subdirectory: @username/repo/plugin-name
- * - GitHub repo (plugin is the repo): @username/plugin-name
+ * - GitHub repo (plugin is the repo): @username/repo
  * - Non-GitHub or local: plugin-name (no scoping)
  * 
  * Fallback behavior:
  * - If pluginManifestName is undefined → use subdirectory name or repo name
- * - If marketplaceName is undefined → use repo name
  */
 export function generatePluginName(
   context: PluginNamingContext
@@ -32,7 +30,6 @@ export function generatePluginName(
     gitUrl,
     subdirectory,
     pluginManifestName,
-    marketplaceName,
     repoPath
   } = context;
   
@@ -54,36 +51,34 @@ export function generatePluginName(
     return generated;
   }
   
-  // GitHub URL - generate scoped name
+  // GitHub URL - generate scoped name using repo name
   const { username, repo } = githubInfo;
-  
-  // Determine plugin name
-  let pluginName: string;
-  
-  if (pluginManifestName) {
-    // Use plugin manifest name if provided
-    pluginName = pluginManifestName;
-  } else if (subdirectory) {
-    // Use subdirectory name as fallback
-    pluginName = basename(subdirectory);
-  } else {
-    // Use repo name as fallback
-    pluginName = repo;
-  }
   
   // Determine if this is a marketplace plugin (has subdirectory)
   const isMarketplacePlugin = Boolean(subdirectory);
   
   if (isMarketplacePlugin) {
-    // Format (marketplace plugin): @username/marketplace/plugin
-    // This matches how Claude Code marketplaces identify plugins.
-    const marketplace = (marketplaceName || repo).toLowerCase();
+    // Determine plugin name
+    let pluginName: string;
+    
+    if (pluginManifestName) {
+      // Use plugin manifest name if provided
+      pluginName = pluginManifestName;
+    } else if (subdirectory) {
+      // Use subdirectory name as fallback
+      pluginName = basename(subdirectory);
+    } else {
+      // Use repo name as fallback
+      pluginName = repo;
+    }
+    
+    // Format: @username/repo/plugin-name
     const plugin = pluginName.toLowerCase();
-    const generated = `@${username}/${marketplace}/${plugin}`;
+    const generated = `@${username}/${repo}/${plugin}`;
     return generated;
   } else {
-    // Format: @username/plugin-name
-    const generated = `@${username}/${pluginName}`;
+    // Format: @username/repo
+    const generated = `@${username}/${repo}`;
     return generated;
   }
 }
@@ -92,7 +87,7 @@ export function generatePluginName(
  * Generate a scoped name for a marketplace.
  * 
  * Format:
- * - GitHub: @username/marketplace-name
+ * - GitHub: @username/repo
  * - Non-GitHub: marketplace-name
  */
 export function generateMarketplaceName(
@@ -115,11 +110,10 @@ export function generateMarketplaceName(
            (repoPath ? basename(repoPath) : 'unnamed-marketplace');
   }
   
-  // GitHub URL - generate scoped name
+  // GitHub URL - generate scoped name using repo name
   const { username, repo } = githubInfo;
-  const marketplaceName = marketplaceManifestName || repo;
   
-  return `@${username}/${marketplaceName}`;
+  return `@${username}/${repo}`;
 }
 
 /**
@@ -152,4 +146,59 @@ export function parseScopedPluginName(name: string): {
  */
 export function isScopedPluginName(name: string): boolean {
   return parseScopedPluginName(name) !== null;
+}
+
+/**
+ * Detect if a plugin dependency uses old naming format.
+ * Returns the correct new name if migration needed, null otherwise.
+ * 
+ * Old format: @username/marketplace-name/plugin (marketplace name from marketplace.json)
+ * New format: @username/repo/plugin (always use repo name)
+ */
+export function detectOldPluginNaming(dep: { name: string; git?: string; subdirectory?: string }): string | null {
+  // Only check GitHub git sources with scoped names
+  if (!dep.git || !dep.name.startsWith('@')) {
+    return null;
+  }
+  
+  const githubInfo = extractGitHubInfo(dep.git);
+  if (!githubInfo) {
+    return null;
+  }
+  
+  const { username, repo } = githubInfo;
+  
+  // Parse the current name
+  const nameMatch = dep.name.match(/^@([^\/]+)\/(?:([^\/]+)\/)?([^\/]+)$/);
+  if (!nameMatch) {
+    return null;
+  }
+  
+  const [, nameUsername, middlePart, pluginPart] = nameMatch;
+  
+  // Check if username matches
+  if (nameUsername !== username) {
+    return null;
+  }
+  
+  // If there's a subdirectory, this should be a 3-part name
+  if (dep.subdirectory) {
+    // Expected format: @username/repo/plugin
+    const expectedName = `@${username}/${repo}/${pluginPart}`;
+    
+    // If middle part doesn't match repo name, it's old format
+    if (middlePart !== repo) {
+      return expectedName;
+    }
+  } else {
+    // No subdirectory - should be 2-part name: @username/repo
+    const expectedName = `@${username}/${repo}`;
+    
+    // If current name has 3 parts or doesn't match repo, it's old format
+    if (middlePart || nameUsername + '/' + (middlePart || pluginPart) !== username + '/' + repo) {
+      return expectedName;
+    }
+  }
+  
+  return null;
 }
