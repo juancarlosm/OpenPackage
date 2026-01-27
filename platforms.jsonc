@@ -895,12 +895,11 @@
     ]
   },
 
+  // Pi-Mono AI coding assistant framework
   "pimono": {
     "name": "Pi-Mono",
-    "rootDir": ".pi",
-    "rootFile": "AGENTS.md",
+    "detection": [".pi"],
     "aliases": ["pi-mono", "pi"],
-    "description": "Pi-Mono AI coding assistant framework",
     "export": [
       {
         "from": "commands/**/*.md",
