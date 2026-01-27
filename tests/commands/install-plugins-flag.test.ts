@@ -50,3 +50,66 @@ import { parsePluginsOption } from '../../src/commands/install.js';
 }
 
 console.log('parsePluginsOption tests passed');
+
+import { validatePluginNames } from '../../src/core/install/marketplace-handler.js';
+import type { MarketplaceManifest } from '../../src/core/install/marketplace-handler.js';
+
+// Test: validatePluginNames returns valid plugins
+{
+  const marketplace: MarketplaceManifest = {
+    name: 'test-marketplace',
+    plugins: [
+      { name: 'plugin-1', source: './plugin-1' },
+      { name: 'plugin-2', source: './plugin-2' },
+      { name: 'plugin-3', source: './plugin-3' }
+    ]
+  };
+
+  const result = validatePluginNames(marketplace, ['plugin-1', 'plugin-3']);
+  assert.deepEqual(result.valid, ['plugin-1', 'plugin-3']);
+  assert.deepEqual(result.invalid, []);
+}
+
+// Test: validatePluginNames identifies invalid plugins
+{
+  const marketplace: MarketplaceManifest = {
+    name: 'test-marketplace',
+    plugins: [
+      { name: 'plugin-1', source: './plugin-1' }
+    ]
+  };
+
+  const result = validatePluginNames(marketplace, ['plugin-1', 'nonexistent', 'also-missing']);
+  assert.deepEqual(result.valid, ['plugin-1']);
+  assert.deepEqual(result.invalid, ['nonexistent', 'also-missing']);
+}
+
+// Test: validatePluginNames handles all invalid plugins
+{
+  const marketplace: MarketplaceManifest = {
+    name: 'test-marketplace',
+    plugins: [
+      { name: 'plugin-1', source: './plugin-1' }
+    ]
+  };
+
+  const result = validatePluginNames(marketplace, ['nonexistent']);
+  assert.deepEqual(result.valid, []);
+  assert.deepEqual(result.invalid, ['nonexistent']);
+}
+
+// Test: validatePluginNames handles empty requested list
+{
+  const marketplace: MarketplaceManifest = {
+    name: 'test-marketplace',
+    plugins: [
+      { name: 'plugin-1', source: './plugin-1' }
+    ]
+  };
+
+  const result = validatePluginNames(marketplace, []);
+  assert.deepEqual(result.valid, []);
+  assert.deepEqual(result.invalid, []);
+}
+
+console.log('validatePluginNames tests passed');
