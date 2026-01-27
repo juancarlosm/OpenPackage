@@ -76,6 +76,40 @@ describe('resolveTargetFromGlob with prefix', () => {
       );
       assert.equal(result, '/workspace/.cursor/my-plugin-config.json');
     });
+
+    it('should extract plugin name from qualified marketplace package name', () => {
+      // Marketplace plugins have names like @scope/marketplace/plugin-name
+      const marketplaceContext: FlowContext = {
+        ...baseContext,
+        packageName: '@wshobson/claude-code-workflows/git-pr-workflows',
+        variables: { ...baseContext.variables, withPrefix: true }
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/git-pr-workflows/code-reviewer.md',
+        'code-reviewer.md',
+        '.opencode/agents/code-reviewer.md',
+        marketplaceContext
+      );
+      // Should use only "git-pr-workflows" as prefix, not the full qualified name
+      assert.equal(result, '/workspace/.opencode/agents/git-pr-workflows-code-reviewer.md');
+    });
+
+    it('should extract plugin name from scoped package name', () => {
+      // Scoped packages have names like @scope/package-name
+      const scopedContext: FlowContext = {
+        ...baseContext,
+        packageName: '@acme/my-tools',
+        variables: { ...baseContext.variables, withPrefix: true }
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/my-tools/helper.md',
+        'helper.md',
+        '.cursor/agents/helper.md',
+        scopedContext
+      );
+      // Should use only "my-tools" as prefix
+      assert.equal(result, '/workspace/.cursor/agents/my-tools-helper.md');
+    });
   });
 
   describe('root files should not be prefixed', () => {

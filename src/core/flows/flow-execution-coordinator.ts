@@ -317,6 +317,18 @@ function isRootFile(toPattern: string): boolean {
 }
 
 /**
+ * Extract the simple plugin name from a potentially qualified package name.
+ * @example "@wshobson/claude-code-workflows/git-pr-workflows" -> "git-pr-workflows"
+ * @example "@scope/package-name" -> "package-name"
+ * @example "simple-name" -> "simple-name"
+ */
+function extractPluginName(packageName: string): string {
+  // Get the last segment after any '/'
+  const parts = packageName.split('/');
+  return parts[parts.length - 1];
+}
+
+/**
  * Apply package name prefix to filename if withPrefix is enabled
  */
 function applyPrefixToFilename(
@@ -326,9 +338,10 @@ function applyPrefixToFilename(
 ): string {
   if (!withPrefix) return filename;
 
+  const pluginName = extractPluginName(packageName);
   const ext = extname(filename);
   const base = basename(filename, ext);
-  return `${packageName}-${base}${ext}`;
+  return `${pluginName}-${base}${ext}`;
 }
 
 /**
