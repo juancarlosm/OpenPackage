@@ -80,7 +80,9 @@ export abstract class BaseStrategy implements InstallationStrategy {
         source: originalSource,  // Original source format (from conversion context)
         sourcePlatform: originalSource,  // Explicit source platform
         // Path variable for conditional installation behavior
-        targetRoot: context.workspaceRoot
+        targetRoot: context.workspaceRoot,
+        // Prefix mode for filename collision prevention
+        withPrefix: context.withPrefix ?? false
       },
       dryRun: context.dryRun
     };

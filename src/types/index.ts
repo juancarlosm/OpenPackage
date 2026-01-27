@@ -160,6 +160,11 @@ export interface InstallOptions {
    * Comma-separated or array of plugin names.
    */
   plugins?: string[];
+  /**
+   * Prepend plugin name to all installed files to prevent filename collisions.
+   * When true, files are installed as `{pluginName}-{filename}` instead of `{filename}`.
+   */
+  withPrefix?: boolean;
 }
 
 export interface UninstallOptions {

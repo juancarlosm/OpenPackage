@@ -302,9 +302,39 @@ async function processSourceFile(
 }
 
 /**
+ * Check if target is a root file that should not be prefixed
+ * Root files use composite merge and have their own package markers
+ */
+function isRootFile(toPattern: string): boolean {
+  // Root files are directly in workspace root (no path separator or only at start)
+  const dir = dirname(toPattern);
+  if (dir !== '.' && dir !== '') return false;
+
+  // Root files are uppercase composite files
+  const filename = basename(toPattern);
+  const rootFilePatterns = ['AGENTS.md', 'CLAUDE.md', 'RULES.md', 'README.md'];
+  return rootFilePatterns.some(p => filename.toUpperCase() === p.toUpperCase());
+}
+
+/**
+ * Apply package name prefix to filename if withPrefix is enabled
+ */
+function applyPrefixToFilename(
+  filename: string,
+  packageName: string,
+  withPrefix: boolean
+): string {
+  if (!withPrefix) return filename;
+
+  const ext = extname(filename);
+  const base = basename(filename, ext);
+  return `${packageName}-${base}${ext}`;
+}
+
+/**
  * Resolve target path from glob patterns
  * Strips platform suffixes from filenames (e.g. read-specs.claude.md -> read-specs.md)
- * 
+ *
  * @param sourceAbsPath - Absolute source path
  * @param fromPattern - Source pattern from flow
  * @param toPattern - Target pattern from flow
@@ -328,6 +358,19 @@ export function resolveTargetFromGlob(
         fromPattern,
         toPattern
       );
+
+      // Apply prefix if enabled - extract filename, apply prefix, reconstruct
+      const withPrefix = context.variables?.withPrefix ?? false;
+      if (withPrefix) {
+        const dir = dirname(targetRel);
+        const filename = basename(targetRel);
+        const prefixedFilename = applyPrefixToFilename(
+          filename,
+          context.packageName,
+          true
+        );
+        return join(context.workspaceRoot, dir, prefixedFilename);
+      }
       return join(context.workspaceRoot, targetRel);
     }
     
@@ -344,11 +387,35 @@ export function resolveTargetFromGlob(
     
     // Strip platform suffix from the final target filename
     const strippedTargetFileName = stripPlatformSuffixFromFilename(targetFileName);
-    
-    return join(context.workspaceRoot, toPrefix + strippedTargetFileName);
+
+    // Apply prefix if enabled
+    const withPrefix = context.variables?.withPrefix ?? false;
+    const finalFileName = applyPrefixToFilename(
+      strippedTargetFileName,
+      context.packageName,
+      withPrefix
+    );
+
+    return join(context.workspaceRoot, toPrefix + finalFileName);
   }
-  
-  // No glob in target - use as-is
+
+  // Skip prefix for root files (they use composite merge)
+  if (isRootFile(toPattern)) {
+    return join(context.workspaceRoot, toPattern);
+  }
+
+  // No glob in target - apply prefix to filename if enabled
+  const withPrefix = context.variables?.withPrefix ?? false;
+  if (withPrefix) {
+    const dir = dirname(toPattern);
+    const filename = basename(toPattern);
+    const prefixedFilename = applyPrefixToFilename(
+      filename,
+      context.packageName,
+      true
+    );
+    return join(context.workspaceRoot, dir, prefixedFilename);
+  }
   return join(context.workspaceRoot, toPattern);
 }
 

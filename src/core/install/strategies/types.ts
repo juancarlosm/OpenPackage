@@ -21,6 +21,8 @@ export interface FlowInstallContext {
   packageVersion: string;
   priority: number;
   dryRun: boolean;
+  /** Prepend plugin name to installed file names */
+  withPrefix?: boolean;
   packageFormat?: PackageFormat;
   
   /**

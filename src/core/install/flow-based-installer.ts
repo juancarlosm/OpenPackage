@@ -190,6 +190,7 @@ export async function installPackagesWithFlows(
       packageVersion: pkg.packageVersion,
       priority: pkg.priority,
       dryRun,
+      withPrefix: options?.withPrefix ?? false,
       packageFormat: format,
       conversionContext
     };
