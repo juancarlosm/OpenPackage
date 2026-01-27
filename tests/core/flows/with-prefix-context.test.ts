@@ -35,4 +35,40 @@ describe('FlowContext withPrefix variable', () => {
 
     assert.equal(context.variables.withPrefix, undefined);
   });
+
+  it('should accept prefixSeparator in variables', () => {
+    const context: FlowContext = {
+      workspaceRoot: '/workspace',
+      packageRoot: '/packages/test',
+      platform: 'cursor',
+      packageName: 'test-plugin',
+      variables: {
+        name: 'test-plugin',
+        withPrefix: true,
+        prefixSeparator: '::'
+      },
+      direction: 'install',
+      dryRun: false
+    };
+
+    assert.equal(context.variables.prefixSeparator, '::');
+  });
+
+  it('should default prefixSeparator to undefined when not specified', () => {
+    const context: FlowContext = {
+      workspaceRoot: '/workspace',
+      packageRoot: '/packages/test',
+      platform: 'cursor',
+      packageName: 'test-plugin',
+      variables: {
+        name: 'test-plugin',
+        withPrefix: true
+      },
+      direction: 'install',
+      dryRun: false
+    };
+
+    // Default separator is applied in resolveTargetFromGlob, not in context
+    assert.equal(context.variables.prefixSeparator, undefined);
+  });
 });

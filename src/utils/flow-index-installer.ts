@@ -196,6 +196,7 @@ export async function installPackageByIndexWithFlows(
       priority: 0, // Priority is calculated from dependency graph during multi-package installs
       dryRun: options.dryRun ?? false,
       withPrefix: options.withPrefix ?? false,
+      prefixSeparator: options.prefixSeparator ?? '-',
       packageFormat: format,
       conversionContext
     };

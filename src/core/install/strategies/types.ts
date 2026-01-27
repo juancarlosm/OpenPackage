@@ -23,6 +23,8 @@ export interface FlowInstallContext {
   dryRun: boolean;
   /** Prepend plugin name to installed file names */
   withPrefix?: boolean;
+  /** Separator for prefix (default: "-") */
+  prefixSeparator?: string;
   packageFormat?: PackageFormat;
   
   /**

@@ -162,9 +162,15 @@ export interface InstallOptions {
   plugins?: string[];
   /**
    * Prepend plugin name to all installed files to prevent filename collisions.
-   * When true, files are installed as `{pluginName}-{filename}` instead of `{filename}`.
+   * Files are installed as `{pluginName}{separator}{filename}`.
    */
   withPrefix?: boolean;
+  /**
+   * Separator to use when withPrefix is enabled.
+   * Default: "-" (e.g., my-plugin-agents.md)
+   * Examples: "::", "@", "_"
+   */
+  prefixSeparator?: string;
 }
 
 export interface UninstallOptions {

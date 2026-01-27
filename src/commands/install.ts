@@ -303,6 +303,7 @@ export function setupInstallCommand(program: Command): void {
     .option('--api-key <key>', 'API key for authentication (overrides profile)')
     .option('-p, --plugins <names>', 'install specific plugins from marketplace (comma-separated, bypasses interactive selection)')
     .option('--with-prefix', 'prepend plugin name to installed files (e.g., my-plugin-agents.md)')
+    .option('--prefix <separator>', 'separator for --with-prefix (default: "-", e.g., --prefix "::" or --prefix "@")')
     .action(withErrorHandling(async (packageName: string | undefined, options: InstallOptions) => {
       // Normalize platforms
       options.platforms = normalizePlatforms(options.platforms);

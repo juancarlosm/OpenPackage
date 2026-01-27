@@ -201,4 +201,77 @@ describe('resolveTargetFromGlob with prefix', () => {
       assert.equal(result, '/workspace/.opencode/commands/my-plugin-run.md');
     });
   });
+
+  describe('custom prefix separator', () => {
+    it('should use custom separator for direct paths', () => {
+      const customSepContext: FlowContext = {
+        ...baseContext,
+        variables: { ...baseContext.variables, withPrefix: true, prefixSeparator: '::' }
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/agents.md',
+        'agents.md',
+        '.cursor/agents/agents.md',
+        customSepContext
+      );
+      assert.equal(result, '/workspace/.cursor/agents/my-plugin::agents.md');
+    });
+
+    it('should use custom separator for glob patterns', () => {
+      const customSepContext: FlowContext = {
+        ...baseContext,
+        variables: { ...baseContext.variables, withPrefix: true, prefixSeparator: '@' }
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/rules/style.md',
+        'rules/*.md',
+        '.cursor/rules/*.md',
+        customSepContext
+      );
+      assert.equal(result, '/workspace/.cursor/rules/my-plugin@style.md');
+    });
+
+    it('should use custom separator for recursive glob patterns', () => {
+      const customSepContext: FlowContext = {
+        ...baseContext,
+        variables: { ...baseContext.variables, withPrefix: true, prefixSeparator: '__' }
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/commands/utils/helper.md',
+        'commands/**/*.md',
+        '.cursor/commands/**/*.md',
+        customSepContext
+      );
+      assert.ok(result.endsWith('my-plugin__helper.md'));
+    });
+
+    it('should use custom separator for skills directory prefix', () => {
+      const customSepContext: FlowContext = {
+        ...baseContext,
+        variables: { ...baseContext.variables, withPrefix: true, prefixSeparator: '::' }
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/skills/debugging/SKILL.md',
+        'skills/**/*',
+        '.opencode/skills/**/*',
+        customSepContext
+      );
+      assert.equal(result, '/workspace/.opencode/skills/my-plugin::debugging/SKILL.md');
+    });
+
+    it('should default to hyphen separator when not specified', () => {
+      const prefixContext: FlowContext = {
+        ...baseContext,
+        variables: { ...baseContext.variables, withPrefix: true }
+        // No prefixSeparator specified
+      };
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/agents.md',
+        'agents.md',
+        '.cursor/agents/agents.md',
+        prefixContext
+      );
+      assert.equal(result, '/workspace/.cursor/agents/my-plugin-agents.md');
+    });
+  });
 });

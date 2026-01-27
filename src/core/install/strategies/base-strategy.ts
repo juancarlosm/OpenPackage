@@ -82,7 +82,8 @@ export abstract class BaseStrategy implements InstallationStrategy {
         // Path variable for conditional installation behavior
         targetRoot: context.workspaceRoot,
         // Prefix mode for filename collision prevention
-        withPrefix: context.withPrefix ?? false
+        withPrefix: context.withPrefix ?? false,
+        prefixSeparator: context.prefixSeparator ?? '-'
       },
       dryRun: context.dryRun
     };

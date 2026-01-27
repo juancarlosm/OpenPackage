@@ -191,6 +191,7 @@ export async function installPackagesWithFlows(
       priority: pkg.priority,
       dryRun,
       withPrefix: options?.withPrefix ?? false,
+      prefixSeparator: options?.prefixSeparator ?? '-',
       packageFormat: format,
       conversionContext
     };

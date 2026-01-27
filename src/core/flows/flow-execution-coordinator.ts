@@ -334,14 +334,15 @@ function extractPluginName(packageName: string): string {
 function applyPrefixToFilename(
   filename: string,
   packageName: string,
-  withPrefix: boolean
+  withPrefix: boolean,
+  separator: string = '-'
 ): string {
   if (!withPrefix) return filename;
 
   const pluginName = extractPluginName(packageName);
   const ext = extname(filename);
   const base = basename(filename, ext);
-  return `${pluginName}-${base}${ext}`;
+  return `${pluginName}${separator}${base}${ext}`;
 }
 
 /**
@@ -359,12 +360,13 @@ function isSkillsPath(targetPath: string): boolean {
 
 /**
  * Apply prefix to the skill directory name instead of the filename.
- * @example (".opencode/skills/debugging/SKILL.md", "superpowers")
+ * @example (".opencode/skills/debugging/SKILL.md", "superpowers", "-")
  *       -> ".opencode/skills/superpowers-debugging/SKILL.md"
  */
 function applyPrefixToSkillDirectory(
   targetPath: string,
-  packageName: string
+  packageName: string,
+  separator: string = '-'
 ): string {
   const pluginName = extractPluginName(packageName);
   const parts = targetPath.split('/');
@@ -372,7 +374,7 @@ function applyPrefixToSkillDirectory(
 
   if (skillsIndex >= 0 && parts.length > skillsIndex + 1) {
     // Prefix the skill directory name (the part right after "skills/")
-    parts[skillsIndex + 1] = `${pluginName}-${parts[skillsIndex + 1]}`;
+    parts[skillsIndex + 1] = `${pluginName}${separator}${parts[skillsIndex + 1]}`;
   }
 
   return parts.join('/');
@@ -408,10 +410,11 @@ export function resolveTargetFromGlob(
 
       // Apply prefix if enabled
       const withPrefix = context.variables?.withPrefix ?? false;
+      const separator = context.variables?.prefixSeparator ?? '-';
       if (withPrefix) {
         // For skills directories, prefix the skill folder name instead of the filename
         if (isSkillsPath(targetRel)) {
-          const prefixedPath = applyPrefixToSkillDirectory(targetRel, context.packageName);
+          const prefixedPath = applyPrefixToSkillDirectory(targetRel, context.packageName, separator);
           return join(context.workspaceRoot, prefixedPath);
         }
         // For other paths, prefix the filename
@@ -420,7 +423,8 @@ export function resolveTargetFromGlob(
         const prefixedFilename = applyPrefixToFilename(
           filename,
           context.packageName,
-          true
+          true,
+          separator
         );
         return join(context.workspaceRoot, dir, prefixedFilename);
       }
@@ -443,10 +447,12 @@ export function resolveTargetFromGlob(
 
     // Apply prefix if enabled
     const withPrefix = context.variables?.withPrefix ?? false;
+    const separator = context.variables?.prefixSeparator ?? '-';
     const finalFileName = applyPrefixToFilename(
       strippedTargetFileName,
       context.packageName,
-      withPrefix
+      withPrefix,
+      separator
     );
 
     return join(context.workspaceRoot, toPrefix + finalFileName);
@@ -459,13 +465,15 @@ export function resolveTargetFromGlob(
 
   // No glob in target - apply prefix to filename if enabled
   const withPrefix = context.variables?.withPrefix ?? false;
+  const separator = context.variables?.prefixSeparator ?? '-';
   if (withPrefix) {
     const dir = dirname(toPattern);
     const filename = basename(toPattern);
     const prefixedFilename = applyPrefixToFilename(
       filename,
       context.packageName,
-      true
+      true,
+      separator
     );
     return join(context.workspaceRoot, dir, prefixedFilename);
   }
