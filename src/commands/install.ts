@@ -44,20 +44,22 @@ export function validateResolutionFlags(options: InstallOptions & { local?: bool
 
 /**
  * Parse --plugins option value into an array of plugin names.
- * Handles comma-separated values and trims whitespace.
+ * Handles comma-separated values, trims whitespace, and deduplicates.
  *
  * @param value - Raw option value (comma-separated string or undefined)
- * @returns Array of plugin names, or undefined if empty/not provided
+ * @returns Array of unique plugin names, or undefined if empty/not provided
  */
 export function parsePluginsOption(value: string | undefined): string[] | undefined {
   if (!value || value.trim() === '') {
     return undefined;
   }
 
-  const plugins = value
-    .split(',')
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
+  const plugins = [...new Set(
+    value
+      .split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+  )];
 
   return plugins.length > 0 ? plugins : undefined;
 }

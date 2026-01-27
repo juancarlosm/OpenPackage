@@ -49,6 +49,12 @@ import { parsePluginsOption } from '../../src/commands/install.js';
   assert.equal(result, undefined);
 }
 
+// Test: parsePluginsOption deduplicates plugin names
+{
+  const result = parsePluginsOption('plugin-a,plugin-b,plugin-a,plugin-c,plugin-b');
+  assert.deepEqual(result, ['plugin-a', 'plugin-b', 'plugin-c']);
+}
+
 console.log('parsePluginsOption tests passed');
 
 import { validatePluginNames } from '../../src/core/install/marketplace-handler.js';
