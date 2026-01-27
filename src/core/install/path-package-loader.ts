@@ -11,6 +11,7 @@ import { FILE_PATTERNS, PACKAGE_PATHS, CLAUDE_PLUGIN_PATHS } from '../../constan
 import { detectPluginType, detectPluginWithMarketplace } from './plugin-detector.js';
 import { transformPluginToPackage } from './plugin-transformer.js';
 import type { MarketplacePluginEntry } from './marketplace-handler.js';
+import { generateGitHubPackageName } from '../../utils/plugin-naming.js';
 import * as yaml from 'js-yaml';
 
 export type PathSourceType = 'directory' | 'tarball';
@@ -72,6 +73,29 @@ export async function loadPackageFromDirectory(
       `Directory '${dirPath}' is not a valid OpenPackage directory or Claude Code plugin. ` +
       `Missing ${FILE_PATTERNS.OPENPACKAGE_YML} or ${CLAUDE_PLUGIN_PATHS.PLUGIN_MANIFEST}`
     );
+  }
+
+  // Apply GitHub scoping for packages from GitHub sources
+  // This ensures consistent naming: gh@username/repo or gh@username/repo/path
+  if (context?.gitUrl) {
+    const originalName = config.name;
+    const scopedName = generateGitHubPackageName({
+      gitUrl: context.gitUrl,
+      path: context.path,
+      packageName: originalName,  // Pass original name for non-GitHub sources
+      repoPath: context.repoPath
+    });
+    
+    // Only override if GitHub scoping was applied (name changed)
+    if (scopedName !== originalName) {
+      config.name = scopedName;
+      logger.debug('Applied GitHub scoping to OpenPackage repo', {
+        original: originalName,
+        scoped: scopedName,
+        gitUrl: context.gitUrl,
+        path: context.path
+      });
+    }
   }
 
   // Discover all files in the directory

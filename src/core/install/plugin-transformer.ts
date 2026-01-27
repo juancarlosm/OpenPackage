@@ -6,7 +6,7 @@ import { isJunk } from 'junk';
 import type { Package, PackageFile, PackageYml, PackageWithContext } from '../../types/index.js';
 import { detectPackageFormat } from './format-detector.js';
 import { DIR_PATTERNS } from '../../constants/index.js';
-import { generatePluginName } from '../../utils/plugin-naming.js';
+import { generateGitHubPackageName } from '../../utils/plugin-naming.js';
 import { createPlatformContext } from '../conversion-context/index.js';
 import { resolvePluginMetadata, type ClaudePluginManifest } from './plugin-metadata-resolver.js';
 import type { MarketplacePluginEntry } from './marketplace-handler.js';
@@ -87,10 +87,10 @@ export async function transformPluginToPackage(
   
   // Generate scoped name using consistent naming logic
   // Always generate the name (no override) to ensure consistency
-  const packageName = generatePluginName({
+  const packageName = generateGitHubPackageName({
     gitUrl: context?.gitUrl,
     path: context?.path,
-    pluginManifestName: pluginManifest.name,
+    packageName: pluginManifest.name,
     repoPath: context?.repoPath
   });
   

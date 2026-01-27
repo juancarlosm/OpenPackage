@@ -3,75 +3,94 @@ import { extractGitHubInfo } from './git-url-parser.js';
 import { logger } from './logger.js';
 
 /**
- * Context for generating scoped plugin names.
+ * Context for generating scoped package names from GitHub sources.
+ * Used for both Claude plugins and OpenPackage repositories.
  */
-export interface PluginNamingContext {
+export interface GitHubPackageNamingContext {
   gitUrl?: string;              // Git URL (for extracting GitHub info)
-  path?: string;                // Path within repo
-  pluginManifestName?: string;  // Name from plugin.json (may be undefined)
+  path?: string;                // Path within repo (subdirectory)
+  packageName?: string;         // Name from manifest (plugin.json or openpackage.yml)
   repoPath?: string;            // Path to repository root (for fallback)
 }
 
 /**
- * Generate a scoped name for a Claude Code plugin.
+ * Generate a scoped name for any GitHub-sourced package.
+ * 
+ * Works for:
+ * - Claude Code plugins
+ * - OpenPackage repositories
+ * - Marketplace plugins
  * 
  * Format:
  * - GitHub repo with path: gh@username/repo/path
- * - GitHub repo (plugin is the repo): gh@username/repo
- * - Non-GitHub or local: plugin-name (no scoping)
+ * - GitHub repo (package is the repo): gh@username/repo
+ * - Non-GitHub or local: use packageName as-is (no scoping)
  * 
  * Fallback behavior:
- * - If pluginManifestName is undefined → use path name or repo name
+ * - If packageName is undefined → use path basename or repo name
  */
-export function generatePluginName(
-  context: PluginNamingContext
+export function generateGitHubPackageName(
+  context: GitHubPackageNamingContext
 ): string {
   const {
     gitUrl,
     path,
-    pluginManifestName,
+    packageName,
     repoPath
   } = context;
   
-  // If no Git URL, use plugin manifest name or fallback
+  // If no Git URL, use package name or fallback
   if (!gitUrl) {
-    const generated =
-      pluginManifestName || (path ? basename(path) : 'unnamed-plugin');
-    return generated;
+    return packageName || (path ? basename(path) : 'unnamed-package');
   }
   
   // Try to extract GitHub info
   const githubInfo = extractGitHubInfo(gitUrl);
   
-  // If not GitHub, use plugin manifest name
+  // If not GitHub, use package name as-is
   if (!githubInfo) {
-    logger.debug('Non-GitHub URL, using plugin manifest name', { gitUrl });
-    const generated =
-      pluginManifestName || (path ? basename(path) : 'unnamed-plugin');
-    return generated;
+    logger.debug('Non-GitHub URL, using package name as-is', { gitUrl });
+    return packageName || (path ? basename(path) : 'unnamed-package');
   }
   
-  // GitHub URL - generate scoped name using repo name
+  // GitHub URL - generate scoped name
   const { username, repo } = githubInfo;
   
-  // Determine if this is a marketplace plugin (has path)
-  const isMarketplacePlugin = Boolean(path);
-  
-  if (isMarketplacePlugin) {
+  // If there's a subdirectory path, include it for uniqueness
+  if (path) {
     // Use the full path for maximum clarity and unambiguity
     // Example: plugins/feature-dev -> gh@username/repo/plugins/feature-dev
-    const pluginPath = path!.toLowerCase();
-    const generated = `gh@${username}/${repo}/${pluginPath}`;
-    return generated;
+    const normalizedPath = path.toLowerCase();
+    return `gh@${username}/${repo}/${normalizedPath}`;
   } else {
-    // Format: gh@username/repo
-    const generated = `gh@${username}/${repo}`;
-    return generated;
+    // Root of repo: gh@username/repo
+    return `gh@${username}/${repo}`;
   }
 }
 
 /**
+ * DEPRECATED: Use generateGitHubPackageName instead.
+ * Kept for backward compatibility with plugin-specific code.
+ * 
+ * @deprecated
+ */
+export function generatePluginName(
+  context: GitHubPackageNamingContext
+): string {
+  return generateGitHubPackageName(context);
+}
+
+/**
+ * DEPRECATED: Use GitHubPackageNamingContext instead.
+ * Kept for backward compatibility.
+ * 
+ * @deprecated
+ */
+export type PluginNamingContext = GitHubPackageNamingContext;
+
+/**
  * Generate a scoped name for a marketplace.
+ * Uses the unified GitHub package naming system.
  * 
  * Format:
  * - GitHub: gh@username/repo
@@ -82,25 +101,12 @@ export function generateMarketplaceName(
   marketplaceManifestName?: string,
   repoPath?: string
 ): string {
-  // If no Git URL, use marketplace manifest name or fallback
-  if (!gitUrl) {
-    return marketplaceManifestName || 
-           (repoPath ? basename(repoPath) : 'unnamed-marketplace');
-  }
-  
-  // Try to extract GitHub info
-  const githubInfo = extractGitHubInfo(gitUrl);
-  
-  // If not GitHub, use marketplace manifest name
-  if (!githubInfo) {
-    return marketplaceManifestName || 
-           (repoPath ? basename(repoPath) : 'unnamed-marketplace');
-  }
-  
-  // GitHub URL - generate scoped name using repo name
-  const { username, repo } = githubInfo;
-  
-  return `gh@${username}/${repo}`;
+  // Reuse the unified naming function for consistency
+  return generateGitHubPackageName({
+    gitUrl,
+    packageName: marketplaceManifestName,
+    repoPath
+  });
 }
 
 /**
