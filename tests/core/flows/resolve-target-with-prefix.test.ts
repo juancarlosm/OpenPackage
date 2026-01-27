@@ -150,4 +150,55 @@ describe('resolveTargetFromGlob with prefix', () => {
       assert.equal(result, '/workspace/.cursor/my-plugin-agents.md');
     });
   });
+
+  describe('skills directories should prefix folder name, not filename', () => {
+    const prefixContext: FlowContext = {
+      ...baseContext,
+      variables: { ...baseContext.variables, withPrefix: true }
+    };
+
+    it('should prefix skill directory name for SKILL.md', () => {
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/skills/debugging/SKILL.md',
+        'skills/**/*',
+        '.opencode/skills/**/*',
+        prefixContext
+      );
+      // Prefix should be on directory, not filename
+      assert.equal(result, '/workspace/.opencode/skills/my-plugin-debugging/SKILL.md');
+    });
+
+    it('should prefix skill directory name for other files in skill folder', () => {
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/skills/debugging/helper.md',
+        'skills/**/*',
+        '.opencode/skills/**/*',
+        prefixContext
+      );
+      assert.equal(result, '/workspace/.opencode/skills/my-plugin-debugging/helper.md');
+    });
+
+    it('should prefix skill directory for deeply nested skill files', () => {
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/skills/writing/examples/test.md',
+        'skills/**/*',
+        '.opencode/skills/**/*',
+        prefixContext
+      );
+      // Only the first directory after "skills/" gets prefixed
+      assert.equal(result, '/workspace/.opencode/skills/my-plugin-writing/examples/test.md');
+    });
+
+    it('should NOT prefix when path has no skill subdirectory', () => {
+      // Edge case: file directly in skills/ (shouldn't happen but handle gracefully)
+      const result = resolveTargetFromGlob(
+        '/packages/my-plugin/commands/run.md',
+        'commands/**/*',
+        '.opencode/commands/**/*',
+        prefixContext
+      );
+      // Not a skills path, so filename gets prefixed
+      assert.equal(result, '/workspace/.opencode/commands/my-plugin-run.md');
+    });
+  });
 });

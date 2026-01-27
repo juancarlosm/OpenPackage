@@ -345,6 +345,40 @@ function applyPrefixToFilename(
 }
 
 /**
+ * Check if a path is within a skills directory structure.
+ * Skills have structure: {base}/skills/{skill-name}/{files}
+ * @example ".opencode/skills/debugging/SKILL.md" -> true
+ * @example ".opencode/commands/run.md" -> false
+ */
+function isSkillsPath(targetPath: string): boolean {
+  const parts = targetPath.split('/');
+  const skillsIndex = parts.findIndex(p => p === 'skills');
+  // Must have "skills" followed by at least 2 more parts (skill-name and file)
+  return skillsIndex >= 0 && parts.length > skillsIndex + 2;
+}
+
+/**
+ * Apply prefix to the skill directory name instead of the filename.
+ * @example (".opencode/skills/debugging/SKILL.md", "superpowers")
+ *       -> ".opencode/skills/superpowers-debugging/SKILL.md"
+ */
+function applyPrefixToSkillDirectory(
+  targetPath: string,
+  packageName: string
+): string {
+  const pluginName = extractPluginName(packageName);
+  const parts = targetPath.split('/');
+  const skillsIndex = parts.findIndex(p => p === 'skills');
+
+  if (skillsIndex >= 0 && parts.length > skillsIndex + 1) {
+    // Prefix the skill directory name (the part right after "skills/")
+    parts[skillsIndex + 1] = `${pluginName}-${parts[skillsIndex + 1]}`;
+  }
+
+  return parts.join('/');
+}
+
+/**
  * Resolve target path from glob patterns
  * Strips platform suffixes from filenames (e.g. read-specs.claude.md -> read-specs.md)
  *
@@ -372,9 +406,15 @@ export function resolveTargetFromGlob(
         toPattern
       );
 
-      // Apply prefix if enabled - extract filename, apply prefix, reconstruct
+      // Apply prefix if enabled
       const withPrefix = context.variables?.withPrefix ?? false;
       if (withPrefix) {
+        // For skills directories, prefix the skill folder name instead of the filename
+        if (isSkillsPath(targetRel)) {
+          const prefixedPath = applyPrefixToSkillDirectory(targetRel, context.packageName);
+          return join(context.workspaceRoot, prefixedPath);
+        }
+        // For other paths, prefix the filename
         const dir = dirname(targetRel);
         const filename = basename(targetRel);
         const prefixedFilename = applyPrefixToFilename(
