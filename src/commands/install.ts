@@ -328,6 +328,11 @@ export function setupInstallCommand(program: Command): void {
       // Parse plugins option
       options.plugins = parsePluginsOption((options as any).plugins);
 
+      // Normalize prefix option (commander stores --prefix as options.prefix)
+      if ((options as any).prefix !== undefined) {
+        options.prefixSeparator = (options as any).prefix;
+      }
+
       // Execute install
       const result = await installCommand(packageName, options);
       
