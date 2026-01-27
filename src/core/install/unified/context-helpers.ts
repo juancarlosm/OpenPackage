@@ -79,7 +79,7 @@ export function getSourceDisplayName(ctx: InstallationContext): string {
     
     case 'git':
       const ref = source.gitRef ? `#${source.gitRef}` : '';
-      const subdir = source.gitSubdirectory ? `&subdirectory=${source.gitSubdirectory}` : '';
+      const subdir = source.gitPath ? `&path=${source.gitPath}` : '';
       return `${source.packageName} (git:${source.gitUrl}${ref}${subdir})`;
     
     case 'workspace':

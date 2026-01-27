@@ -51,7 +51,7 @@ export function clearPluginCache(): void {
  */
 export interface PluginTransformContext {
   gitUrl?: string;
-  subdirectory?: string;
+  path?: string;
   repoPath?: string;
   marketplaceEntry?: MarketplacePluginEntry;
 }
@@ -89,7 +89,7 @@ export async function transformPluginToPackage(
   // Always generate the name (no override) to ensure consistency
   const packageName = generatePluginName({
     gitUrl: context?.gitUrl,
-    subdirectory: context?.subdirectory,
+    path: context?.path,
     pluginManifestName: pluginManifest.name,
     repoPath: context?.repoPath
   });
@@ -98,7 +98,7 @@ export async function transformPluginToPackage(
     original: pluginManifest.name, 
     scoped: packageName,
     hasGitContext: !!context?.gitUrl,
-    hasSubdirectory: !!context?.subdirectory
+    hasPath: !!context?.path
   });
   
   // Transform to OpenPackage metadata

@@ -26,7 +26,7 @@ export interface PackageSource {
   // Git source fields
   gitUrl?: string;
   gitRef?: string;
-  gitSubdirectory?: string;
+  gitPath?: string;
   
   // Git source override for manifest recording
   // Used when physical source is path-based but logical source is git
@@ -34,7 +34,7 @@ export interface PackageSource {
   gitSourceOverride?: {
     gitUrl: string;
     gitRef?: string;
-    gitSubdirectory?: string;
+    gitPath?: string;
   };
   
   // Resolved content root (populated after loading)

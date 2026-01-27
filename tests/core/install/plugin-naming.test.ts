@@ -10,17 +10,17 @@ import {
 
 describe('Plugin Naming', () => {
   describe('generatePluginName', () => {
-    it('should generate scoped name for GitHub plugin with subdirectory', () => {
+    it('should generate scoped name for GitHub plugin with path', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/anthropics/claude-code.git',
-        subdirectory: 'plugins/commit-commands',
+        path: 'plugins/commit-commands',
         pluginManifestName: 'commit-commands'
       });
       
-      assert.strictEqual(name, 'gh@anthropics/claude-code/p/commit-commands');
+      assert.strictEqual(name, 'gh@anthropics/claude-code/commit-commands');
     });
     
-    it('should generate scoped name for GitHub plugin without subdirectory', () => {
+    it('should generate scoped name for GitHub plugin without path', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/anthropics/my-plugin.git',
         pluginManifestName: 'my-plugin'
@@ -46,34 +46,34 @@ describe('Plugin Naming', () => {
       assert.strictEqual(name, 'gh@user/awesome-plugin');
     });
     
-    it('should use subdirectory basename as fallback when plugin manifest name is undefined', () => {
+    it('should use path basename as fallback when plugin manifest name is undefined', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/user/repo-name.git',
-        subdirectory: 'plugins/cool-plugin',
+        path: 'plugins/cool-plugin',
         pluginManifestName: undefined
       });
       
-      assert.strictEqual(name, 'gh@user/repo-name/p/cool-plugin');
+      assert.strictEqual(name, 'gh@user/repo-name/cool-plugin');
     });
     
     it('should always use repo name for marketplace plugins', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/user/actual-repo.git',
-        subdirectory: 'plugins/plugin-a',
+        path: 'plugins/plugin-a',
         pluginManifestName: 'plugin-a'
       });
       
-      assert.strictEqual(name, 'gh@user/actual-repo/p/plugin-a');
+      assert.strictEqual(name, 'gh@user/actual-repo/plugin-a');
     });
     
     it('should use repo name even when marketplace has different name', () => {
       const name = generatePluginName({
         gitUrl: 'https://github.com/anthropics/claude-code-plugins.git',
-        subdirectory: 'packages/my-plugin',
+        path: 'packages/my-plugin',
         pluginManifestName: 'my-plugin'
       });
       
-      assert.strictEqual(name, 'gh@anthropics/claude-code-plugins/p/my-plugin');
+      assert.strictEqual(name, 'gh@anthropics/claude-code-plugins/my-plugin');
     });
     
     it('should return plain name for non-GitHub URLs', () => {
@@ -93,9 +93,9 @@ describe('Plugin Naming', () => {
       assert.strictEqual(name, 'local-plugin');
     });
     
-    it('should use subdirectory basename for local paths when manifest name is undefined', () => {
+    it('should use path basename for local paths when manifest name is undefined', () => {
       const name = generatePluginName({
-        subdirectory: 'path/to/my-plugin',
+        path: 'path/to/my-plugin',
         pluginManifestName: undefined
       });
       
@@ -151,8 +151,8 @@ describe('Plugin Naming', () => {
   });
   
   describe('parseScopedPluginName', () => {
-    it('should parse plugin name with /p/ infix (new format)', () => {
-      const parsed = parseScopedPluginName('gh@anthropics/claude-code/p/commit-commands');
+    it('should parse plugin name with path (new format)', () => {
+      const parsed = parseScopedPluginName('gh@anthropics/claude-code/commit-commands');
       
       assert.ok(parsed);
       assert.strictEqual(parsed.username, 'anthropics');
@@ -207,7 +207,7 @@ describe('Plugin Naming', () => {
   describe('isScopedPluginName', () => {
     it('should return true for new GitHub format', () => {
       assert.strictEqual(isScopedPluginName('gh@user/repo'), true);
-      assert.strictEqual(isScopedPluginName('gh@user/repo/p/plugin'), true);
+      assert.strictEqual(isScopedPluginName('gh@user/repo/plugin'), true);
     });
     
     it('should return true for old scoped format', () => {
@@ -231,14 +231,14 @@ describe('Plugin Naming', () => {
       assert.strictEqual(newName, 'gh@anthropics/claude-code');
     });
     
-    it('should detect old plugin format and add /p/ infix', () => {
+    it('should detect old plugin format and convert to new format', () => {
       const newName = detectOldGitHubNaming({
         name: '@anthropics/claude-code/commit-commands',
         git: 'https://github.com/anthropics/claude-code.git',
-        subdirectory: 'plugins/commit-commands'
+        path: 'plugins/commit-commands'
       });
       
-      assert.strictEqual(newName, 'gh@anthropics/claude-code/p/commit-commands');
+      assert.strictEqual(newName, 'gh@anthropics/claude-code/commit-commands');
     });
     
     it('should return null for new format', () => {

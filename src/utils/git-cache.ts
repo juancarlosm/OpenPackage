@@ -22,7 +22,7 @@ export interface GitCommitMetadata {
   url: string;
   commit: string;        // Full commit SHA
   ref?: string;          // Branch/tag name if specified
-  subdirectory?: string;
+  subdir?: string;
   clonedAt: string;
   lastAccessed: string;
 }

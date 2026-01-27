@@ -38,7 +38,7 @@ export class PathSourceLoader implements PackageSourceLoader {
       
       if (source.gitSourceOverride) {
         loadContext.gitUrl = source.gitSourceOverride.gitUrl;
-        loadContext.subdirectory = source.gitSourceOverride.gitSubdirectory;
+        loadContext.path = source.gitSourceOverride.gitPath;
       }
       
       // Load package from path, passing git context for proper scoping

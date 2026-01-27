@@ -16,13 +16,19 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
     if (parsed.packages && !parsed.dependencies) {
       parsed.dependencies = parsed.packages;
     }
+    // Delete old key to ensure it doesn't persist through round-trip serialization
+    delete parsed.packages;
+    
     if (parsed['dev-packages'] && !parsed['dev-dependencies']) {
       parsed['dev-dependencies'] = parsed['dev-packages'];
     }
+    // Delete old key to ensure it doesn't persist through round-trip serialization
+    delete parsed['dev-packages'];
     
     // Auto-migrate old plugin naming format
     let needsPluginMigration = false;
     let needsGitHubMigration = false;
+    let needsSubdirectoryMigration = false;
     const { detectOldPluginNaming, detectOldGitHubNaming } = await import('./plugin-naming.js');
     
     if (parsed.dependencies) {
@@ -39,6 +45,17 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
         if (newGitHubName) {
           dep.name = newGitHubName;
           needsGitHubMigration = true;
+        }
+        
+        // Migrate subdirectory field to path field
+        if (dep.subdirectory && dep.git && !dep.path) {
+          // Normalize path: strip leading ./ if present
+          const normalizedPath = dep.subdirectory.startsWith('./')
+            ? dep.subdirectory.substring(2)
+            : dep.subdirectory;
+          dep.path = normalizedPath;
+          delete dep.subdirectory;
+          needsSubdirectoryMigration = true;
         }
       }
     }
@@ -58,6 +75,17 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
           dep.name = newGitHubName;
           needsGitHubMigration = true;
         }
+        
+        // Migrate subdirectory field to path field
+        if (dep.subdirectory && dep.git && !dep.path) {
+          // Normalize path: strip leading ./ if present
+          const normalizedPath = dep.subdirectory.startsWith('./')
+            ? dep.subdirectory.substring(2)
+            : dep.subdirectory;
+          dep.path = normalizedPath;
+          delete dep.subdirectory;
+          needsSubdirectoryMigration = true;
+        }
       }
     }
     
@@ -68,11 +96,19 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
     if (needsGitHubMigration) {
       (parsed as any)._needsGitHubMigration = true;
     }
+    if (needsSubdirectoryMigration) {
+      (parsed as any)._needsSubdirectoryMigration = true;
+    }
     
     const validateDependencies = (deps: PackageDependency[] | undefined, section: string): void => {
       if (!deps) return;
       for (const dep of deps) {
-        const sources = [dep.version, dep.path, dep.git].filter(Boolean);
+        // For git sources, path is a subdirectory, not a source
+        // For non-git sources, path is a source
+        const sources = dep.git
+          ? [dep.version, dep.git].filter(Boolean)
+          : [dep.version, dep.path, dep.git].filter(Boolean);
+        
         if (sources.length > 1) {
           throw new Error(
             `openpackage.yml ${section}: dependency '${dep.name}' has multiple sources; specify at most one of version, path, or git`
@@ -81,6 +117,18 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
         if (dep.ref && !dep.git) {
           throw new Error(
             `openpackage.yml ${section}: dependency '${dep.name}' has ref but no git source`
+          );
+        }
+        // Validate legacy subdirectory field (should have been migrated)
+        if (dep.subdirectory && !dep.git) {
+          throw new Error(
+            `openpackage.yml ${section}: dependency '${dep.name}' has subdirectory field without git source`
+          );
+        }
+        // Warn if both subdirectory and path exist (shouldn't happen after migration)
+        if (dep.subdirectory && dep.path) {
+          throw new Error(
+            `openpackage.yml ${section}: dependency '${dep.name}' has both subdirectory and path fields; use path only`
           );
         }
       }
@@ -192,6 +240,17 @@ export async function writePackageYml(packageYmlPath: string, config: PackageYml
   }
   delete migratedConfig['dev-packages'];
   
+  // Clean up legacy subdirectory fields from all dependencies
+  const cleanSubdirectoryField = (deps: PackageDependency[] | undefined) => {
+    if (!deps) return;
+    for (const dep of deps) {
+      delete dep.subdirectory;
+    }
+  };
+  
+  cleanSubdirectoryField(migratedConfig.dependencies);
+  cleanSubdirectoryField(migratedConfig['dev-dependencies']);
+  
   // Log if plugin naming was migrated
   if ((config as any)._needsPluginMigration) {
     const { logger } = await import('./logger.js');
@@ -204,6 +263,13 @@ export async function writePackageYml(packageYmlPath: string, config: PackageYml
     const { logger } = await import('./logger.js');
     logger.info('✓ Migrated GitHub package names to new format');
     delete (migratedConfig as any)._needsGitHubMigration;
+  }
+  
+  // Log if subdirectory field was migrated
+  if ((config as any)._needsSubdirectoryMigration) {
+    const { logger } = await import('./logger.js');
+    logger.info('✓ Migrated subdirectory fields to path');
+    delete (migratedConfig as any)._needsSubdirectoryMigration;
   }
   
   const content = serializePackageYml(migratedConfig);

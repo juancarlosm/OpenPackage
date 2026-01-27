@@ -5,13 +5,7 @@ import { validatePackageName, normalizePackageNameForLookup } from '../../../src
 
 describe('Package Name Validation', () => {
   describe('validatePackageName - strict validation but flexible format', () => {
-    it('should accept new format with /p/ spacer', () => {
-      assert.doesNotThrow(() => {
-        validatePackageName('gh@anthropics/claude-code/p/commit-commands');
-      });
-    });
-
-    it('should accept legacy format without /p/ spacer', () => {
+    it('should accept new format with path', () => {
       assert.doesNotThrow(() => {
         validatePackageName('gh@anthropics/claude-code/commit-commands');
       });
@@ -23,13 +17,7 @@ describe('Package Name Validation', () => {
       });
     });
 
-    it('should accept multi-segment plugin paths with /p/', () => {
-      assert.doesNotThrow(() => {
-        validatePackageName('gh@user/repo/p/nested/path/plugin');
-      });
-    });
-
-    it('should accept multi-segment plugin paths without /p/ (legacy)', () => {
+    it('should accept multi-segment plugin paths', () => {
       assert.doesNotThrow(() => {
         validatePackageName('gh@user/repo/nested/path/plugin');
       });
@@ -77,19 +65,14 @@ describe('Package Name Validation', () => {
   });
 
   describe('normalizePackageNameForLookup', () => {
-    it('should preserve new format with /p/', () => {
-      const normalized = normalizePackageNameForLookup('gh@anthropics/claude-code/p/commit-commands');
-      assert.strictEqual(normalized, 'gh@anthropics/claude-code/p/commit-commands');
-    });
-
-    it('should preserve legacy format without /p/', () => {
+    it('should preserve new format with path', () => {
       const normalized = normalizePackageNameForLookup('gh@anthropics/claude-code/commit-commands');
       assert.strictEqual(normalized, 'gh@anthropics/claude-code/commit-commands');
     });
 
-    it('should convert old @ format with plugin to new format with /p/', () => {
+    it('should convert old @ format with path to new format', () => {
       const normalized = normalizePackageNameForLookup('@anthropics/claude-code/commit-commands');
-      assert.strictEqual(normalized, 'gh@anthropics/claude-code/p/commit-commands');
+      assert.strictEqual(normalized, 'gh@anthropics/claude-code/commit-commands');
     });
 
     it('should convert old @ format standalone to new format', () => {
@@ -98,8 +81,8 @@ describe('Package Name Validation', () => {
     });
 
     it('should handle case-insensitive normalization', () => {
-      const normalized = normalizePackageNameForLookup('GH@Anthropics/Claude-Code/P/Plugin');
-      assert.strictEqual(normalized, 'gh@anthropics/claude-code/p/plugin');
+      const normalized = normalizePackageNameForLookup('GH@Anthropics/Claude-Code/Plugin');
+      assert.strictEqual(normalized, 'gh@anthropics/claude-code/plugin');
     });
   });
 
@@ -107,16 +90,12 @@ describe('Package Name Validation', () => {
     it('should normalize all formats for workspace lookup', () => {
       const testCases = [
         {
-          input: 'gh@anthropics/claude-code/p/commit-commands',
-          expected: 'gh@anthropics/claude-code/p/commit-commands'
-        },
-        {
           input: 'gh@anthropics/claude-code/commit-commands',
           expected: 'gh@anthropics/claude-code/commit-commands'
         },
         {
           input: '@anthropics/claude-code/commit-commands',
-          expected: 'gh@anthropics/claude-code/p/commit-commands'
+          expected: 'gh@anthropics/claude-code/commit-commands'
         },
         {
           input: 'gh@anthropics/claude-code',
@@ -128,8 +107,8 @@ describe('Package Name Validation', () => {
         },
         // Uppercase is normalized
         {
-          input: 'GH@Anthropics/Claude-Code/P/Plugin',
-          expected: 'gh@anthropics/claude-code/p/plugin'
+          input: 'GH@Anthropics/Claude-Code/Plugin',
+          expected: 'gh@anthropics/claude-code/plugin'
         },
       ];
 

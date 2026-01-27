@@ -342,10 +342,10 @@ async function installRelativePathPlugin(
   
   // Validate plugin subdirectory exists
   if (!(await exists(pluginDir))) {
-    const error = `Subdirectory '${pluginSubdir}' does not exist in marketplace repository`;
-    logger.error('Plugin subdirectory not found', { 
+    const error = `Path '${pluginSubdir}' does not exist in marketplace repository`;
+    logger.error('Plugin path not found', { 
       plugin: pluginEntry.name, 
-      subdirectory: pluginSubdir,
+      path: pluginSubdir,
       fullPath: pluginDir
     });
     spinner.stop();
@@ -361,10 +361,10 @@ async function installRelativePathPlugin(
     const strictInfo = pluginEntry.strict === false 
       ? ' Set "strict": false in marketplace entry if this plugin is defined entirely in marketplace.json.'
       : '';
-    const error = `Subdirectory '${pluginSubdir}' does not contain a valid plugin.${strictInfo}`;
+    const error = `Path '${pluginSubdir}' does not contain a valid plugin.${strictInfo}`;
     logger.error('Invalid plugin structure', { 
       plugin: pluginEntry.name, 
-      subdirectory: pluginSubdir,
+      path: pluginSubdir,
       strict: pluginEntry.strict
     });
     spinner.stop();
@@ -386,7 +386,7 @@ async function installRelativePathPlugin(
   spinner.update(`✓ Installing ${pluginEntry.name}`);
   logger.info('Installing relative path plugin', {
     plugin: pluginEntry.name,
-    subdirectory: pluginSubdir
+    path: pluginSubdir
   });
   
   // Build path context for the already-cloned plugin directory
@@ -407,7 +407,7 @@ async function installRelativePathPlugin(
   ctx.source.gitSourceOverride = {
     gitUrl: marketplaceGitUrl,
     gitRef: marketplaceGitRef,
-    gitSubdirectory: pluginSubdir
+    gitPath: pluginSubdir
   };
   
   // Add marketplace metadata to context for passing to loader and workspace index
@@ -457,7 +457,7 @@ async function installGitPlugin(
 ): Promise<CommandResult> {
   const gitUrl = normalizedSource.gitUrl!;
   const gitRef = normalizedSource.gitRef;
-  const gitSubdirectory = normalizedSource.gitSubdirectory;
+  const gitPath = normalizedSource.gitPath;
   
   const spinner = new Spinner(`Installing ${pluginEntry.name}`);
   spinner.start();
@@ -466,7 +466,7 @@ async function installGitPlugin(
     plugin: pluginEntry.name,
     gitUrl,
     gitRef,
-    gitSubdirectory
+    gitPath
   });
   
   // Build git context
@@ -476,7 +476,7 @@ async function installGitPlugin(
     {
       ...options,
       gitRef,
-      gitSubdirectory
+      gitPath
     }
   );
   

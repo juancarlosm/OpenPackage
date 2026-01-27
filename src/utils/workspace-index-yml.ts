@@ -166,10 +166,8 @@ export async function readWorkspaceIndex(cwd: string): Promise<WorkspaceIndexRec
       return { path: indexPath, index: { packages: {} } };
     }
     
-    // Auto-migrate old GitHub naming format (@username/repo -> gh@username/repo)
-    const migrated = migrateGitHubPackageNames(sanitized);
-    
-    return { path: indexPath, index: migrated };
+    // No migration on read - return data as-is from disk
+    return { path: indexPath, index: sanitized };
   } catch (error) {
     logger.warn(`Failed to read workspace index at ${indexPath}: ${error}`);
     return { path: indexPath, index: { packages: {} } };
@@ -180,48 +178,84 @@ export async function readWorkspaceIndex(cwd: string): Promise<WorkspaceIndexRec
  * Migrate old GitHub package names to new format.
  * Converts:
  * - @username/repo → gh@username/repo
- * - @username/repo/plugin → gh@username/repo/p/plugin
+ * - @username/repo/path → gh@username/repo/path
+ * 
+ * Also normalizes package names to use full path from git cache location.
+ * For example: gh@user/repo/basename → gh@user/repo/full/path
  */
 function migrateGitHubPackageNames(index: WorkspaceIndex): WorkspaceIndex {
   const migratedPackages: Record<string, WorkspaceIndexPackage> = {};
   
   for (const [pkgName, pkgData] of Object.entries(index.packages)) {
-    // Skip if already using new format
-    if (pkgName.startsWith('gh@')) {
+    const normalizedPath = pkgData.path.replace(/\\/g, '/');
+    
+    // Detect if this is a git source by checking:
+    // 1. No version field (git sources don't have semver versions)
+    // 2. Path contains git cache location marker
+    const isGitSource = !pkgData.version;
+    const isGitCache = normalizedPath.includes('/.openpackage/cache/git/') || 
+                       normalizedPath.includes('.openpackage/cache/git/');
+    
+    if (!isGitSource && !isGitCache) {
+      // Not a git source, keep as-is
       migratedPackages[pkgName] = pkgData;
       continue;
     }
     
-    // Check if this is an old GitHub format (@username/...)
-    if (pkgName.startsWith('@')) {
-      // Detect if this is a GitHub source by checking:
-      // 1. No version field (git sources don't have semver versions)
-      // 2. Path contains git cache location marker
-      const isGitSource = !pkgData.version;
-      const normalizedPath = pkgData.path.replace(/\\/g, '/');
-      const isGitCache = normalizedPath.includes('/.openpackage/cache/git/') || 
-                         normalizedPath.includes('.openpackage/cache/git/');
-      
-      if (isGitSource || isGitCache) {
-        // Check if this has a plugin segment (3+ segments)
-        const pluginMatch = pkgName.match(/^@([^\/]+)\/([^\/]+)\/(.+)$/);
-        if (pluginMatch) {
-          // Migrate with /p/ infix: @username/repo/plugin → gh@username/repo/p/plugin
-          const [, username, repo, pluginPath] = pluginMatch;
-          const newName = `gh@${username}/${repo}/p/${pluginPath}`;
-          migratedPackages[newName] = pkgData;
-          continue;
-        }
-        
-        // Migrate standalone repo: @username/repo → gh@username/repo
-        const newName = 'gh' + pkgName;
-        migratedPackages[newName] = pkgData;
-        continue;
+    // Extract the actual path from git cache location
+    // Format: .openpackage/cache/git/{url-hash}/{commit-hash}/{optional-subpath}
+    const gitCacheMatch = normalizedPath.match(/\.openpackage\/cache\/git\/[^\/]+\/[^\/]+(?:\/(.+))?$/);
+    const actualSubpath = gitCacheMatch?.[1] || undefined;
+    
+    // Parse package name to extract username/repo
+    let username: string | undefined;
+    let repo: string | undefined;
+    let nameHasGhPrefix = false;
+    
+    // Check for gh@ prefix first
+    if (pkgName.startsWith('gh@')) {
+      nameHasGhPrefix = true;
+      const ghMatch = pkgName.match(/^gh@([^\/]+)\/([^\/]+)(?:\/(.+))?$/);
+      if (ghMatch) {
+        username = ghMatch[1];
+        repo = ghMatch[2];
+      }
+    }
+    // Check for @ prefix (old format)
+    else if (pkgName.startsWith('@')) {
+      const atMatch = pkgName.match(/^@([^\/]+)\/([^\/]+)(?:\/(.+))?$/);
+      if (atMatch) {
+        username = atMatch[1];
+        repo = atMatch[2];
+      }
+    }
+    // Check for no prefix (missing @)
+    else {
+      const noAtMatch = pkgName.match(/^([^\/]+)\/([^\/]+)(?:\/(.+))?$/);
+      if (noAtMatch) {
+        username = noAtMatch[1];
+        repo = noAtMatch[2];
       }
     }
     
-    // Keep as-is (non-GitHub or already migrated)
-    migratedPackages[pkgName] = pkgData;
+    // If we couldn't extract username/repo, keep original
+    if (!username || !repo) {
+      migratedPackages[pkgName] = pkgData;
+      continue;
+    }
+    
+    // Build the correct package name
+    let correctName: string;
+    if (actualSubpath) {
+      // Has a subpath, include it in the name
+      correctName = `gh@${username}/${repo}/${actualSubpath}`;
+    } else {
+      // Standalone repo
+      correctName = `gh@${username}/${repo}`;
+    }
+    
+    // Use the correct name (which might be the same as original if already correct)
+    migratedPackages[correctName] = pkgData;
   }
   
   return { packages: migratedPackages };
@@ -229,7 +263,10 @@ function migrateGitHubPackageNames(index: WorkspaceIndex): WorkspaceIndex {
 
 export async function writeWorkspaceIndex(record: WorkspaceIndexRecord): Promise<void> {
   const indexPath = record.path;
-  const packages = record.index.packages ?? {};
+  
+  // Migrate package names before writing
+  const migrated = migrateGitHubPackageNames(record.index);
+  const packages = migrated.packages ?? {};
 
   const sortedPackages: Record<string, WorkspaceIndexPackage> = {};
   for (const pkgName of Object.keys(packages).sort()) {

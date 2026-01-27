@@ -48,7 +48,7 @@ export interface NormalizedPluginSource {
   // For git type (both GitHub and Git URL)
   gitUrl?: string;
   gitRef?: string;
-  gitSubdirectory?: string;
+  gitPath?: string;
   
   // Original spec for reference
   rawSource: PluginSourceSpec;
@@ -123,11 +123,14 @@ function normalizeRelativePathSource(
     );
   }
   
-  logger.debug('Normalized relative path source', { pluginName, path });
+  // Normalize path: strip leading ./ if present
+  const normalizedPath = path.startsWith('./') ? path.substring(2) : path;
+  
+  logger.debug('Normalized relative path source', { pluginName, path: normalizedPath });
   
   return {
     type: 'relative-path',
-    relativePath: path,
+    relativePath: normalizedPath,
     rawSource: path
   };
 }
@@ -174,7 +177,7 @@ function normalizeGitHubSource(
     type: 'git',
     gitUrl,
     gitRef: source.ref,
-    gitSubdirectory: source.path,
+    gitPath: source.path,
     rawSource: source
   };
 }
@@ -214,7 +217,7 @@ function normalizeGitUrlSource(
     type: 'git',
     gitUrl: source.url,
     gitRef: source.ref,
-    gitSubdirectory: source.path,
+    gitPath: source.path,
     rawSource: source
   };
 }

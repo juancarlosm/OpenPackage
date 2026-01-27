@@ -7,7 +7,7 @@ import { logger } from './logger.js';
  */
 export interface PluginNamingContext {
   gitUrl?: string;              // Git URL (for extracting GitHub info)
-  subdirectory?: string;        // Subdirectory within repo
+  path?: string;                // Path within repo
   pluginManifestName?: string;  // Name from plugin.json (may be undefined)
   repoPath?: string;            // Path to repository root (for fallback)
 }
@@ -16,19 +16,19 @@ export interface PluginNamingContext {
  * Generate a scoped name for a Claude Code plugin.
  * 
  * Format:
- * - GitHub repo with subdirectory: gh@username/repo/p/plugin-name
+ * - GitHub repo with path: gh@username/repo/path
  * - GitHub repo (plugin is the repo): gh@username/repo
  * - Non-GitHub or local: plugin-name (no scoping)
  * 
  * Fallback behavior:
- * - If pluginManifestName is undefined → use subdirectory name or repo name
+ * - If pluginManifestName is undefined → use path name or repo name
  */
 export function generatePluginName(
   context: PluginNamingContext
 ): string {
   const {
     gitUrl,
-    subdirectory,
+    path,
     pluginManifestName,
     repoPath
   } = context;
@@ -36,7 +36,7 @@ export function generatePluginName(
   // If no Git URL, use plugin manifest name or fallback
   if (!gitUrl) {
     const generated =
-      pluginManifestName || (subdirectory ? basename(subdirectory) : 'unnamed-plugin');
+      pluginManifestName || (path ? basename(path) : 'unnamed-plugin');
     return generated;
   }
   
@@ -47,34 +47,21 @@ export function generatePluginName(
   if (!githubInfo) {
     logger.debug('Non-GitHub URL, using plugin manifest name', { gitUrl });
     const generated =
-      pluginManifestName || (subdirectory ? basename(subdirectory) : 'unnamed-plugin');
+      pluginManifestName || (path ? basename(path) : 'unnamed-plugin');
     return generated;
   }
   
   // GitHub URL - generate scoped name using repo name
   const { username, repo } = githubInfo;
   
-  // Determine if this is a marketplace plugin (has subdirectory)
-  const isMarketplacePlugin = Boolean(subdirectory);
+  // Determine if this is a marketplace plugin (has path)
+  const isMarketplacePlugin = Boolean(path);
   
   if (isMarketplacePlugin) {
-    // Determine plugin name
-    let pluginName: string;
-    
-    if (pluginManifestName) {
-      // Use plugin manifest name if provided
-      pluginName = pluginManifestName;
-    } else if (subdirectory) {
-      // Use subdirectory name as fallback
-      pluginName = basename(subdirectory);
-    } else {
-      // Use repo name as fallback
-      pluginName = repo;
-    }
-    
-    // Format: gh@username/repo/p/plugin-name
-    const plugin = pluginName.toLowerCase();
-    const generated = `gh@${username}/${repo}/p/${plugin}`;
+    // Use the full path for maximum clarity and unambiguity
+    // Example: plugins/feature-dev -> gh@username/repo/plugins/feature-dev
+    const pluginPath = path!.toLowerCase();
+    const generated = `gh@${username}/${repo}/${pluginPath}`;
     return generated;
   } else {
     // Format: gh@username/repo
@@ -118,8 +105,8 @@ export function generateMarketplaceName(
 
 /**
  * Parse a scoped plugin name into its components.
- * Supports new (gh@username/repo/p/plugin), new standalone (gh@username/repo),
- * legacy (gh@username/repo/plugin), and old (@username/...) formats.
+ * Supports GitHub (gh@username/repo or gh@username/repo/path) and
+ * old (@username/...) formats.
  * Returns null if the name is not scoped.
  */
 export function parseScopedPluginName(name: string): {
@@ -128,22 +115,12 @@ export function parseScopedPluginName(name: string): {
   plugin?: string;
   isGitHub: boolean;
 } | null {
-  // New GitHub format: gh@username/repo or gh@username/repo/...
+  // GitHub format: gh@username/repo or gh@username/repo/...
   const ghMatch = name.match(/^gh@([^\/]+)\/([^\/]+)(?:\/(.+))?$/);
   if (ghMatch) {
     const [, username, repo, rest] = ghMatch;
     
-    // Check if it has /p/ prefix (new format with plugin)
-    if (rest?.startsWith('p/')) {
-      return {
-        username,
-        repo,
-        plugin: rest.substring(2), // Remove 'p/' prefix
-        isGitHub: true
-      };
-    }
-    
-    // Legacy format: gh@username/repo/plugin (no /p/ prefix)
+    // If has path after repo
     if (rest) {
       return {
         username,
@@ -210,7 +187,7 @@ export function isGitHubPluginName(name: string): boolean {
  * Old format: @username/marketplace-name/plugin (marketplace name from marketplace.json)
  * New format: @username/repo/plugin (always use repo name)
  */
-export function detectOldPluginNaming(dep: { name: string; git?: string; subdirectory?: string }): string | null {
+export function detectOldPluginNaming(dep: { name: string; git?: string; path?: string; subdirectory?: string }): string | null {
   // Only check GitHub git sources with scoped names
   if (!dep.git || !dep.name.startsWith('@')) {
     return null;
@@ -236,8 +213,8 @@ export function detectOldPluginNaming(dep: { name: string; git?: string; subdire
     return null;
   }
   
-  // If there's a subdirectory, this should be a 3-part name
-  if (dep.subdirectory) {
+  // If there's a path, this should be a 3-part name
+  if (dep.path) {
     // Expected format: @username/repo/plugin
     const expectedName = `@${username}/${repo}/${pluginPart}`;
     
@@ -262,17 +239,14 @@ export function detectOldPluginNaming(dep: { name: string; git?: string; subdire
  * Detect if a plugin dependency uses old GitHub naming format without gh@ prefix.
  * Returns the correct new name if migration needed, null otherwise.
  * 
- * Old format: @username/repo or @username/repo/plugin
- * New format: gh@username/repo or gh@username/repo/p/plugin
+ * Old format: @username/repo or @username/repo/path
+ * New format: gh@username/repo or gh@username/repo/path
+ * 
+ * Also handles path mismatches where package name doesn't match the path/subdirectory field.
  */
-export function detectOldGitHubNaming(dep: { name: string; git?: string; subdirectory?: string }): string | null {
-  // Skip if already using new format
-  if (dep.name.startsWith('gh@')) {
-    return null;
-  }
-  
-  // Only check GitHub git sources with @ prefix (but not gh@)
-  if (!dep.git || !dep.name.startsWith('@')) {
+export function detectOldGitHubNaming(dep: { name: string; git?: string; path?: string; subdirectory?: string }): string | null {
+  // Skip if not a git source
+  if (!dep.git) {
     return null;
   }
   
@@ -283,19 +257,46 @@ export function detectOldGitHubNaming(dep: { name: string; git?: string; subdire
   
   const { username, repo } = githubInfo;
   
-  // Check if old format has plugin segment: @username/repo/plugin
-  const oldPluginMatch = dep.name.match(/^@([^\/]+)\/([^\/]+)\/(.+)$/);
-  if (oldPluginMatch) {
-    const [, , , pluginPath] = oldPluginMatch;
-    // Convert to new format with /p/ infix
-    return `gh@${username}/${repo}/p/${pluginPath}`;
+  // Get the actual path (prefer path over subdirectory, normalize subdirectory)
+  const actualPath = dep.path || (dep.subdirectory?.startsWith('./') 
+    ? dep.subdirectory.substring(2) 
+    : dep.subdirectory);
+  
+  // Check if name is missing gh@ prefix
+  if (!dep.name.startsWith('gh@')) {
+    // Handle old format with @ prefix
+    if (dep.name.startsWith('@')) {
+      // @username/repo/path or @username/repo
+      if (actualPath) {
+        return `gh@${username}/${repo}/${actualPath}`;
+      }
+      return `gh@${username}/${repo}`;
+    }
+    
+    // Handle format without @ prefix: username/repo/path or username/repo
+    // This happens when the @ was stripped somewhere
+    if (actualPath) {
+      return `gh@${username}/${repo}/${actualPath}`;
+    }
+    return `gh@${username}/${repo}`;
   }
   
-  // Check if old format is standalone: @username/repo
-  const oldRepoMatch = dep.name.match(/^@([^\/]+)\/([^\/]+)$/);
-  if (oldRepoMatch) {
-    // Convert to new format without /p/
-    return `gh@${username}/${repo}`;
+  // Check if package name path matches the actual path field
+  // This handles cases where name has basename instead of full path
+  if (actualPath && dep.name.startsWith('gh@')) {
+    // Extract the path portion from the package name
+    const nameMatch = dep.name.match(/^gh@([^\/]+)\/([^\/]+)(?:\/(.+))?$/);
+    if (nameMatch) {
+      const [, nameUsername, nameRepo, namePath] = nameMatch;
+      
+      // Verify username and repo match
+      if (nameUsername === username && nameRepo === repo) {
+        // If actualPath exists but namePath is different, update to use full path
+        if (namePath !== actualPath) {
+          return `gh@${username}/${repo}/${actualPath}`;
+        }
+      }
+    }
   }
   
   return null;

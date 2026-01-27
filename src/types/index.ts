@@ -85,11 +85,15 @@ export interface PackageDependency {
   /**
    * Local filesystem source (mutually exclusive with version/git).
    * If ends with .tgz/.tar.gz → tarball, otherwise directory.
+   * 
+   * Also used for git source subdirectory when git field is present.
+   * Example for git: plugins/commit-commands
    */
   path?: string;
   /**
-   * Git source (mutually exclusive with version/path).
+   * Git source (mutually exclusive with version/path as source).
    * Supports https/ssh/git URLs; refs handled separately.
+   * When git is present, path refers to subdirectory within the repository.
    */
   git?: string;
   /**
@@ -97,8 +101,9 @@ export interface PackageDependency {
    */
   ref?: string;
   /**
+   * @deprecated Legacy field - use 'path' instead
    * Optional subdirectory within git repository (for plugin marketplaces).
-   * Example: plugins/commit-commands
+   * This field is automatically migrated to 'path' when reading/writing manifests.
    */
   subdirectory?: string;
   /**

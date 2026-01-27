@@ -26,7 +26,7 @@ export interface PackageInputClassification {
   // For 'git' type
   gitUrl?: string;
   gitRef?: string;
-  gitSubdirectory?: string;
+  gitPath?: string;
   
   // For 'directory' or 'tarball' types
   resolvedPath?: string;  // Absolute path
@@ -61,7 +61,7 @@ export async function classifyPackageInput(
       type: 'git',
       gitUrl: gitSpec.url,
       gitRef: gitSpec.ref,
-      gitSubdirectory: gitSpec.subdirectory
+      gitPath: gitSpec.subdirectory
     };
   }
 

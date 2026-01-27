@@ -274,12 +274,12 @@ export function normalizePackageName(name: string): string {
 
 /**
  * Normalize package name for lookup/resolution with backward compatibility.
- * Converts old GitHub format to new format with p/ prefix for plugins.
+ * Converts old GitHub format to new format.
  * This allows commands to accept old format names and still match workspace entries.
  * 
  * Conversions:
  * - @username/repo → gh@username/repo
- * - @username/repo/plugin → gh@username/repo/p/plugin
+ * - @username/repo/path → gh@username/repo/path
  * 
  * @param name - Package name to normalize
  * @returns Normalized name in new format if applicable
@@ -292,11 +292,11 @@ export function normalizePackageNameForLookup(name: string): string {
     return normalized;
   }
   
-  // If using old GitHub format (@username/repo/plugin), convert to new format with /p/
+  // If using old GitHub format (@username/repo/path), convert to new format
   const oldPluginMatch = normalized.match(/^@([^\/]+)\/([^\/]+)\/(.+)$/);
   if (oldPluginMatch) {
     const [, username, repo, pluginPath] = oldPluginMatch;
-    return `gh@${username}/${repo}/p/${pluginPath}`;
+    return `gh@${username}/${repo}/${pluginPath}`;
   }
   
   // If using old GitHub format (@username/repo), convert to new format

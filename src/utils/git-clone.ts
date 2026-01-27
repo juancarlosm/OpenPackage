@@ -23,11 +23,11 @@ const execFileAsync = promisify(execFile);
 export interface GitCloneOptions {
   url: string;
   ref?: string; // branch/tag/sha
-  subdirectory?: string; // subdirectory within repository
+  subdir?: string; // subdir within repository
 }
 
 export interface GitCloneResult {
-  path: string;         // Full path to clone (including subdirectory if specified)
+  path: string;         // Full path to clone (including subdir if specified)
   commitSha: string;    // Resolved commit SHA (7 chars)
   repoPath: string;     // Path to repository root
 }
@@ -61,10 +61,10 @@ async function getCurrentCommitSha(repoPath: string): Promise<string> {
  * Cache structure:
  * ~/.openpackage/cache/git/<url-hash>/<commit-sha-7>/
  * 
- * Returns the path to the cloned repository (or subdirectory if specified).
+ * Returns the path to the cloned repository (or subdir if specified).
  */
 export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitCloneResult> {
-  const { url, ref, subdirectory } = options;
+  const { url, ref, subdir } = options;
   
   // Clone to a temporary commit directory (we'll get the actual SHA after cloning)
   const repoDir = getGitRepoCacheDir(url);
@@ -85,7 +85,7 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     await rm(tempClonePath, { recursive: true, force: true });
   }
   
-  logger.debug(`Cloning repository to cache`, { url, ref, subdirectory });
+  logger.debug(`Cloning repository to cache`, { url, ref, subdir });
   
   try {
     // Clone repository
@@ -116,11 +116,11 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       // Update access time
       await touchCacheEntry(commitDir);
       
-      // Validate subdirectory if specified
-      const finalPath = subdirectory ? join(commitDir, subdirectory) : commitDir;
-      if (subdirectory && !(await exists(finalPath))) {
+      // Validate subdir if specified
+      const finalPath = subdir ? join(commitDir, subdir) : commitDir;
+      if (subdir && !(await exists(finalPath))) {
         throw new ValidationError(
-          `Subdirectory '${subdirectory}' does not exist in cached repository ${url}`
+          `Subdirectory '${subdir}' does not exist in cached repository ${url}`
         );
       }
       
@@ -141,16 +141,16 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       url,
       commit: commitSha,
       ref,
-      subdirectory,
+      subdir,
       clonedAt: new Date().toISOString(),
       lastAccessed: new Date().toISOString()
     });
     
-    // Validate subdirectory if specified
-    const finalPath = subdirectory ? join(commitDir, subdirectory) : commitDir;
-    if (subdirectory && !(await exists(finalPath))) {
+    // Validate subdir if specified
+    const finalPath = subdir ? join(commitDir, subdir) : commitDir;
+    if (subdir && !(await exists(finalPath))) {
       throw new ValidationError(
-        `Subdirectory '${subdirectory}' does not exist in cloned repository ${url}`
+        `Subdirectory '${subdir}' does not exist in cloned repository ${url}`
       );
     }
     
@@ -168,12 +168,12 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       throw new ValidationError(
         `Cloned repository is not an OpenPackage or Claude Code plugin ` +
         `(missing ${FILE_PATTERNS.OPENPACKAGE_YML}, ${DIR_PATTERNS.CLAUDE_PLUGIN}/${FILE_PATTERNS.PLUGIN_JSON}, or ${DIR_PATTERNS.CLAUDE_PLUGIN}/${FILE_PATTERNS.MARKETPLACE_JSON} ` +
-        `at ${subdirectory ? `subdirectory '${subdirectory}'` : 'repository root'})`
+        `at ${subdir ? `subdir '${subdir}'` : 'repository root'})`
       );
     }
     
     const refPart = ref ? `#${ref}` : '';
-    const subdirPart = subdirectory ? `&subdirectory=${subdirectory}` : '';
+    const subdirPart = subdir ? `&subdirectory=${subdir}` : '';
     logger.info(`Cloned git repository ${url}${refPart}${subdirPart} to cache [${commitSha}]`);
     
     return {

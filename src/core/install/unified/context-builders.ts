@@ -74,14 +74,14 @@ export async function buildPathInstallContext(
 export async function buildGitInstallContext(
   cwd: string,
   gitUrl: string,
-  options: InstallOptions & { gitRef?: string; gitSubdirectory?: string }
+  options: InstallOptions & { gitRef?: string; gitPath?: string }
 ): Promise<InstallationContext> {
   const source: PackageSource = {
     type: 'git',
     packageName: '', // Populated after loading
     gitUrl,
     gitRef: options.gitRef,
-    gitSubdirectory: options.gitSubdirectory
+    gitPath: options.gitPath
   };
   
   return {
@@ -186,7 +186,7 @@ export async function buildInstallContext(
       return buildGitInstallContext(cwd, classification.gitUrl!, {
         ...options,
         gitRef: classification.gitRef,
-        gitSubdirectory: classification.gitSubdirectory
+        gitPath: classification.gitPath
       });
     
     default:
@@ -236,7 +236,7 @@ async function buildBulkInstallContexts(
           packageName: dep.name,
           gitUrl: dep.git,
           gitRef: dep.ref,
-          gitSubdirectory: dep.subdirectory
+          gitPath: dep.path
         };
       } else if (dep.path) {
         // Path source - resolve tilde paths before creating source

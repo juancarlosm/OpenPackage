@@ -27,7 +27,7 @@ export class GitSourceLoader implements PackageSourceLoader {
       const result = await loadPackageFromGit({
         url: source.gitUrl,
         ref: source.gitRef,
-        subdirectory: source.gitSubdirectory
+        path: source.gitPath
       });
       
       // Check if marketplace - return metadata, let command handle selection
@@ -56,7 +56,7 @@ export class GitSourceLoader implements PackageSourceLoader {
       const { loadPackageFromPath } = await import('../path-package-loader.js');
       let sourcePackage = await loadPackageFromPath(result.sourcePath, {
         gitUrl: source.gitUrl,
-        subdirectory: source.gitSubdirectory,
+        path: source.gitPath,
         repoPath: result.sourcePath,
         marketplaceEntry: source.pluginMetadata?.marketplaceEntry
       });
@@ -90,7 +90,7 @@ export class GitSourceLoader implements PackageSourceLoader {
       }
       
       const ref = source.gitRef ? `#${source.gitRef}` : '';
-      const subdir = source.gitSubdirectory ? ` (subdirectory: ${source.gitSubdirectory})` : '';
+      const subdir = source.gitPath ? ` (path: ${source.gitPath})` : '';
       throw new SourceLoadError(
         source,
         `Failed to load package from git: ${source.gitUrl}${ref}${subdir}`,
@@ -101,7 +101,7 @@ export class GitSourceLoader implements PackageSourceLoader {
   
   getDisplayName(source: PackageSource): string {
     const ref = source.gitRef ? `#${source.gitRef}` : '';
-    const subdir = source.gitSubdirectory ? `&subdirectory=${source.gitSubdirectory}` : '';
+    const subdir = source.gitPath ? `&path=${source.gitPath}` : '';
     return source.packageName
       ? `${source.packageName} (git:${source.gitUrl}${ref}${subdir})`
       : `git:${source.gitUrl}${ref}${subdir}`;

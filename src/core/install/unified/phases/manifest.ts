@@ -31,7 +31,7 @@ export async function updateManifestPhase(ctx: InstallationContext): Promise<voi
       fields.path,
       fields.gitUrl,
       fields.gitRef,
-      fields.gitSubdirectory
+      fields.gitPath
     );
     
     logger.info(`Updated manifest for ${ctx.source.packageName}`);
@@ -50,7 +50,7 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
     path: undefined,
     gitUrl: undefined,
     gitRef: undefined,
-    gitSubdirectory: undefined
+    gitPath: undefined
   };
   
   // Check for git source override first (for marketplace plugins)
@@ -58,7 +58,7 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
   if (ctx.source.gitSourceOverride) {
     fields.gitUrl = ctx.source.gitSourceOverride.gitUrl;
     fields.gitRef = ctx.source.gitSourceOverride.gitRef;
-    fields.gitSubdirectory = ctx.source.gitSourceOverride.gitSubdirectory;
+    fields.gitPath = ctx.source.gitSourceOverride.gitPath;
     return fields;
   }
   
@@ -78,7 +78,7 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
       // Git packages get git fields
       fields.gitUrl = ctx.source.gitUrl;
       fields.gitRef = ctx.source.gitRef;
-      fields.gitSubdirectory = ctx.source.gitSubdirectory;
+      fields.gitPath = ctx.source.gitPath;
       break;
     
     case 'workspace':

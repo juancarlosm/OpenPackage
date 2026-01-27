@@ -71,7 +71,7 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
       const pkg = await loadPackageFromPath(contentRoot, {
         packageName: source.packageName,
         gitUrl: source.gitUrl,
-        subdirectory: source.gitSubdirectory
+        path: source.gitPath
       });
       const metadata = pkg.metadata;
       

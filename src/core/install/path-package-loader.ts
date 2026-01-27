@@ -20,7 +20,7 @@ export type PathSourceType = 'directory' | 'tarball';
  */
 export interface PackageLoadContext {
   gitUrl?: string;
-  subdirectory?: string;
+  path?: string;
   repoPath?: string;
   packageName?: string;  // Optional override (avoid using - let transformer generate)
   marketplaceEntry?: MarketplacePluginEntry;

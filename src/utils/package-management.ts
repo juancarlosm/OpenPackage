@@ -9,7 +9,8 @@ import { DEPENDENCY_ARRAYS, FILE_PATTERNS, PACKAGE_PATHS } from '../constants/in
 import { createCaretRange, hasExplicitPrereleaseIntent, isPrereleaseVersion } from './version-ranges.js';
 import { extractBaseVersion } from './version-generator.js';
 import { isUnversionedVersion } from './package-versioning.js';
-import { normalizePackageName, arePackageNamesEquivalent } from './package-name.js';
+import { normalizePackageName, arePackageNamesEquivalent, normalizePackageNameForLookup } from './package-name.js';
+import { extractGitHubInfo } from './git-url-parser.js';
 import { packageManager } from '../core/package.js';
 import { promptPackageDetailsForNamed } from './prompts.js';
 import { writePackageFilesToDirectory } from './package-copy.js';
@@ -170,7 +171,7 @@ export async function addPackageToYml(
   path?: string,  // Path to local directory or tarball (for path-based dependencies)
   git?: string,   // Git source url (mutually exclusive with path/version)
   ref?: string,   // Git ref (branch/tag/sha)
-  subdirectory?: string  // Git subdirectory path (for plugins in marketplaces)
+  gitPath?: string  // Git subdirectory path (for plugins in marketplaces)
 ): Promise<void> {
   const packageYmlPath = getLocalPackageYmlPath(cwd);
   
@@ -271,10 +272,10 @@ export async function addPackageToYml(
     name: normalizedPackageName,
     ...(versionToWrite ? { version: versionToWrite } : {}),
     ...(includeToWrite ? { include: includeToWrite } : {}),
-    ...(path ? { path } : {}),
+    ...(path && !git ? { path } : {}),  // Only use path for local sources
     ...(git ? { git } : {}),
     ...(ref ? { ref } : {}),
-    ...(subdirectory ? { subdirectory } : {})
+    ...(gitPath ? { path: gitPath } : {})  // Use path field for git subdirectory
   };
   
   // Determine target location (dependencies vs dev-dependencies)
@@ -405,6 +406,82 @@ export async function updatePackageDependencyInclude(
 }
 
 /**
+ * Check if a dependency matches a given package name, handling various naming formats.
+ * This function supports matching across format migrations:
+ * - Direct name comparison (after normalization)
+ * - Git-based matching (username/repo/path combinations)
+ * 
+ * Examples of matches:
+ * - "anthropics/claude-plugins-official/code-review" matches "ghanthropics/claude-plugins-official/plugins/code-review"
+ * - "@anthropics/claude-plugins-official" matches "ghanthropics/claude-plugins-official"
+ * - "username/repo" matches "gh@username/repo"
+ */
+function doesDependencyMatchPackageName(
+  dep: PackageDependency,
+  userInputName: string
+): boolean {
+  // Normalize both for direct comparison
+  const normalizedDepName = normalizePackageNameForLookup(dep.name);
+  const normalizedUserName = normalizePackageNameForLookup(userInputName);
+  
+  // Direct match after normalization
+  if (normalizedDepName === normalizedUserName) {
+    return true;
+  }
+  
+  // If dependency has a git source, try matching based on git URL + path
+  if (dep.git) {
+    const githubInfo = extractGitHubInfo(dep.git);
+    if (!githubInfo) {
+      return false;
+    }
+    
+    const { username, repo } = githubInfo;
+    
+    // Get the actual path from dependency (prefer path over subdirectory)
+    const actualPath = dep.path || (dep.subdirectory?.startsWith('./') 
+      ? dep.subdirectory.substring(2) 
+      : dep.subdirectory);
+    
+    // Build all possible name variations that could match
+    const possibleNames = [
+      `${username}/${repo}`,
+      `@${username}/${repo}`,
+      `gh@${username}/${repo}`,
+    ];
+    
+    if (actualPath) {
+      possibleNames.push(
+        `${username}/${repo}/${actualPath}`,
+        `@${username}/${repo}/${actualPath}`,
+        `gh@${username}/${repo}/${actualPath}`,
+      );
+      
+      // Also try with just the basename of the path
+      // e.g., "plugins/code-review" -> "code-review"
+      const pathBasename = actualPath.split('/').pop();
+      if (pathBasename && pathBasename !== actualPath) {
+        possibleNames.push(
+          `${username}/${repo}/${pathBasename}`,
+          `@${username}/${repo}/${pathBasename}`,
+          `gh@${username}/${repo}/${pathBasename}`,
+        );
+      }
+    }
+    
+    // Check if any possible name matches the user input (case-insensitive)
+    const normalizedInput = normalizePackageName(userInputName);
+    for (const possibleName of possibleNames) {
+      if (normalizePackageName(possibleName) === normalizedInput) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Remove a dependency entry from openpackage.yml (both dependencies and dev-dependencies).
  */
 export async function removePackageFromOpenpackageYml(
@@ -418,18 +495,27 @@ export async function removePackageFromOpenpackageYml(
     const config = await parsePackageYml(packageYmlPath);
     const sections: Array<'dependencies' | 'dev-dependencies'> = [DEPENDENCY_ARRAYS.DEPENDENCIES, DEPENDENCY_ARRAYS.DEV_DEPENDENCIES];
     let removed = false;
+    let hadAnyDependencies = false;
 
     for (const section of sections) {
       const arr = config[section];
       if (!arr) continue;
-      const next = arr.filter(dep => !arePackageNamesEquivalent(dep.name, packageName));
+      if (arr.length > 0) hadAnyDependencies = true;
+      
+      // Filter out dependencies that match the package name
+      // Uses context-aware matching to handle git sources and naming migrations
+      const next = arr.filter(dep => !doesDependencyMatchPackageName(dep, packageName));
+      
       if (next.length !== arr.length) {
         config[section] = next as any;
         removed = true;
       }
     }
 
-    if (removed) {
+    // Always write the config if:
+    // 1. A package was removed (to persist the removal), OR
+    // 2. The file had dependencies (to trigger migration even if no removal happened)
+    if (removed || hadAnyDependencies) {
       await writePackageYml(packageYmlPath, config);
     }
     return removed;

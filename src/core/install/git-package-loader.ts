@@ -6,7 +6,7 @@ import type { Package } from '../../types/index.js';
 export interface GitPackageLoadOptions {
   url: string;
   ref?: string;
-  subdirectory?: string;
+  path?: string;
 }
 
 export interface GitPackageLoadResult {
@@ -21,7 +21,7 @@ export async function loadPackageFromGit(options: GitPackageLoadOptions): Promis
   const cloneResult = await cloneRepoToCache({ 
     url: options.url, 
     ref: options.ref,
-    subdirectory: options.subdirectory
+    subdir: options.path
   });
   
   const { path: sourcePath, repoPath, commitSha } = cloneResult;
@@ -43,7 +43,7 @@ export async function loadPackageFromGit(options: GitPackageLoadOptions): Promis
   // Pass GitHub context for scoped naming
   const pkg = await loadPackageFromPath(sourcePath, {
     gitUrl: options.url,
-    subdirectory: options.subdirectory,
+    path: options.path,
     repoPath
   });
   
