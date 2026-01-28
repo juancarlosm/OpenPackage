@@ -6,43 +6,96 @@ This document specifies how `install` supports installing packages from **git re
 
 ## 1. Supported inputs
 
-### 1.1 CLI inputs
+### 1.1 CLI inputs (New Syntax)
 
-- **`opkg install git:<url>[#ref][&subdirectory=path]`**
-  - Installs a package from a git repository URL.
+**Modern syntax (recommended):**
+
+- **`opkg install gh@<owner>/<repo>[/path]`**
+  - GitHub shorthand for installing from GitHub repositories.
+  - Always uses the default branch.
+  - `path` is optional and specifies a subdirectory within the repository.
+
+- **`opkg install <github-url>`**
+  - Direct GitHub URLs from browser (copy-paste friendly).
+  - Supports repository URLs: `https://github.com/owner/repo`
+  - Supports tree URLs with branch/tag: `https://github.com/owner/repo/tree/main`
+  - Supports tree URLs with subdirectory: `https://github.com/owner/repo/tree/main/path`
+
+- **`opkg install <git-url>[#ref][&path=<path>]`**
+  - Generic git URLs with hash fragments for ref and path.
+  - Supports any git host (GitLab, Bitbucket, self-hosted, etc.)
   - `ref` is optional and may be a branch, tag, or commit SHA.
-  - `subdirectory` is optional and specifies a subdirectory within the repository to install.
+  - `path` is optional and specifies a subdirectory within the repository.
 
-- **`opkg install github:<owner>/<repo>[#ref][&subdirectory=path]`**
-  - Convenience shorthand for GitHub.
-  - Equivalent to:
-    - `opkg install git:https://github.com/<owner>/<repo>.git[#ref][&subdirectory=path]`
+**Legacy syntax (deprecated, still works with warnings):**
 
-**Examples:**
+- **`opkg install github:<owner>/<repo>[#ref][&subdirectory=path]`** ⚠️ DEPRECATED
+  - Shows warning: `The 'github:' prefix is deprecated. Use 'gh@user/repo' instead.`
+  - Legacy GitHub shorthand, use `gh@` instead.
+
+- **`opkg install git:<url>[#ref][&subdirectory=path]`** ⚠️ DEPRECATED
+  - Shows warning: `The 'git:' prefix is deprecated. Use the URL directly.`
+  - Legacy git prefix, use URL directly instead.
+
+**Examples (Modern Syntax):**
 ```bash
-# Install from main branch
-opkg install github:anthropics/claude-code
+# GitHub shorthand (uses default branch)
+opkg install gh@anthropics/claude-code
 
-# Install from specific branch
-opkg install github:anthropics/claude-code#main
+# GitHub shorthand with subdirectory
+opkg install gh@anthropics/claude-code/plugins/commit-commands
 
-# Install from subdirectory (Claude Code plugin)
-opkg install github:anthropics/claude-code#subdirectory=plugins/commit-commands
+# GitHub web URL (copy from browser)
+opkg install https://github.com/anthropics/claude-code
 
-# Install from specific tag and subdirectory
-opkg install github:anthropics/claude-code#v1.0.0&subdirectory=plugins/commit-commands
+# GitHub web URL with branch
+opkg install https://github.com/anthropics/claude-code/tree/main
 
-# Install from any git URL with subdirectory
-opkg install git:https://gitlab.com/user/repo.git#main&subdirectory=packages/plugin-a
+# GitHub web URL with branch and subdirectory
+opkg install https://github.com/anthropics/claude-code/tree/v1.0.0/plugins/commit-commands
+
+# Generic git URL with ref
+opkg install https://gitlab.com/user/repo.git#main
+
+# Generic git URL with ref and subdirectory
+opkg install https://gitlab.com/user/repo.git#main&path=packages/plugin-a
+
+# Generic git URL with subdirectory only
+opkg install https://example.com/repo.git#path=src/plugin
 ```
 
-### 1.2 Subdirectory syntax
+**Examples (Legacy Syntax - Still Works):**
+```bash
+# Legacy GitHub shorthand (deprecated)
+opkg install github:anthropics/claude-code
+⚠️  The 'github:' prefix is deprecated. Use 'gh@user/repo' instead.
 
-The subdirectory option supports two formats:
-- **After ref**: `#ref&subdirectory=path` (ref + subdirectory)
-- **Without ref**: `#subdirectory=path` (subdirectory only)
+# Legacy git prefix (deprecated)
+opkg install git:https://gitlab.com/user/repo.git
+⚠️  The 'git:' prefix is deprecated. Use the URL directly.
 
-Order matters: `ref` must come before `subdirectory` when both are present.
+# Legacy with subdirectory (both path= and subdirectory= work)
+opkg install github:user/repo#main&subdirectory=plugins/x  # Still works
+opkg install gh@user/repo                                   # Recommended
+```
+
+### 1.2 Path/subdirectory syntax
+
+**Modern syntax** uses `path=` in hash fragments for generic git URLs:
+- **With ref**: `#ref&path=<path>` (ref + path)
+- **Without ref**: `#path=<path>` (path only)
+
+**GitHub shorthand** embeds path directly in the syntax:
+- Format: `gh@owner/repo/path/to/subdir`
+
+**GitHub web URLs** extract path from the URL structure:
+- Format: `https://github.com/owner/repo/tree/ref/path/to/subdir`
+
+**Legacy syntax** uses `subdirectory=` (still supported, no warning):
+- **With ref**: `#ref&subdirectory=path`
+- **Without ref**: `#subdirectory=path`
+
+**Note:** Both `path=` and `subdirectory=` work in hash fragments for backward compatibility. The system automatically normalizes to `path` internally.
 
 ---
 
@@ -50,19 +103,39 @@ Order matters: `ref` must come before `subdirectory` when both are present.
 
 Dependencies in `openpackage.yml` support git sources via:
 
+**Current schema (as of Phase 2):**
 ```yaml
-packages:
+dependencies:
+  # Basic git source (default branch)
+  - name: somepkg
+    url: https://example.com/org/repo.git
+
+  # With specific ref (branch/tag/commit)
+  - name: somepkg-versioned
+    url: https://example.com/org/repo.git#v1.0.0
+
+  # With subdirectory
+  - name: plugin-package
+    url: https://example.com/org/repo.git#main
+    path: plugins/my-plugin
+```
+
+**Legacy schema (auto-migrated on read, never written):**
+```yaml
+dependencies:
+  # Old format - automatically migrated
   - name: somepkg
     git: https://example.com/org/repo.git
     ref: main
-    subdirectory: plugins/my-plugin  # Optional
+    subdirectory: plugins/my-plugin  # Also migrated to 'path'
 ```
 
 Rules:
-- Each dependency entry MUST specify **exactly one** source field: `version`, `path`, or `git`.
-- `ref` and `subdirectory` are only valid when `git` is present.
+- Each dependency entry MUST specify **exactly one** source field: `version`, `path`, or `url`.
+- `path` specifies a subdirectory path within the repository when `url` is present.
 - Git dependencies MUST NOT specify `version` (git dependencies are source-pinned, not semver-ranged).
-- `subdirectory` specifies a subdirectory path within the repository to use as the package root.
+- Legacy `git`, `ref`, and `subdirectory` fields are automatically migrated when reading old manifests.
+- New manifests always use the `url` field format with optional embedded `#ref`.
 
 ---
 

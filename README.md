@@ -78,21 +78,28 @@ Installs all files from a package into the codebase at cwd, formatted and conver
 
 The install command supports various package sources:
 ```bash title="Terminal"
-opkg install essentials               # Local/remote registry
+# Registry packages
+opkg install essentials               # From registry
+opkg install essentials@1.0.0         # Specific version
+
+# Local packages
 opkg install ../packages/essentials/  # Local path
 
-# GitHub package repo
-opkg install git:https://github.com/enulus/awesome-openpackage.git    
+# GitHub packages (modern syntax)
+opkg install gh@anthropics/claude-code                    # GitHub shorthand
+opkg install gh@anthropics/claude-code/plugins/feature    # With subdirectory
+opkg install https://github.com/anthropics/claude-code    # Direct URL
 
-# GitHub Claude Code Plugins marketplace          
-opkg install github:anthropics/claude-code
+# Other git repositories
+opkg install https://gitlab.com/user/repo.git             # GitLab
+opkg install https://example.com/repo.git#v1.0.0          # With version tag
 ```  
 
 Use the `--global` (or `-g`) option to install files to user scope:
 ```bash title="Terminal"
 # Installs to home dir, ex: ~/.cursor/, ~/.opencode/
-opkg install github:anthropics/claude-code -g
-```  
+opkg install gh@anthropics/claude-code -g
+```
 
 ### Show installed packages and files
 ```bash title="Terminal"

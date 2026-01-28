@@ -18,7 +18,7 @@ import {
 {
   const result = normalizePluginSource('./plugins/my-plugin', 'test-plugin');
   assert.equal(result.type, 'relative-path');
-  assert.equal(result.relativePath, './plugins/my-plugin');
+  assert.equal(result.relativePath, 'plugins/my-plugin'); // Leading ./ is stripped during normalization
   assert.equal(isRelativePathSource(result), true);
   assert.equal(isGitSource(result), false);
 }
@@ -52,7 +52,7 @@ assert.throws(
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://github.com/owner/repo.git');
   assert.equal(result.gitRef, undefined);
-  assert.equal(result.gitSubdirectory, undefined);
+  assert.equal(result.gitPath, undefined);
   assert.equal(isGitSource(result), true);
   assert.equal(isRelativePathSource(result), false);
 }
@@ -69,7 +69,7 @@ assert.throws(
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://github.com/owner/repo.git');
   assert.equal(result.gitRef, 'v1.0.0');
-  assert.equal(result.gitSubdirectory, undefined);
+  assert.equal(result.gitPath, undefined);
 }
 
 // Test: GitHub sources with path (subdirectory)
@@ -84,7 +84,7 @@ assert.throws(
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://github.com/owner/repo.git');
   assert.equal(result.gitRef, undefined);
-  assert.equal(result.gitSubdirectory, 'plugins/my-plugin');
+  assert.equal(result.gitPath, 'plugins/my-plugin');
 }
 
 // Test: GitHub sources with ref and path
@@ -100,7 +100,7 @@ assert.throws(
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://github.com/owner/repo.git');
   assert.equal(result.gitRef, 'main');
-  assert.equal(result.gitSubdirectory, 'plugins/my-plugin');
+  assert.equal(result.gitPath, 'plugins/my-plugin');
 }
 
 // Test: reject GitHub sources without repo field
@@ -141,7 +141,7 @@ assert.throws(
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://gitlab.com/team/plugin.git');
   assert.equal(result.gitRef, undefined);
-  assert.equal(result.gitSubdirectory, undefined);
+  assert.equal(result.gitPath, undefined);
 }
 
 // Test: Git URL sources with ref
@@ -169,7 +169,7 @@ assert.throws(
   const result = normalizePluginSource(source, 'test-plugin');
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://bitbucket.org/team/monorepo.git');
-  assert.equal(result.gitSubdirectory, 'packages/plugin-a');
+  assert.equal(result.gitPath, 'packages/plugin-a');
 }
 
 // Test: Git URL sources with ref and path
@@ -185,7 +185,7 @@ assert.throws(
   assert.equal(result.type, 'git');
   assert.equal(result.gitUrl, 'https://gitlab.com/team/plugin.git');
   assert.equal(result.gitRef, 'v2.0.0');
-  assert.equal(result.gitSubdirectory, 'src/plugin');
+  assert.equal(result.gitPath, 'src/plugin');
 }
 
 // Test: SSH Git URLs

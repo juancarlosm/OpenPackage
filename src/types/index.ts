@@ -78,34 +78,55 @@ export interface PackageRepository {
 // Package.yml file types
 export interface PackageDependency {
   name: string;
+  
+  // === Source fields (mutually exclusive) ===
+  
   /**
-   * Registry source (mutually exclusive with path/git).
+   * Registry source: semver version or range
+   * Mutually exclusive with path (local) and url
    */
   version?: string;
+  
   /**
-   * Local filesystem source (mutually exclusive with version/git).
-   * If ends with .tgz/.tar.gz → tarball, otherwise directory.
-   * 
-   * Also used for git source subdirectory when git field is present.
-   * Example for git: plugins/commit-commands
+   * Dual meaning based on context:
+   * - When url is absent: Local filesystem path
+   * - When url is present: Subdirectory within git repository
    */
   path?: string;
+  
   /**
-   * Git source (mutually exclusive with version/path as source).
-   * Supports https/ssh/git URLs; refs handled separately.
-   * When git is present, path refers to subdirectory within the repository.
+   * Git/HTTP source URL with optional embedded ref (#ref)
+   * Format: <git-url>[#<ref>]
+   * Examples:
+   *   - https://github.com/user/repo.git
+   *   - https://github.com/user/repo.git#main
+   *   - https://github.com/user/repo.git#v1.0.0
+   * Mutually exclusive with version
+   */
+  url?: string;
+  
+  // === Deprecated fields (backward compat) ===
+  
+  /**
+   * @deprecated Use url instead
+   * Still read for backward compatibility, never written
    */
   git?: string;
+  
   /**
-   * Optional ref (branch/tag/commit) when using git source.
+   * @deprecated Embed in url as #ref
+   * Still read for backward compatibility, never written
    */
   ref?: string;
+  
   /**
-   * @deprecated Legacy field - use 'path' instead
-   * Optional subdirectory within git repository (for plugin marketplaces).
-   * This field is automatically migrated to 'path' when reading/writing manifests.
+   * @deprecated Use path instead
+   * Already migrated in v0.8.x, kept for older files
    */
   subdirectory?: string;
+  
+  // === Other fields ===
+  
   /**
    * Optional list of registry-relative paths to install for this dependency.
    * When provided (non-empty), installs are partial and limited to these paths.

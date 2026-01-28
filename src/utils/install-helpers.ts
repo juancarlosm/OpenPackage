@@ -9,8 +9,8 @@ import { exists } from './fs.js';
 /**
  * Extract packages from openpackage.yml configuration
  */
-export function extractPackagesFromConfig(config: PackageYml): Array<{ name: string; version?: string; path?: string; git?: string; ref?: string; subdirectory?: string; isDev: boolean }> {
-  const packages: Array<{ name: string; version?: string; path?: string; git?: string; ref?: string; subdirectory?: string; isDev: boolean }> = [];
+export function extractPackagesFromConfig(config: PackageYml): Array<{ name: string; version?: string; path?: string; git?: string; url?: string; ref?: string; subdirectory?: string; isDev: boolean }> {
+  const packages: Array<{ name: string; version?: string; path?: string; git?: string; url?: string; ref?: string; subdirectory?: string; isDev: boolean }> = [];
   
   const processSection = (section: 'dependencies' | 'dev-dependencies', isDev: boolean) => {
     const deps = config[section];
@@ -21,6 +21,7 @@ export function extractPackagesFromConfig(config: PackageYml): Array<{ name: str
           version: pkg.version,
           path: pkg.path,
           git: (pkg as any).git,
+          url: (pkg as any).url,
           ref: (pkg as any).ref,
           subdirectory: (pkg as any).subdirectory,
           isDev
@@ -96,8 +97,19 @@ export async function findExistingPathOrGitSource(
     return null;
   }
 
-  if (dep.git) {
-    return { type: 'git', url: dep.git, ref: dep.ref, subdir: dep.path };
+  // Handle both new (url) and legacy (git) fields
+  if (dep.url || dep.git) {
+    const gitUrlRaw = dep.url || dep.git!;
+    
+    // Parse url field to extract ref if embedded
+    const [gitUrl, embeddedRef] = gitUrlRaw.includes('#') 
+      ? gitUrlRaw.split('#', 2)
+      : [gitUrlRaw, undefined];
+    
+    // Use embedded ref if present, otherwise fall back to separate ref field
+    const ref = embeddedRef || dep.ref;
+    
+    return { type: 'git', url: gitUrl, ref, subdir: dep.path };
   }
 
   if (dep.path) {

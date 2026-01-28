@@ -193,13 +193,17 @@ export function isGitHubPluginName(name: string): boolean {
  * Old format: @username/marketplace-name/plugin (marketplace name from marketplace.json)
  * New format: @username/repo/plugin (always use repo name)
  */
-export function detectOldPluginNaming(dep: { name: string; git?: string; path?: string; subdirectory?: string }): string | null {
-  // Only check GitHub git sources with scoped names
-  if (!dep.git || !dep.name.startsWith('@')) {
+export function detectOldPluginNaming(dep: { name: string; git?: string; url?: string; path?: string; subdirectory?: string }): string | null {
+  // Only check GitHub git/url sources with scoped names
+  const gitUrlRaw = dep.url || dep.git;
+  if (!gitUrlRaw || !dep.name.startsWith('@')) {
     return null;
   }
   
-  const githubInfo = extractGitHubInfo(dep.git);
+  // Parse url to get base url (strip ref if present)
+  const gitUrl = gitUrlRaw.includes('#') ? gitUrlRaw.split('#', 2)[0] : gitUrlRaw;
+  
+  const githubInfo = extractGitHubInfo(gitUrl);
   if (!githubInfo) {
     return null;
   }
@@ -250,13 +254,17 @@ export function detectOldPluginNaming(dep: { name: string; git?: string; path?: 
  * 
  * Also handles path mismatches where package name doesn't match the path/subdirectory field.
  */
-export function detectOldGitHubNaming(dep: { name: string; git?: string; path?: string; subdirectory?: string }): string | null {
-  // Skip if not a git source
-  if (!dep.git) {
+export function detectOldGitHubNaming(dep: { name: string; git?: string; url?: string; path?: string; subdirectory?: string }): string | null {
+  // Skip if not a git/url source
+  const gitUrlRaw = dep.url || dep.git;
+  if (!gitUrlRaw) {
     return null;
   }
   
-  const githubInfo = extractGitHubInfo(dep.git);
+  // Parse url to get base url (strip ref if present)
+  const gitUrl = gitUrlRaw.includes('#') ? gitUrlRaw.split('#', 2)[0] : gitUrlRaw;
+  
+  const githubInfo = extractGitHubInfo(gitUrl);
   if (!githubInfo) {
     return null;
   }

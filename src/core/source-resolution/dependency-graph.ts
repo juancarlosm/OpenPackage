@@ -16,6 +16,7 @@ interface PackageDependency {
   version?: string;
   path?: string;
   git?: string;
+  url?: string;
   ref?: string;
 }
 
@@ -40,10 +41,21 @@ async function resolveFromManifest(
     };
   }
 
-  if (dep.git) {
+  // Handle both new (url) and legacy (git) fields
+  if (dep.url || dep.git) {
+    const gitUrlRaw = dep.url || dep.git!;
+    
+    // Parse url field to extract ref if embedded
+    const [gitUrl, embeddedRef] = gitUrlRaw.includes('#') 
+      ? gitUrlRaw.split('#', 2)
+      : [gitUrlRaw, undefined];
+    
+    // Use embedded ref if present, otherwise fall back to separate ref field
+    const ref = embeddedRef || dep.ref;
+    
     const { absolutePath, declaredPath } = await cloneGitToRegistry({
-      url: dep.git,
-      ref: dep.ref
+      url: gitUrl,
+      ref
     });
     const mutability = isRegistryPath(absolutePath) ? MUTABILITY.IMMUTABLE : MUTABILITY.MUTABLE;
     return {

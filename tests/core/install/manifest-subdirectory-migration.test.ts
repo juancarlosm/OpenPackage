@@ -33,7 +33,9 @@ dependencies:
       
       const dep = parsed.dependencies[0];
       assert.strictEqual(dep.name, 'gh@anthropics/claude-plugins-official/plugins/feature-dev');
-      assert.strictEqual(dep.git, 'https://github.com/anthropics/claude-plugins-official.git');
+      // Phase 2: git field migrated to url field
+      assert.strictEqual(dep.url, 'https://github.com/anthropics/claude-plugins-official.git');
+      assert.strictEqual(dep.git, undefined); // Migrated to url
       assert.strictEqual(dep.path, 'plugins/feature-dev'); // Leading ./ stripped
       assert.strictEqual(dep.subdirectory, undefined); // Removed
       
@@ -173,7 +175,7 @@ dependencies:
       // Should throw during validation
       await assert.rejects(
         async () => await parsePackageYml(manifestPath),
-        /has subdirectory field without git source/
+        /has subdirectory field without git\/url source/
       );
       
     } finally {

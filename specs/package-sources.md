@@ -49,19 +49,37 @@ packages:
 
 Cloned to local path; mutability by location.
 
+**Current format:**
 ```yaml
-packages:
+dependencies:
+  # Basic git source
   - name: git-pkg
-    git: https://github.com/user/repo.git
-    ref: main  # Branch/tag/commit optional
-    subdirectory: packages/my-package  # Optional (for monorepos/plugins)
+    url: https://github.com/user/repo.git
+
+  # With specific ref
+  - name: git-pkg-versioned
+    url: https://github.com/user/repo.git#v1.0.0
+
+  # With subdirectory
+  - name: plugin-pkg
+    url: https://github.com/user/repo.git#main
+    path: packages/my-package  # For monorepos/plugins
 ```
 
-- Cloned to `~/.openpackage/registry/...` (current impl; thus immutable).
-- Ops: `apply`/`install` ok; `save`/`add` fail if in registry.
-- Future: Could clone to mutable dir for editability.
+**Legacy format (auto-migrated):**
+```yaml
+dependencies:
+  - name: git-pkg
+    git: https://github.com/user/repo.git  # → migrated to 'url:'
+    ref: main                               # → embedded as '#main'
+    subdirectory: packages/my-package       # → migrated to 'path:'
+```
+
+- Cloned to `~/.openpackage/cache/git/` (cached, immutable).
+- Ops: `apply`/`install` ok; `save`/`add` fail (immutable).
 - **Subdirectory support**: Allows installing from monorepo subdirectories or Claude Code plugin marketplaces.
 - **Claude Code plugins**: Automatically detected via `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`.
+- **Auto-migration**: Old `git:`, `ref:`, and `subdirectory:` fields automatically converted to new format.
 - See [Git Sources](install/git-sources.md) for install details including subdirectory syntax and plugin support.
 
 Other: Absolute/custom paths treated by resolved location.

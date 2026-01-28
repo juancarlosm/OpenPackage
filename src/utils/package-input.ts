@@ -3,7 +3,7 @@ import { exists } from './fs.js';
 import { isValidPackageDirectory } from '../core/package-context.js';
 import { parsePackageInstallSpec } from './package-name.js';
 import { ValidationError } from './errors.js';
-import { parseGitSpec } from './git-spec.js';
+import { detectGitSource } from './git-url-detection.js';
 import { logger } from './logger.js';
 import {
   resolvePackageByName,
@@ -54,14 +54,14 @@ export async function classifyPackageInput(
   raw: string,
   cwd: string = process.cwd()
 ): Promise<PackageInputClassification> {
-  // Check for git/github specs first
-  const gitSpec = parseGitSpec(raw);
+  // Check for git sources first (new detection system)
+  const gitSpec = detectGitSource(raw);
   if (gitSpec) {
     return {
       type: 'git',
       gitUrl: gitSpec.url,
       gitRef: gitSpec.ref,
-      gitPath: gitSpec.subdirectory
+      gitPath: gitSpec.path
     };
   }
 

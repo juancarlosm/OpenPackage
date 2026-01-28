@@ -229,13 +229,23 @@ async function buildBulkInstallContexts(
       
       let source: PackageSource;
       
-      if (dep.git) {
-        // Git source
+      if (dep.git || dep.url) {
+        // Git source - handle both old (git) and new (url) formats
+        const gitUrlRaw = dep.url || dep.git!;
+        
+        // Parse url field to extract ref if embedded
+        const [gitUrl, embeddedRef] = gitUrlRaw.includes('#') 
+          ? gitUrlRaw.split('#', 2)
+          : [gitUrlRaw, undefined];
+        
+        // Use embedded ref if present, otherwise fall back to separate ref field
+        const gitRef = embeddedRef || dep.ref;
+        
         source = {
           type: 'git',
           packageName: dep.name,
-          gitUrl: dep.git,
-          gitRef: dep.ref,
+          gitUrl,
+          gitRef,
           gitPath: dep.path
         };
       } else if (dep.path) {

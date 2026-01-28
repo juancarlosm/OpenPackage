@@ -260,12 +260,22 @@ export async function resolveDependencies(
       };
 
       const processDependencyEntry = async (dep: any) => {
-        // Git-based dependency
-        if (dep.git) {
+        // Git-based dependency - handle both new (url) and legacy (git) fields
+        if (dep.url || dep.git) {
+          const gitUrlRaw = dep.url || dep.git!;
+          
           try {
+            // Parse url field to extract ref if embedded
+            const [gitUrl, embeddedRef] = gitUrlRaw.includes('#') 
+              ? gitUrlRaw.split('#', 2)
+              : [gitUrlRaw, undefined];
+            
+            // Use embedded ref if present, otherwise fall back to separate ref field
+            const ref = embeddedRef || dep.ref;
+            
             const result = await loadPackageFromGit({
-              url: dep.git,
-              ref: dep.ref
+              url: gitUrl,
+              ref
             });
             if (result.isMarketplace) {
               logger.error(`Dependency '${dep.name}' points to a Claude Code plugin marketplace, which cannot be used as a dependency`);
@@ -274,7 +284,7 @@ export async function resolveDependencies(
             }
             await resolveLocalPackage(result.pkg!, 'git', result.sourcePath, dep.version);
           } catch (error) {
-            logger.error(`Failed to load git-based dependency '${dep.name}' from '${dep.git}': ${error}`);
+            logger.error(`Failed to load git-based dependency '${dep.name}' from '${gitUrlRaw}': ${error}`);
             missing.add(dep.name);
           }
         } else if (dep.path) {
@@ -753,12 +763,22 @@ export async function resolveDependencies(
     };
 
     const processDependencyEntry = async (dep: any) => {
-      // Git-based dependency
-      if (dep.git) {
+      // Git-based dependency - handle both new (url) and legacy (git) fields
+      if (dep.url || dep.git) {
+        const gitUrlRaw = dep.url || dep.git!;
+        
         try {
+          // Parse url field to extract ref if embedded
+          const [gitUrl, embeddedRef] = gitUrlRaw.includes('#') 
+            ? gitUrlRaw.split('#', 2)
+            : [gitUrlRaw, undefined];
+          
+          // Use embedded ref if present, otherwise fall back to separate ref field
+          const ref = embeddedRef || dep.ref;
+          
           const result = await loadPackageFromGit({
-            url: dep.git,
-            ref: dep.ref
+            url: gitUrl,
+            ref
           });
           if (result.isMarketplace) {
             logger.error(`Dependency '${dep.name}' points to a Claude Code plugin marketplace, which cannot be used as a dependency`);
@@ -767,7 +787,7 @@ export async function resolveDependencies(
           }
           await resolveLocalPackage(result.pkg!, 'git', result.sourcePath, dep.version);
         } catch (error) {
-          logger.error(`Failed to load git-based dependency '${dep.name}' from '${dep.git}': ${error}`);
+          logger.error(`Failed to load git-based dependency '${dep.name}' from '${gitUrlRaw}': ${error}`);
           missing.add(dep.name);
         }
       } else if (dep.path) {

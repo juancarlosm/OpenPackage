@@ -47,8 +47,21 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
           needsGitHubMigration = true;
         }
         
+        // Migrate git → url and ref → embed in url
+        if (dep.git && !dep.url) {
+          dep.url = dep.git;
+          if (dep.ref) {
+            // Only embed ref if url doesn't already have one
+            if (!dep.url.includes('#')) {
+              dep.url = `${dep.url}#${dep.ref}`;
+            }
+            delete dep.ref;
+          }
+          delete dep.git;
+        }
+        
         // Migrate subdirectory field to path field
-        if (dep.subdirectory && dep.git && !dep.path) {
+        if (dep.subdirectory && (dep.git || dep.url) && !dep.path) {
           // Normalize path: strip leading ./ if present
           const normalizedPath = dep.subdirectory.startsWith('./')
             ? dep.subdirectory.substring(2)
@@ -76,8 +89,21 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
           needsGitHubMigration = true;
         }
         
+        // Migrate git → url and ref → embed in url
+        if (dep.git && !dep.url) {
+          dep.url = dep.git;
+          if (dep.ref) {
+            // Only embed ref if url doesn't already have one
+            if (!dep.url.includes('#')) {
+              dep.url = `${dep.url}#${dep.ref}`;
+            }
+            delete dep.ref;
+          }
+          delete dep.git;
+        }
+        
         // Migrate subdirectory field to path field
-        if (dep.subdirectory && dep.git && !dep.path) {
+        if (dep.subdirectory && (dep.git || dep.url) && !dep.path) {
           // Normalize path: strip leading ./ if present
           const normalizedPath = dep.subdirectory.startsWith('./')
             ? dep.subdirectory.substring(2)
@@ -103,26 +129,27 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
     const validateDependencies = (deps: PackageDependency[] | undefined, section: string): void => {
       if (!deps) return;
       for (const dep of deps) {
-        // For git sources, path is a subdirectory, not a source
+        // For git/url sources, path is a subdirectory, not a source
         // For non-git sources, path is a source
-        const sources = dep.git
-          ? [dep.version, dep.git].filter(Boolean)
-          : [dep.version, dep.path, dep.git].filter(Boolean);
+        const hasGitSource = dep.git || dep.url;
+        const sources = hasGitSource
+          ? [dep.version, dep.git, dep.url].filter(Boolean)
+          : [dep.version, dep.path, dep.git, dep.url].filter(Boolean);
         
         if (sources.length > 1) {
           throw new Error(
-            `openpackage.yml ${section}: dependency '${dep.name}' has multiple sources; specify at most one of version, path, or git`
+            `openpackage.yml ${section}: dependency '${dep.name}' has multiple sources; specify at most one of version, path, url, or git`
           );
         }
-        if (dep.ref && !dep.git) {
+        if (dep.ref && !(dep.git || dep.url)) {
           throw new Error(
-            `openpackage.yml ${section}: dependency '${dep.name}' has ref but no git source`
+            `openpackage.yml ${section}: dependency '${dep.name}' has ref but no git/url source`
           );
         }
         // Validate legacy subdirectory field (should have been migrated)
-        if (dep.subdirectory && !dep.git) {
+        if (dep.subdirectory && !hasGitSource) {
           throw new Error(
-            `openpackage.yml ${section}: dependency '${dep.name}' has subdirectory field without git source`
+            `openpackage.yml ${section}: dependency '${dep.name}' has subdirectory field without git/url source`
           );
         }
         // Warn if both subdirectory and path exist (shouldn't happen after migration)
@@ -240,16 +267,18 @@ export async function writePackageYml(packageYmlPath: string, config: PackageYml
   }
   delete migratedConfig['dev-packages'];
   
-  // Clean up legacy subdirectory fields from all dependencies
-  const cleanSubdirectoryField = (deps: PackageDependency[] | undefined) => {
+  // Clean up legacy fields from all dependencies
+  const cleanLegacyFields = (deps: PackageDependency[] | undefined) => {
     if (!deps) return;
     for (const dep of deps) {
       delete dep.subdirectory;
+      delete dep.git;
+      delete dep.ref;
     }
   };
   
-  cleanSubdirectoryField(migratedConfig.dependencies);
-  cleanSubdirectoryField(migratedConfig['dev-dependencies']);
+  cleanLegacyFields(migratedConfig.dependencies);
+  cleanLegacyFields(migratedConfig['dev-dependencies']);
   
   // Log if plugin naming was migrated
   if ((config as any)._needsPluginMigration) {
