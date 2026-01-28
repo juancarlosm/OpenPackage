@@ -15,6 +15,7 @@ import { setupRemoveCommand } from './commands/remove.js';
 import { setupInstallCommand } from './commands/install.js';
 import { setupUninstallCommand } from './commands/uninstall.js';
 import { setupListCommand } from './commands/list.js';
+import { setupPackCommand } from './commands/pack.js';
 import { setupConfigureCommand } from './commands/configure.js';
 import { setupLoginCommand } from './commands/login.js';
 import { setupLogoutCommand } from './commands/logout.js';
@@ -103,8 +104,9 @@ program
       
       // All commands section - ultra compact
       output += 'All commands:\n\n';
-      output += '    new, add, remove, set, list,\n';
-      output += '    install, uninstall, configure, login, logout\n\n';
+      output += '    install, uninstall, list,\n';
+      output += '    new, add, remove, set, pack,\n';
+      output += '    login, logout\n\n';
       
       // Version
       const version = cmd.version();
@@ -124,6 +126,7 @@ setupSetCommand(program);
 setupInstallCommand(program);
 setupUninstallCommand(program);
 setupListCommand(program);
+setupPackCommand(program);
 
 // === CONFIGURATION ===
 setupConfigureCommand(program);
