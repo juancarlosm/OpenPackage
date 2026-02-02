@@ -1,9 +1,9 @@
 import { packageManager } from '../../package.js';
 import { FILE_PATTERNS, PACKAGE_PATHS } from '../../../constants/index.js';
 import type { PackageFile } from '../../../types/index.js';
-import { getPlatformDefinition, type Platform } from '../../platforms.js';
-import { buildNormalizedIncludeSet, isManifestPath, normalizePackagePath } from '../../../utils/manifest-paths.js';
-import { getPlatformRootFileNames, stripRootCopyPrefix, isRootCopyPath } from '../../../utils/platform-root-files.js';
+import type { Platform } from '../../platforms.js';
+import { isManifestPath, normalizePackagePath } from '../../../utils/manifest-paths.js';
+import { getPlatformRootFileNames, stripRootCopyPrefix } from '../../../utils/platform-root-files.js';
 import { minimatch } from 'minimatch';
 
 export interface CategorizedInstallFiles {
@@ -16,7 +16,6 @@ export async function discoverAndCategorizeFiles(
   packageName: string,
   version: string,
   platforms: Platform[],
-  includePaths?: string[],
   contentRoot?: string,
   matchedPattern?: string  // Phase 4: Pattern for filtering
 ): Promise<CategorizedInstallFiles> {
@@ -25,18 +24,9 @@ export async function discoverAndCategorizeFiles(
     packageRootDir: contentRoot
   });
 
-  const normalizedIncludes = buildNormalizedIncludeSet(includePaths);
-
-  // Phase 4: Build include filter that considers both includePaths and matchedPattern
+  // Phase 4: Build include filter that considers matchedPattern
   const shouldInclude = (path: string): boolean => {
-    const normalized = normalizePackagePath(path);
-    
-    // First check explicit include paths (from convenience filters)
-    if (normalizedIncludes && !normalizedIncludes.has(normalized)) {
-      return false;
-    }
-    
-    // Then check matched pattern (from base detection)
+    // Check matched pattern (from base detection or resource scoping)
     if (matchedPattern && !minimatch(path, matchedPattern)) {
       return false;
     }

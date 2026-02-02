@@ -35,7 +35,6 @@ export interface PushPackageResponse {
 export interface PullPackageDownload {
   name: string;
   downloadUrl?: string;
-  include?: string[];
 }
 
 export interface PullPackageResponse {

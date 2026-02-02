@@ -64,7 +64,6 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
     const resourceFilteredSources = this.applyResourceFiltering(
       flowSources,
       context.matchedPattern,
-      context.resourceFilter,
       packageRoot
     );
     

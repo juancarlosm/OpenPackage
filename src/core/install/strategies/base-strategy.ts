@@ -14,6 +14,8 @@ import { logger } from '../../../utils/logger.js';
 import { createEmptyResult } from './helpers/result-converter.js';
 import { getApplicableFlows } from './helpers/flow-helpers.js';
 import { logInstallationResult } from '../helpers/result-logging.js';
+import { minimatch } from 'minimatch';
+import { relative } from 'path';
 
 /**
  * Abstract base class for installation strategies
@@ -137,62 +139,42 @@ export abstract class BaseStrategy implements InstallationStrategy {
   /**
    * Apply resource filtering to flow sources (Phase 4: Resource model)
    * 
-   * Filters sources based on:
-   * 1. Matched pattern (from base detection)
-   * 2. Explicit resource filter (from convenience options)
+   * Filters sources based on matched pattern (from base detection or resource scoping).
    * 
    * @param flowSources - Map of flows to source paths
    * @param matchedPattern - Pattern that matched for base detection
-   * @param resourceFilter - Specific paths to include (from convenience options)
    * @param packageRoot - Package root directory
    * @returns Filtered flow sources
    */
   protected applyResourceFiltering(
     flowSources: Map<any, string[]>,
     matchedPattern: string | undefined,
-    resourceFilter: string[] | undefined,
     packageRoot: string
   ): Map<any, string[]> {
     // If no filtering specified, return original sources
-    if (!matchedPattern && !resourceFilter) {
+    if (!matchedPattern) {
       return flowSources;
     }
     
-    const { minimatch } = require('minimatch');
-    const { relative } = require('path');
+    const normalizedPattern = matchedPattern.replace(/\\/g, '/');
     
     const filteredSources = new Map<any, string[]>();
     
     for (const [flow, sources] of flowSources.entries()) {
       const filtered = sources.filter(sourcePath => {
-        // Make path relative to package root for matching
-        const relativePath = relative(packageRoot, sourcePath);
+        // discoverFlowSources returns paths relative to packageRoot already.
+        // However, some callers may provide absolute paths. Support both robustly.
+        const isAbs = sourcePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(sourcePath);
+        const normalizedSource = sourcePath.replace(/\\/g, '/');
+        const relativePath = (isAbs ? relative(packageRoot, sourcePath) : normalizedSource).replace(/\\/g, '/');
         
         // Check matched pattern if specified
-        if (matchedPattern && !minimatch(relativePath, matchedPattern)) {
+        if (!minimatch(relativePath, normalizedPattern)) {
           logger.debug('Source filtered by pattern', {
             source: relativePath,
-            pattern: matchedPattern
+            pattern: normalizedPattern
           });
           return false;
-        }
-        
-        // Check resource filter if specified
-        if (resourceFilter && resourceFilter.length > 0) {
-          const matches = resourceFilter.some(filter => {
-            // Check if source matches or is within filtered path
-            return relativePath === filter || 
-                   relativePath.startsWith(filter + '/') ||
-                   filter.startsWith(relativePath + '/');
-          });
-          
-          if (!matches) {
-            logger.debug('Source filtered by resource filter', {
-              source: relativePath,
-              filters: resourceFilter
-            });
-            return false;
-          }
         }
         
         return true;
@@ -206,8 +188,7 @@ export abstract class BaseStrategy implements InstallationStrategy {
     logger.debug('Applied resource filtering', {
       originalFlowCount: flowSources.size,
       filteredFlowCount: filteredSources.size,
-      matchedPattern,
-      resourceFilterCount: resourceFilter?.length || 0
+      matchedPattern: normalizedPattern
     });
     
     return filteredSources;

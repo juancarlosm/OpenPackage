@@ -81,7 +81,6 @@ export async function installPackageByIndexWithFlows(
   version: string,
   platforms: Platform[],
   options: InstallOptions,
-  includePaths?: string[],
   contentRoot?: string,
   packageFormat?: any,  // Optional format metadata from plugin transformer
   marketplaceMetadata?: {  // Optional marketplace source metadata
@@ -199,8 +198,7 @@ export async function installPackageByIndexWithFlows(
       packageFormat: format,
       conversionContext,
       // Phase 4: Pass resource filtering info
-      matchedPattern,
-      resourceFilter: includePaths
+      matchedPattern
     };
 
     try {
@@ -269,11 +267,18 @@ export async function installPackageByIndexWithFlows(
 
   // Update workspace index if not dry-run
   if (!options.dryRun) {
+    // For resource-scoped installs, store the most specific source path possible (file when matchedPattern is a file).
+    // This keeps workspace index keys stable and aligned with manifest naming.
+    const isGlob = Boolean(matchedPattern && (matchedPattern.includes('*') || matchedPattern.includes('?') || matchedPattern.includes('[')));
+    const indexSourcePath = (matchedPattern && !isGlob)
+      ? join(resolvedContentRoot, matchedPattern)
+      : resolvedContentRoot;
+
     await updateWorkspaceIndexForFlows(
       cwd,
       packageName,
       version,
-      resolvedContentRoot,
+      indexSourcePath,
       fileMapping,
       marketplaceMetadata
     );

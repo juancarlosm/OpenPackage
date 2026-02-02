@@ -128,13 +128,6 @@ export interface PackageDependency {
   // === Other fields ===
   
   /**
-   * Optional list of registry-relative paths to install for this dependency.
-   * When provided (non-empty), installs are partial and limited to these paths.
-   * When omitted, installs include the full package payload.
-   */
-  include?: string[];
-  
-  /**
    * Base path within the repository (Phase 5: Resource model)
    * Relative path from repository root to the installation base.
    * Used for reproducibility when ambiguous base was resolved by user.

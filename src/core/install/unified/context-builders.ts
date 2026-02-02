@@ -1,4 +1,4 @@
-import { basename } from 'path';
+import { basename, join, relative } from 'path';
 import type { InstallOptions } from '../../../types/index.js';
 import type { InstallationContext, PackageSource } from './context.js';
 import { classifyPackageInput } from '../../../utils/package-input.js';
@@ -9,6 +9,7 @@ import { exists } from '../../../utils/fs.js';
 import { createWorkspacePackageYml, ensureLocalOpenPackageStructure } from '../../../utils/package-management.js';
 import { logger } from '../../../utils/logger.js';
 import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
+import type { ResourceInstallationSpec } from '../convenience-matchers.js';
 
 /**
  * Build context for registry-based installation
@@ -335,12 +336,15 @@ export async function buildResourceInstallContext(
     
     case 'filepath':
       // Local path source
+      const absolutePath = resourceSpec.absolutePath!;
+      const relativePath = relative(cwd, absolutePath).replace(/\\/g, '/');
+      const resourcePath = relativePath.startsWith('..') ? basename(absolutePath) : relativePath;
       source = {
         type: 'path',
         packageName: '', // Populated after loading
-        localPath: resourceSpec.absolutePath!,
+        localPath: absolutePath,
         sourceType: resourceSpec.isDirectory ? 'directory' : 'tarball',
-        resourcePath: resourceSpec.absolutePath // Store absolute path for base detection
+        resourcePath
       };
       break;
     
@@ -359,6 +363,61 @@ export async function buildResourceInstallContext(
     warnings: [],
     errors: []
   };
+}
+
+function buildResourceMatchedPattern(
+  resourceSpec: ResourceInstallationSpec,
+  repoRoot: string,
+  basePath: string
+): string | undefined {
+  const absoluteResourcePath = join(repoRoot, resourceSpec.resourcePath);
+  const relativeToBase = relative(basePath, absoluteResourcePath)
+    .replace(/\\/g, '/')
+    .replace(/^\.\/?/, '');
+
+  if (!relativeToBase) {
+    return undefined;
+  }
+
+  if (resourceSpec.resourceKind === 'directory') {
+    const normalized = relativeToBase.replace(/\/$/, '');
+    return `${normalized}/**`;
+  }
+
+  return relativeToBase;
+}
+
+/**
+ * Build multiple contexts for resource-centric installations.
+ */
+export function buildResourceInstallContexts(
+  baseContext: InstallationContext,
+  resourceSpecs: ResourceInstallationSpec[],
+  repoRoot: string
+): InstallationContext[] {
+  const detectedBase = baseContext.detectedBase ?? baseContext.source.contentRoot ?? baseContext.cwd;
+  const baseRelative = baseContext.baseRelative ?? (relative(repoRoot, detectedBase) || '.');
+
+  return resourceSpecs.map(spec => {
+    const source: PackageSource = {
+      ...baseContext.source,
+      resourcePath: spec.resourcePath
+    };
+
+    const effectiveBase = baseContext.detectedBase ?? spec.basePath;
+
+    return {
+      ...baseContext,
+      source,
+      resolvedPackages: [],
+      warnings: [],
+      errors: [],
+      detectedBase: effectiveBase,
+      baseRelative: baseRelative === '' ? '.' : baseRelative,
+      baseSource: baseContext.baseSource,
+      matchedPattern: buildResourceMatchedPattern(spec, repoRoot, effectiveBase) ?? baseContext.matchedPattern
+    };
+  });
 }
 
 

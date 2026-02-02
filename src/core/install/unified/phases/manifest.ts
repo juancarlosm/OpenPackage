@@ -27,7 +27,6 @@ export async function updateManifestPhase(ctx: InstallationContext): Promise<voi
       ctx.options.dev ?? false,
       fields.range,
       fields.force,
-      fields.include,
       fields.path,
       fields.gitUrl,
       fields.gitRef,
@@ -47,7 +46,6 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
   const fields: any = {
     range: undefined,
     force: true,
-    include: undefined,
     path: undefined,
     gitUrl: undefined,
     gitRef: undefined,
@@ -60,7 +58,9 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
   if (ctx.source.gitSourceOverride) {
     fields.gitUrl = ctx.source.gitSourceOverride.gitUrl;
     fields.gitRef = ctx.source.gitSourceOverride.gitRef;
-    fields.gitPath = ctx.source.gitSourceOverride.gitPath;
+    // If this install was scoped to a specific resource, record the full repo-relative resource path.
+    // This keeps manifest entries logically consistent with ctx.source.packageName (which includes the resource path).
+    fields.gitPath = ctx.source.resourcePath ?? ctx.source.gitSourceOverride.gitPath;
     return fields;
   }
   

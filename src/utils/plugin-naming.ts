@@ -9,6 +9,7 @@ import { logger } from './logger.js';
 export interface GitHubPackageNamingContext {
   gitUrl?: string;              // Git URL (for extracting GitHub info)
   path?: string;                // Path within repo (subdirectory)
+  resourcePath?: string;        // Full resource path within repo
   packageName?: string;         // Name from manifest (plugin.json or openpackage.yml)
   repoPath?: string;            // Path to repository root (for fallback)
 }
@@ -35,13 +36,19 @@ export function generateGitHubPackageName(
   const {
     gitUrl,
     path,
+    resourcePath,
     packageName,
     repoPath
   } = context;
+  const pathToUse = resourcePath ?? path;
+  const normalizePath = (value: string): string => value.replace(/\\/g, '/').replace(/^\.\/?/, '').toLowerCase();
   
   // If no Git URL, use package name or fallback
   if (!gitUrl) {
-    return packageName || (path ? basename(path) : 'unnamed-package');
+    if (packageName && pathToUse) {
+      return `${packageName}/${normalizePath(pathToUse)}`;
+    }
+    return packageName || (pathToUse ? basename(pathToUse) : 'unnamed-package');
   }
   
   // Try to extract GitHub info
@@ -50,17 +57,20 @@ export function generateGitHubPackageName(
   // If not GitHub, use package name as-is
   if (!githubInfo) {
     logger.debug('Non-GitHub URL, using package name as-is', { gitUrl });
-    return packageName || (path ? basename(path) : 'unnamed-package');
+    if (packageName && pathToUse) {
+      return `${packageName}/${normalizePath(pathToUse)}`;
+    }
+    return packageName || (pathToUse ? basename(pathToUse) : 'unnamed-package');
   }
   
   // GitHub URL - generate scoped name
   const { username, repo } = githubInfo;
   
   // If there's a subdirectory path, include it for uniqueness
-  if (path) {
+  if (pathToUse) {
     // Use the full path for maximum clarity and unambiguity
     // Example: plugins/feature-dev -> gh@username/repo/plugins/feature-dev
-    const normalizedPath = path.toLowerCase();
+    const normalizedPath = normalizePath(pathToUse);
     return `gh@${username}/${repo}/${normalizedPath}`;
   } else {
     // Root of repo: gh@username/repo

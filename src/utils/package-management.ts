@@ -15,7 +15,7 @@ import { packageManager } from '../core/package.js';
 import { promptPackageDetailsForNamed } from './prompts.js';
 import { writePackageFilesToDirectory } from './package-copy.js';
 import { getPackageFilesDir, getPackageYmlPath } from '../core/package-context.js';
-import { buildNormalizedIncludeSet, isManifestPath, normalizePackagePath } from './manifest-paths.js';
+import { isManifestPath, normalizePackagePath } from './manifest-paths.js';
 
 /**
  * Ensure local OpenPackage directory structure exists
@@ -167,7 +167,6 @@ export async function addPackageToYml(
   isDev: boolean = false,
   originalVersion?: string, // The original version/range that was requested
   silent: boolean = false,
-  include?: string[] | null,
   path?: string,  // Path to local directory or tarball (for path-based dependencies)
   git?: string,   // Git source url (DEPRECATED: use url) (mutually exclusive with path/version)
   ref?: string,   // Git ref (DEPRECATED: embed in url as #ref)
@@ -256,19 +255,6 @@ export async function addPackageToYml(
     }
   }
 
-  const existingDep =
-    currentLocation && existingIndex >= 0 ? config[currentLocation]![existingIndex] : null;
-
-  let includeToWrite: string[] | undefined;
-  if (include === undefined) {
-    includeToWrite = existingDep?.include;
-  } else if (include === null) {
-    includeToWrite = undefined;
-  } else {
-    const unique = Array.from(new Set(include));
-    includeToWrite = unique.length > 0 ? unique : undefined;
-  }
-
   // Build url field with embedded ref for git sources
   let urlField: string | undefined;
   if (git) {
@@ -278,7 +264,6 @@ export async function addPackageToYml(
   const dependency: PackageDependency = {
     name: normalizedPackageName,
     ...(versionToWrite ? { version: versionToWrite } : {}),
-    ...(includeToWrite ? { include: includeToWrite } : {}),
     ...(path && !git ? { path } : {}),  // Only use path for local sources
     ...(urlField ? { url: urlField } : {}),  // Use url with embedded ref
     ...(gitPath ? { path: gitPath } : {}),  // Use path field for git subdirectory
@@ -313,9 +298,7 @@ export async function addPackageToYml(
   if (existingTargetIndex >= 0) {
     const existingDepForTarget = targetArrayRef[existingTargetIndex];
     const versionChanged = existingDepForTarget.version !== dependency.version;
-    const includeChanged =
-      JSON.stringify(existingDepForTarget.include ?? []) !== JSON.stringify(includeToWrite ?? []);
-    if (versionChanged || includeChanged) {
+    if (versionChanged) {
       targetArrayRef[existingTargetIndex] = dependency;
       if (!silent) {
         logger.info(`Updated existing package dependency: ${nameWithVersion}`);

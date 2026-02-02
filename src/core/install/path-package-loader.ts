@@ -22,6 +22,7 @@ export type PathSourceType = 'directory' | 'tarball';
 export interface PackageLoadContext {
   gitUrl?: string;
   path?: string;
+  resourcePath?: string;
   repoPath?: string;
   packageName?: string;  // Optional override (avoid using - let transformer generate)
   marketplaceEntry?: MarketplacePluginEntry;
@@ -67,12 +68,32 @@ export async function loadPackageFromDirectory(
   }
   
   // Load openpackage.yml for regular packages
-  const config = await loadPackageConfig(dirPath);
+  let config = await loadPackageConfig(dirPath);
   if (!config) {
-    throw new ValidationError(
-      `Directory '${dirPath}' is not a valid OpenPackage directory or Claude Code plugin. ` +
-      `Missing ${FILE_PATTERNS.OPENPACKAGE_YML} or ${CLAUDE_PLUGIN_PATHS.PLUGIN_MANIFEST}`
-    );
+    // Resource-centric installs (Phase 3) can operate on directories without openpackage.yml,
+    // as long as they match installable patterns (base detection ensures this upstream).
+    if (!context?.resourcePath) {
+      throw new ValidationError(
+        `Directory '${dirPath}' is not a valid OpenPackage directory or Claude Code plugin. ` +
+        `Missing ${FILE_PATTERNS.OPENPACKAGE_YML} or ${CLAUDE_PLUGIN_PATHS.PLUGIN_MANIFEST}`
+      );
+    }
+
+    const fallbackBaseName = basename(dirPath);
+    const fallbackName = context?.gitUrl
+      ? generateGitHubPackageName({
+          gitUrl: context.gitUrl,
+          path: context.path,
+          resourcePath: context.resourcePath,
+          packageName: fallbackBaseName,
+          repoPath: context.repoPath
+        })
+      : fallbackBaseName;
+
+    config = {
+      name: fallbackName,
+      version: '0.0.0'
+    } satisfies PackageYml;
   }
 
   // Apply GitHub scoping for packages from GitHub sources
@@ -82,6 +103,7 @@ export async function loadPackageFromDirectory(
     const scopedName = generateGitHubPackageName({
       gitUrl: context.gitUrl,
       path: context.path,
+      resourcePath: context.resourcePath,
       packageName: originalName,  // Pass original name for non-GitHub sources
       repoPath: context.repoPath
     });

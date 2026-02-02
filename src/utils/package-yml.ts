@@ -33,6 +33,9 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
     
     if (parsed.dependencies) {
       for (const dep of parsed.dependencies) {
+        // Ignore deprecated include field from legacy manifests
+        delete (dep as any).include;
+
         // Check for old plugin naming (marketplace name vs repo name)
         const newPluginName = detectOldPluginNaming(dep);
         if (newPluginName) {
@@ -75,6 +78,9 @@ export async function parsePackageYml(packageYmlPath: string): Promise<PackageYm
     
     if (parsed['dev-dependencies']) {
       for (const dep of parsed['dev-dependencies']) {
+        // Ignore deprecated include field from legacy manifests
+        delete (dep as any).include;
+
         // Check for old plugin naming (marketplace name vs repo name)
         const newPluginName = detectOldPluginNaming(dep);
         if (newPluginName) {
@@ -289,6 +295,7 @@ export async function writePackageYml(packageYmlPath: string, config: PackageYml
       delete dep.subdirectory;
       delete dep.git;
       delete dep.ref;
+      delete (dep as any).include;
     }
   };
   

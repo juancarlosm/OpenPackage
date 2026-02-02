@@ -271,7 +271,7 @@ export function aggregateRecursiveDownloads(responses: PullPackageResponse[]): P
 }
 
 export function isPartialDownload(download?: PullPackageDownload): boolean {
-  return Array.isArray(download?.include);
+  return false;
 }
 
 export async function pullDownloadsBatchFromRemote(

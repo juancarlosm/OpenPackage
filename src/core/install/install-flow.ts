@@ -44,7 +44,6 @@ export interface InstallationPhasesParams {
   conflictResult: ConflictSummary;
   options: InstallOptions;
   targetDir: string;
-  fileFilters?: Record<string, string[] | undefined>;
   matchedPattern?: string;  // Phase 4: Pattern from base detection
 }
 
@@ -178,7 +177,7 @@ export async function processConflictResolution(
  * Perform the index-based installation process
  */
 export async function performIndexBasedInstallationPhases(params: InstallationPhasesParams): Promise<InstallationPhasesResult> {
-  const { cwd, packages, platforms, conflictResult, options, targetDir, fileFilters, matchedPattern } = params;
+  const { cwd, packages, platforms, conflictResult, options, targetDir, matchedPattern } = params;
 
   // Install each package using index-based installer
   let totalInstalled = 0;
@@ -195,14 +194,12 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
     try {
       logger.debug(`Installing ${resolved.name}@${resolved.version} using index-based installer`);
 
-      const filtersForPackage = fileFilters?.[resolved.name];
       const installResult: IndexInstallResult = await installPackageByIndex(
         cwd,
         resolved.name,
         resolved.version,
         platforms,
         options,
-        filtersForPackage,
         resolved.contentRoot,  // Pass contentRoot for path-based packages
         resolved.pkg._format,   // Pass format metadata from Package object
         resolved.marketplaceMetadata,  // Pass marketplace metadata if present
@@ -241,12 +238,10 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
 
   for (const resolved of packages) {
     try {
-      const filtersForPackage = fileFilters?.[resolved.name];
       const categorized = await discoverAndCategorizeFiles(
         resolved.name,
         resolved.version,
         platforms,
-        filtersForPackage,
         resolved.contentRoot,  // Pass contentRoot for path-based packages
         matchedPattern  // Phase 4: Pass matched pattern for filtering
       );

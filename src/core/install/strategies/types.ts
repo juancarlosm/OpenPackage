@@ -37,11 +37,6 @@ export interface FlowInstallContext {
    * Pattern that matched for base detection (for pattern-based filtering)
    */
   matchedPattern?: string;
-  
-  /**
-   * Specific resource paths to install (from convenience options)
-   */
-  resourceFilter?: string[];
 }
 
 /**

@@ -134,15 +134,4 @@ export interface InstallationContext {
     base: string;
     startIndex: number;
   }>;
-  
-  /** Filtered resources from convenience options */
-  filteredResources?: Array<{
-    name: string;
-    path: string;
-    matchedBy: string;
-    installDir?: string;  // For skills, the directory to install
-  }>;
-  
-  /** Errors from convenience option filtering */
-  filterErrors?: string[];
 }

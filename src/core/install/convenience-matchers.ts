@@ -5,12 +5,11 @@
  * with deepest match resolution for ambiguous cases.
  */
 
-import { join, basename, dirname, relative } from 'path';
+import { join, basename, dirname, relative, resolve, sep } from 'path';
 import { walkFiles } from '../../utils/file-walker.js';
 import { exists, readTextFile } from '../../utils/fs.js';
 import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
 import { logger } from '../../utils/logger.js';
-import { minimatch } from 'minimatch';
 
 /**
  * Result of a resource match
@@ -38,23 +37,32 @@ export interface ResourceMatchResult {
 /**
  * Container for all filtering results
  */
-export interface ConvenienceFilterResult {
+export interface ResourceInstallationSpec {
+  /** Resource name that was requested */
+  name: string;
+
+  /** Resource type */
+  resourceType: 'agent' | 'skill';
+
+  /** Path to resource relative to repo root */
+  resourcePath: string;
+
+  /** Base path where resource was discovered */
+  basePath: string;
+
+  /** Resource kind for scoping */
+  resourceKind: 'file' | 'directory';
+
+  /** How the resource was matched */
+  matchedBy: 'frontmatter' | 'filename' | 'dirname';
+}
+
+export interface ConvenienceMatcherResult {
   /** Matched resources to install */
-  resources: Array<{
-    name: string;
-    path: string;
-    matchedBy: string;
-    installDir?: string;
-  }>;
+  resources: ResourceInstallationSpec[];
   
   /** Errors for resources that weren't found */
   errors: string[];
-  
-  /** Available resources (for error messages) */
-  available?: {
-    agents?: string[];
-    skills?: string[];
-  };
 }
 
 /**
@@ -80,19 +88,35 @@ export interface ConvenienceFilterOptions {
  */
 export async function applyConvenienceFilters(
   basePath: string,
+  repoRoot: string,
   options: ConvenienceFilterOptions
-): Promise<ConvenienceFilterResult> {
-  const resources: Array<{
-    name: string;
-    path: string;
-    matchedBy: string;
-    installDir?: string;
-  }> = [];
+): Promise<ConvenienceMatcherResult> {
+  const resources: ResourceInstallationSpec[] = [];
   const errors: string[] = [];
-  const available: { agents?: string[]; skills?: string[] } = {};
+  const baseRoot = resolve(basePath);
+  const repoRootResolved = resolve(repoRoot);
+  const scopeRoots = options.pluginScope?.map(scope => resolve(repoRootResolved, scope)) ?? [];
+
+  const isInScope = (absPath: string): boolean => {
+    if (scopeRoots.length === 0) {
+      return true;
+    }
+    return scopeRoots.some(scopeRoot => {
+      if (absPath === scopeRoot) {
+        return true;
+      }
+      return absPath.startsWith(`${scopeRoot}${sep}`);
+    });
+  };
+
+  const toRepoRelative = (absPath: string): string => {
+    const rel = relative(repoRootResolved, absPath);
+    return rel.replace(/\\/g, '/').replace(/^\.\/?/, '');
+  };
 
   logger.debug('Applying convenience filters', {
     basePath,
+    repoRoot: repoRootResolved,
     hasAgents: !!options.agents,
     hasSkills: !!options.skills,
     agentCount: options.agents?.length || 0,
@@ -102,18 +126,22 @@ export async function applyConvenienceFilters(
   // Match agents
   if (options.agents && options.agents.length > 0) {
     const agentResults = await matchAgents(basePath, options.agents);
-    
-    // Collect available agent names for error messages
-    available.agents = agentResults
-      .filter(r => r.found)
-      .map(r => r.name);
-    
+
     for (const result of agentResults) {
       if (result.found && result.path) {
+        const absPath = resolve(result.path);
+        if (!isInScope(absPath)) {
+          errors.push(`Agent '${result.name}' not found in selected plugin scope`);
+          continue;
+        }
+        const resourcePath = toRepoRelative(absPath);
         resources.push({
           name: result.name,
-          path: result.path,
-          matchedBy: result.matchedBy || 'unknown'
+          resourceType: 'agent',
+          resourcePath,
+          basePath: baseRoot,
+          resourceKind: 'file',
+          matchedBy: (result.matchedBy || 'filename') as 'frontmatter' | 'filename' | 'dirname'
         });
       } else if (result.error) {
         errors.push(result.error);
@@ -124,19 +152,22 @@ export async function applyConvenienceFilters(
   // Match skills
   if (options.skills && options.skills.length > 0) {
     const skillResults = await matchSkills(basePath, options.skills);
-    
-    // Collect available skill names for error messages
-    available.skills = skillResults
-      .filter(r => r.found)
-      .map(r => r.name);
-    
+
     for (const result of skillResults) {
       if (result.found && result.path && result.installDir) {
+        const absDir = resolve(result.installDir);
+        if (!isInScope(absDir)) {
+          errors.push(`Skill '${result.name}' not found in selected plugin scope`);
+          continue;
+        }
+        const resourcePath = toRepoRelative(absDir);
         resources.push({
           name: result.name,
-          path: result.path,
-          matchedBy: result.matchedBy || 'unknown',
-          installDir: result.installDir
+          resourceType: 'skill',
+          resourcePath,
+          basePath: baseRoot,
+          resourceKind: 'directory',
+          matchedBy: (result.matchedBy || 'dirname') as 'frontmatter' | 'filename' | 'dirname'
         });
       } else if (result.error) {
         errors.push(result.error);
@@ -151,8 +182,7 @@ export async function applyConvenienceFilters(
 
   return {
     resources,
-    errors,
-    available: Object.keys(available).length > 0 ? available : undefined
+    errors
   };
 }
 
@@ -174,7 +204,8 @@ async function matchAgents(
   const agentFiles: string[] = [];
   
   // Check if agents directory exists
-  if (await exists(agentsDir)) {
+  const agentsDirExists = await exists(agentsDir);
+  if (agentsDirExists) {
     // Walk the agents directory and collect .md files
     for await (const file of walkFiles(agentsDir)) {
       if (file.endsWith('.md')) {
@@ -363,13 +394,7 @@ async function findSkillByName(
  * @param errors - Array of error messages
  * @param available - Available resources (for suggestions)
  */
-export function displayFilterErrors(
-  errors: string[],
-  available?: {
-    agents?: string[];
-    skills?: string[];
-  }
-): void {
+export function displayFilterErrors(errors: string[]): void {
   if (errors.length === 0) {
     return;
   }
@@ -377,28 +402,5 @@ export function displayFilterErrors(
   console.error('\n❌ The following resources were not found:');
   for (const error of errors) {
     console.error(`  • ${error}`);
-  }
-
-  // Show available resources if any
-  if (available) {
-    if (available.agents && available.agents.length > 0) {
-      console.error('\n📋 Available agents:');
-      for (const agent of available.agents.slice(0, 10)) {
-        console.error(`  • ${agent}`);
-      }
-      if (available.agents.length > 10) {
-        console.error(`  • ... and ${available.agents.length - 10} more`);
-      }
-    }
-
-    if (available.skills && available.skills.length > 0) {
-      console.error('\n📋 Available skills:');
-      for (const skill of available.skills.slice(0, 10)) {
-        console.error(`  • ${skill}`);
-      }
-      if (available.skills.length > 10) {
-        console.error(`  • ... and ${available.skills.length - 10} more`);
-      }
-    }
   }
 }

@@ -7,6 +7,7 @@ export interface GitPackageLoadOptions {
   url: string;
   ref?: string;
   path?: string;
+  resourcePath?: string;
 }
 
 export interface GitPackageLoadResult {
@@ -44,6 +45,7 @@ export async function loadPackageFromGit(options: GitPackageLoadOptions): Promis
   const pkg = await loadPackageFromPath(sourcePath, {
     gitUrl: options.url,
     path: options.path,
+    resourcePath: options.resourcePath,
     repoPath
   });
   

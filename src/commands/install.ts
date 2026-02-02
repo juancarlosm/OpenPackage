@@ -2,8 +2,9 @@ import { Command } from 'commander';
 import type { CommandResult, InstallOptions } from '../types/index.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { normalizePlatforms } from '../utils/platform-mapper.js';
-import { buildInstallContext, buildResourceInstallContext } from '../core/install/unified/context-builders.js';
+import { buildInstallContext, buildResourceInstallContext, buildResourceInstallContexts } from '../core/install/unified/context-builders.js';
 import { runUnifiedInstallPipeline } from '../core/install/unified/pipeline.js';
+import { runMultiContextPipeline } from '../core/install/unified/multi-context-pipeline.js';
 import { determineResolutionMode } from '../utils/resolution-mode.js';
 import { DIR_PATTERNS, PACKAGE_PATHS } from '../constants/index.js';
 import { normalizePathForProcessing } from '../utils/path-normalization.js';
@@ -149,6 +150,12 @@ async function installResourceCommand(
   if (loaded.sourceMetadata?.commitSha) {
     (context.source as any)._commitSha = loaded.sourceMetadata.commitSha;
   }
+
+  // Marketplace shortcut: some loaders set pluginType without baseDetection results.
+  // If this is a marketplace, delegate to marketplace handler so --plugins works as intended.
+  if (loaded.pluginMetadata?.pluginType === 'marketplace') {
+    return await handleMarketplaceInstallation(context, options, cwd);
+  }
   
   // Base detection is already done in the source loader (Phase 2)
   // Check if we have base detection results in sourceMetadata
@@ -180,19 +187,16 @@ async function installResourceCommand(
   // Apply convenience filters if specified (--agents, --skills)
   if ((options as any).agents || (options as any).skills) {
     const basePath = context.detectedBase || loaded.contentRoot || cwd;
+    const repoRoot = loaded.sourceMetadata?.repoPath || loaded.contentRoot || basePath;
     
-    const filterResult = await applyConvenienceFilters(basePath, {
+    const filterResult = await applyConvenienceFilters(basePath, repoRoot, {
       agents: (options as any).agents,
       skills: (options as any).skills
     });
     
-    // Store filter results
-    context.filteredResources = filterResult.resources;
-    context.filterErrors = filterResult.errors;
-    
     // Display errors if any
     if (filterResult.errors.length > 0) {
-      displayFilterErrors(filterResult.errors, filterResult.available);
+      displayFilterErrors(filterResult.errors);
       
       // If all resources failed, abort
       if (filterResult.resources.length === 0) {
@@ -205,6 +209,9 @@ async function installResourceCommand(
       // Otherwise, continue with partial install
       console.log(`\n⚠️  Continuing with ${filterResult.resources.length} resource(s)\n`);
     }
+
+    const resourceContexts = buildResourceInstallContexts(context, filterResult.resources, repoRoot);
+    return await runMultiContextPipeline(resourceContexts);
   }
   
   // Not a marketplace or ambiguous - warn if --plugins was specified without agents/skills
@@ -434,7 +441,11 @@ async function handleMarketplaceInstallation(
     context.source.gitRef,
     commitSha,
     options,
-    cwd
+    cwd,
+    {
+      agents: (options as any).agents,
+      skills: (options as any).skills
+    }
   );
 }
 

@@ -21,11 +21,3 @@ export function isManifestPath(path: string): boolean {
   );
 }
 
-/**
- * Build a normalized include set (or null if empty) for registry path filtering.
- */
-export function buildNormalizedIncludeSet(paths: string[] | undefined): Set<string> | null {
-  if (!paths || paths.length === 0) return null;
-  return new Set(paths.map(normalizePackagePath));
-}
-

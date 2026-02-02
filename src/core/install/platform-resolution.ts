@@ -33,7 +33,8 @@ export async function resolvePlatforms(
     return selected;
   }
 
-  return [] as Platform[];
+  // Non-interactive with no detected platforms: default to cursor so installs are not silently no-ops.
+  return ['cursor'] as Platform[];
 }
 
 

@@ -43,6 +43,7 @@ export function getTransformedPlugin(name: string, version: string): PackageWith
 interface PluginTransformContext {
   gitUrl?: string;
   path?: string;
+  resourcePath?: string;
   repoPath?: string;
   marketplaceEntry?: MarketplacePluginEntry;
 }
@@ -81,6 +82,7 @@ export async function transformPluginToPackage(
   const packageName = generateGitHubPackageName({
     gitUrl: context?.gitUrl,
     path: context?.path,
+    resourcePath: context?.resourcePath,
     packageName: pluginManifest.name,
     repoPath: context?.repoPath
   });

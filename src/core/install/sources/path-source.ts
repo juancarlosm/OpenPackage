@@ -8,6 +8,7 @@ import { detectPluginType } from '../plugin-detector.js';
 import { detectBaseForFilepath } from '../base-detector.js';
 import { getPlatformsState } from '../../../core/platforms.js';
 import { logger } from '../../../utils/logger.js';
+import { exists } from '../../../utils/fs.js';
 import { formatNoPatternMatchError } from '../../../utils/install-error-messages.js';
 
 /**
@@ -58,9 +59,12 @@ export class PathSourceLoader implements PackageSourceLoader {
           resourcePath: source.resourcePath,
           resolvedPath
         });
-        
+
+        // For resource-centric installs, prefer detecting base from the actual resource path
+        // when the resource exists under the provided localPath.
+        const candidateAbsoluteResourcePath = resolve(resolvedPath, source.resourcePath);
         detectedBaseInfo = await detectBaseForFilepath(
-          resolvedPath,
+          (await exists(candidateAbsoluteResourcePath)) ? candidateAbsoluteResourcePath : resolvedPath,
           platformsConfig
         );
         
@@ -112,7 +116,8 @@ export class PathSourceLoader implements PackageSourceLoader {
       // If gitSourceOverride exists, use it for proper git-based naming
       const loadContext: any = {
         repoPath: contentRoot,
-        marketplaceEntry: source.pluginMetadata?.marketplaceEntry
+        marketplaceEntry: source.pluginMetadata?.marketplaceEntry,
+        resourcePath: source.resourcePath
       };
       
       if (source.gitSourceOverride) {

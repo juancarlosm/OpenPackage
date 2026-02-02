@@ -31,7 +31,8 @@ export class GitSourceLoader implements PackageSourceLoader {
       const result = await loadPackageFromGit({
         url: source.gitUrl,
         ref: source.gitRef,
-        path: source.gitPath
+        path: source.gitPath,
+        resourcePath: source.resourcePath
       });
       
       // Phase 5: If manifest base is present, skip detection (reproducibility)
@@ -112,6 +113,7 @@ export class GitSourceLoader implements PackageSourceLoader {
       let sourcePackage = await loadPackageFromPath(contentRoot, {
         gitUrl: source.gitUrl,
         path: source.gitPath,
+        resourcePath: source.resourcePath,
         repoPath: result.repoPath,
         marketplaceEntry: source.pluginMetadata?.marketplaceEntry
       });

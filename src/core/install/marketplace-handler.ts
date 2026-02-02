@@ -1,4 +1,4 @@
-import { join, basename } from 'path';
+import { join, basename, relative } from 'path';
 import { readTextFile, exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { ValidationError, UserCancellationError } from '../../utils/errors.js';
@@ -9,6 +9,10 @@ import { safePrompts } from '../../utils/prompts.js';
 import { Spinner } from '../../utils/spinner.js';
 import type { CommandResult, InstallOptions } from '../../types/index.js';
 import { CLAUDE_PLUGIN_PATHS } from '../../constants/index.js';
+import { applyConvenienceFilters, displayFilterErrors } from './convenience-matchers.js';
+import { buildResourceInstallContexts } from './unified/context-builders.js';
+import { runMultiContextPipeline } from './unified/multi-context-pipeline.js';
+import { getLoaderForSource } from './sources/loader-factory.js';
 import {
   normalizePluginSource,
   isRelativePathSource,
@@ -207,7 +211,8 @@ export async function installMarketplacePlugins(
   marketplaceGitRef: string | undefined,
   marketplaceCommitSha: string,
   options: InstallOptions,
-  cwd: string
+  cwd: string,
+  convenienceOptions?: { agents?: string[]; skills?: string[] }
 ): Promise<CommandResult> {
   logger.info('Installing marketplace plugins', { 
     marketplace: marketplace.name,
@@ -267,7 +272,8 @@ export async function installMarketplacePlugins(
           marketplaceGitRef,
           marketplaceCommitSha,
           options,
-          cwd
+          cwd,
+          convenienceOptions
         );
       } else if (isGitSource(normalizedSource)) {
         installResult = await installGitPlugin(
@@ -275,7 +281,8 @@ export async function installMarketplacePlugins(
           pluginEntry,
           normalizedSource,
           options,
-          cwd
+          cwd,
+          convenienceOptions
         );
       } else {
         throw new Error(`Unsupported source type: ${normalizedSource.type}`);
@@ -332,7 +339,8 @@ async function installRelativePathPlugin(
   marketplaceGitRef: string | undefined,
   marketplaceCommitSha: string,
   options: InstallOptions,
-  cwd: string
+  cwd: string,
+  convenienceOptions?: { agents?: string[]; skills?: string[] }
 ): Promise<CommandResult> {
   const pluginSubdir = normalizedSource.relativePath!;
   const pluginDir = join(marketplaceDir, pluginSubdir);
@@ -427,6 +435,37 @@ async function installRelativePathPlugin(
   
   // Stop spinner before pipeline (which has its own output)
   spinner.stop();
+
+  const hasConvenienceOptions = Boolean(convenienceOptions?.agents?.length || convenienceOptions?.skills?.length);
+  if (hasConvenienceOptions) {
+    ctx.detectedBase = pluginDir;
+    ctx.baseRelative = relative(marketplaceDir, pluginDir) || '.';
+
+    // Convenience matching should return a full repo-relative resourcePath for naming consistency:
+    // e.g. plugins/javascript-typescript/agents/typescript-pro.md
+    const filterResult = await applyConvenienceFilters(pluginDir, marketplaceDir, convenienceOptions ?? {});
+    if (filterResult.errors.length > 0) {
+      displayFilterErrors(filterResult.errors);
+      if (filterResult.resources.length === 0) {
+        return { success: false, error: 'None of the requested resources were found' };
+      }
+      console.log(`\n⚠️  Continuing with ${filterResult.resources.length} resource(s)\n`);
+    }
+
+    const resourceContexts = buildResourceInstallContexts(ctx, filterResult.resources, marketplaceDir).map(rc => {
+      // Ensure path-based loader can resolve repo-relative resourcePath by pointing localPath at repo root.
+      // Base detection will still land on pluginDir due to deepest pattern match.
+      if (rc.source.type === 'path') {
+        rc.source.localPath = marketplaceDir;
+      }
+      return rc;
+    });
+    const multiResult = await runMultiContextPipeline(resourceContexts);
+    return {
+      success: multiResult.success,
+      error: multiResult.error
+    };
+  }
   
   const pipelineResult = await runUnifiedInstallPipeline(ctx);
   
@@ -453,7 +492,8 @@ async function installGitPlugin(
   pluginEntry: MarketplacePluginEntry,
   normalizedSource: NormalizedPluginSource,
   options: InstallOptions,
-  cwd: string
+  cwd: string,
+  convenienceOptions?: { agents?: string[]; skills?: string[] }
 ): Promise<CommandResult> {
   const gitUrl = normalizedSource.gitUrl!;
   const gitRef = normalizedSource.gitRef;
@@ -488,6 +528,54 @@ async function installGitPlugin(
   
   // Stop spinner before pipeline (which has its own output)
   spinner.stop();
+
+  const hasConvenienceOptions = Boolean(convenienceOptions?.agents?.length || convenienceOptions?.skills?.length);
+  if (hasConvenienceOptions) {
+    const loader = getLoaderForSource(ctx.source);
+    const loaded = await loader.load(ctx.source, options, cwd);
+
+    ctx.source.packageName = loaded.packageName;
+    ctx.source.version = loaded.version;
+    ctx.source.contentRoot = loaded.contentRoot;
+    ctx.source.pluginMetadata = {
+      ...loaded.pluginMetadata,
+      ...(ctx.source.pluginMetadata ?? {}),
+      marketplaceEntry: pluginEntry
+    };
+
+    if (loaded.sourceMetadata?.commitSha) {
+      (ctx.source as any)._commitSha = loaded.sourceMetadata.commitSha;
+    }
+
+    if (loaded.sourceMetadata?.baseDetection) {
+      const baseDetection = loaded.sourceMetadata.baseDetection;
+      ctx.detectedBase = baseDetection.base;
+      ctx.matchedPattern = baseDetection.matchedPattern;
+      ctx.baseSource = baseDetection.matchType as any;
+
+      if (ctx.detectedBase && loaded.contentRoot) {
+        ctx.baseRelative = relative(loaded.contentRoot, ctx.detectedBase) || '.';
+      }
+    }
+
+    const basePath = ctx.detectedBase || loaded.contentRoot || cwd;
+    const repoRoot = loaded.sourceMetadata?.repoPath || loaded.contentRoot || basePath;
+    const filterResult = await applyConvenienceFilters(basePath, repoRoot, convenienceOptions ?? {});
+    if (filterResult.errors.length > 0) {
+      displayFilterErrors(filterResult.errors);
+      if (filterResult.resources.length === 0) {
+        return { success: false, error: 'None of the requested resources were found' };
+      }
+      console.log(`\n⚠️  Continuing with ${filterResult.resources.length} resource(s)\n`);
+    }
+
+    const resourceContexts = buildResourceInstallContexts(ctx, filterResult.resources, repoRoot);
+    const multiResult = await runMultiContextPipeline(resourceContexts);
+    return {
+      success: multiResult.success,
+      error: multiResult.error
+    };
+  }
   
   const pipelineResult = await runUnifiedInstallPipeline(ctx);
   
