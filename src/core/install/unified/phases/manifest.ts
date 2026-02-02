@@ -87,7 +87,8 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
       // Git packages get git fields
       fields.gitUrl = ctx.source.gitUrl;
       fields.gitRef = ctx.source.gitRef;
-      fields.gitPath = ctx.source.gitPath;
+      // For resource-scoped installs, prefer recording the concrete resource path (file or dir).
+      fields.gitPath = ctx.source.resourcePath ?? ctx.source.gitPath;
       break;
     
     case 'workspace':

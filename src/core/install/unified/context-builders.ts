@@ -219,9 +219,35 @@ async function buildBulkInstallContexts(
   
   // Get workspace package name to exclude it from bulk install
   const workspacePackageName = workspaceContext?.source.packageName;
-  
-  if (opkgYml.packages && opkgYml.packages.length > 0) {
-    for (const dep of opkgYml.packages) {
+
+  // Support both legacy `packages:` and current `dependencies:` + `dev-dependencies:` keys.
+  const deps = ((opkgYml as any).packages ??
+    (opkgYml as any).dependencies ??
+    []) as any[];
+  const devDeps = (((opkgYml as any).devDependencies ??
+    (opkgYml as any)['dev-dependencies'] ??
+    []) as any[]);
+
+  // Merge + dedupe to avoid double-install from duplicate manifest entries
+  const allDeps: any[] = [...deps, ...devDeps].filter(Boolean);
+  const seen = new Set<string>();
+
+  if (allDeps.length > 0) {
+    for (const dep of allDeps) {
+      const dedupeKey = JSON.stringify({
+        name: dep?.name ?? null,
+        url: dep?.url ?? dep?.git ?? null,
+        ref: dep?.ref ?? null,
+        path: dep?.path ?? null,
+        version: dep?.version ?? null,
+        base: dep?.base ?? null
+      });
+      if (seen.has(dedupeKey)) {
+        logger.debug('Skipping duplicate manifest dependency', { name: dep?.name, path: dep?.path, url: dep?.url ?? dep?.git });
+        continue;
+      }
+      seen.add(dedupeKey);
+
       // Skip if this package matches the workspace package name
       if (workspacePackageName && dep.name === workspacePackageName) {
         logger.debug(`Skipping workspace package '${dep.name}' from bulk install`);
@@ -241,13 +267,30 @@ async function buildBulkInstallContexts(
         
         // Use embedded ref if present, otherwise fall back to separate ref field
         const gitRef = embeddedRef || dep.ref;
+
+        // Bulk installs should match the resource-model behavior used by individual installs.
+        // Many manifests use `name: gh@owner/repo/<resourcePath>` and/or `path:` to indicate a resource
+        // (directory or file) within the repo. Passing that as `gitPath` breaks because gitPath implies
+        // "package lives in subdirectory", and can be a file path (invalid).
+        let resourcePathFromName: string | undefined;
+        const depName = String(dep.name ?? '');
+        if (depName.startsWith('gh@')) {
+          const tail = depName.slice(3);
+          const parts = tail.split('/').filter(Boolean);
+          if (parts.length > 2) {
+            resourcePathFromName = parts.slice(2).join('/');
+          }
+        }
+        const effectiveResourcePath: string | undefined = dep.path || resourcePathFromName;
+        const shouldTreatPathAsResource = depName.startsWith('gh@');
         
         source = {
           type: 'git',
           packageName: dep.name,
           gitUrl,
           gitRef,
-          gitPath: dep.path,
+          gitPath: shouldTreatPathAsResource ? undefined : dep.path,
+          resourcePath: shouldTreatPathAsResource ? effectiveResourcePath : undefined,
           manifestBase: dep.base  // Phase 5: Pass manifest base to source
         };
       } else if (dep.path) {
@@ -296,7 +339,7 @@ async function buildBulkInstallContexts(
       contexts.push(context);
     }
   }
-  
+
   return contexts;
 }
 
