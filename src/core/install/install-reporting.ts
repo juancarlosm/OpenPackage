@@ -15,24 +15,6 @@ export function formatSelectionSummary(
   return `✓ Selected ${sourceLabel} ${packageSpecifier}@${version}`;
 }
 
-export function displayInstallationSummary(
-  totalInstalled: number,
-  totalSkipped: number,
-  totalPackages: number,
-  results: Array<{ name: string; success: boolean; error?: string }>
-): void {
-  console.log(`\n✓ Installation Summary:`);
-  console.log(`✓ Successfully installed: ${totalInstalled}/${totalPackages} packages`);
-
-  if (totalSkipped > 0) {
-    console.log(`❌ Failed to install: ${totalSkipped} packages`);
-    console.log('\nFailed packages:');
-    results.filter(r => !r.success).forEach(result => {
-      console.log(`  • ${result.name}: ${result.error}`);
-    });
-  }
-}
-
 export function displayInstallationResults(
   packageName: string,
   resolvedPackages: any[],

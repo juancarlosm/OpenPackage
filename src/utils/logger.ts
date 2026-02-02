@@ -90,6 +90,3 @@ export const logger = new ConsoleLogger(
       ? LogLevel.INFO
       : LogLevel.ERROR
 );
-
-// Export the logger class for custom instances
-export { ConsoleLogger };

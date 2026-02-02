@@ -2,19 +2,20 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { 
-  getAllUniversalSubdirs, 
   getPlatformSubdirExts, 
   getPlatformDefinition, 
   getPlatformDirectoryPaths,
   mergePlatformsConfig,
-  validatePlatformsConfig 
+  validatePlatformsConfig,
+  getPlatformsState
 } from '../../../src/core/platforms.js';
 import { join } from 'path';
 import { logger } from '../../../src/utils/logger.js'; // For potential spying, but skip
 
 describe('Dynamic Subdirectories Feature', () => {
-  it('getAllUniversalSubdirs returns unique set from all platforms', () => {
-    const subdirs = getAllUniversalSubdirs();
+  it('universalSubdirs returns unique set from all platforms', () => {
+    const state = getPlatformsState(null);
+    const subdirs = state.universalSubdirs;
     assert.ok(subdirs instanceof Set);
     assert.ok(subdirs.size > 0);
     assert.ok(subdirs.has('rules'), 'Common subdir "rules" should be discovered');

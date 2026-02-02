@@ -99,11 +99,4 @@ export class GitSourceLoader implements PackageSourceLoader {
     }
   }
   
-  getDisplayName(source: PackageSource): string {
-    const ref = source.gitRef ? `#${source.gitRef}` : '';
-    const subdir = source.gitPath ? `&path=${source.gitPath}` : '';
-    return source.packageName
-      ? `${source.packageName} (git:${source.gitUrl}${ref}${subdir})`
-      : `git:${source.gitUrl}${ref}${subdir}`;
-  }
 }

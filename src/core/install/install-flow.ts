@@ -58,20 +58,8 @@ export interface InstallationPhasesResult {
   errors?: string[];
 }
 
-export interface OpenPackagePackageResult {
-  name: string;
-  filesInstalled: number;
-  filesUpdated: number;
-  installedFiles: string[];
-  updatedFiles: string[];
-  overwritten: boolean;
-}
-
 type ConflictSummary = Awaited<ReturnType<typeof checkAndHandleAllPackageConflicts>>;
 
-/**
- * Handle package availability outcomes and return appropriate command results
- */
 /**
  * Prepare the installation environment by ensuring directories and basic files exist
  */
@@ -310,8 +298,5 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
   };
 }
 
-// Helper functions
-function formatPackageLabel(packageName: string, version?: string): string {
-  return version ? `${packageName}@${version}` : packageName;
-}
+
 

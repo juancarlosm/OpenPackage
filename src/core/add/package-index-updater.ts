@@ -20,7 +20,7 @@ import type { PackageFile } from '../../types/index.js';
 import type { PackageContext } from '../package-context.js';
 import { parseUniversalPath } from '../../utils/platform-file.js';
 import { mapUniversalToPlatform } from '../../utils/platform-mapper.js';
-import { getAllUniversalSubdirs, isPlatformId, type Platform } from '../platforms.js';
+import { getPlatformsState, isPlatformId, type Platform } from '../platforms.js';
 import {
   normalizeRegistryPath,
   isRootRegistryPath,
@@ -40,7 +40,8 @@ export function computeDirKeyFromRegistryPath(registryPath: string, cwd?: string
   if (parts.length <= 1) return '';
   
   // Use dynamically discovered universal subdirs instead of hardcoded list
-  const universalSubdirs = getAllUniversalSubdirs(cwd);
+  const state = getPlatformsState(cwd ?? null);
+  const universalSubdirs = state.universalSubdirs;
   if (universalSubdirs.has(parts[0])) {
     if (parts.length >= 2) return `${parts[0]}/${parts[1]}/`;
     return `${parts[0]}/`;

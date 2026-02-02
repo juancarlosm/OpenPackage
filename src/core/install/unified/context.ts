@@ -67,11 +67,6 @@ export interface PackageSource {
 }
 
 /**
- * Installation mode determines which phases to execute
- */
-export type InstallationMode = 'install' | 'apply';
-
-/**
  * Unified context for all installation operations
  * 
  * Context is mutable and updated by pipeline phases.
@@ -83,7 +78,7 @@ export interface InstallationContext {
   source: PackageSource;
   
   /** Installation mode (install vs apply) */
-  mode: InstallationMode;
+  mode: 'install' | 'apply';
   
   /** CLI options passed by user */
   options: InstallOptions;

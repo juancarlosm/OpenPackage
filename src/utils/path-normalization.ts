@@ -42,15 +42,6 @@ export function getFirstPathComponent(relativePath: string): string {
 }
 
 /**
- * Extract everything after the first directory component
- * Useful for parsing registry paths like "rules/subdir/file.md" -> "subdir/file.md"
- */
-export function getPathAfterFirstComponent(relativePath: string): string {
-  const parts = getRelativePathParts(relativePath);
-  return parts.length > 1 ? parts.slice(1).join(sep) : '';
-}
-
-/**
  * Extract relative path from a full path given a base directory
  * This replaces manual substring operations like fullPath.substring(baseDir.length + 1)
  */

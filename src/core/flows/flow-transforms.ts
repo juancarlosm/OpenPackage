@@ -9,7 +9,6 @@
 import yaml from 'js-yaml';
 import * as TOML from 'smol-toml';
 import { logger } from '../../utils/logger.js';
-import { registerTomlDomainTransforms } from './toml-domain-transforms.js';
 import { serializeMarkdownDocument } from './markdown.js';
 
 /**
@@ -351,13 +350,6 @@ export const bodyTransform: Transform = {
     return input.trim();
   },
 };
-
-/**
- * Serialize frontmatter and body to markdown
- */
-export function serializeMarkdownWithFrontmatter(frontmatter: any, body: string): string {
-  return serializeMarkdownDocument({ frontmatter, body });
-}
 
 // ============================================================================
 // Value Transforms
@@ -712,9 +704,6 @@ export function createDefaultTransformRegistry(): TransformRegistry {
   // Validation
   registry.register(validateTransform);
 
-  // Domain-specific TOML transforms (MCP, Codex, etc.)
-  registerTomlDomainTransforms(registry);
-
   return registry;
 }
 
@@ -722,10 +711,3 @@ export function createDefaultTransformRegistry(): TransformRegistry {
  * Global transform registry instance
  */
 export const defaultTransformRegistry = createDefaultTransformRegistry();
-
-/**
- * Execute a transform by name using the default registry
- */
-export function executeTransform(name: string, input: any, options?: any): any {
-  return defaultTransformRegistry.execute(name, input, options);
-}

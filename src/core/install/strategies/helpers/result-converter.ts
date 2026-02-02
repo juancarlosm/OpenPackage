@@ -5,7 +5,7 @@
  */
 
 import type { Platform } from '../../../platforms.js';
-import type { FlowInstallResult, FlowConflictReport } from '../types.js';
+import type { FlowInstallResult } from '../types.js';
 import { logger } from '../../../../utils/logger.js';
 
 /**
@@ -68,24 +68,4 @@ export function createEmptyResult(): FlowInstallResult {
     targetPaths: [],
     fileMapping: {}
   };
-}
-
-/**
- * Map conflicts to conflict reports with enriched metadata
- */
-export function mapConflictsToReports(
-  conflicts: Array<{ path: string; winner: string; losers: string[] }>
-): FlowConflictReport[] {
-  return conflicts.map(conflict => ({
-    targetPath: conflict.path,
-    packages: [
-      { packageName: conflict.winner, priority: 0, chosen: true },
-      ...conflict.losers.map(loser => ({
-        packageName: loser,
-        priority: 0,
-        chosen: false
-      }))
-    ],
-    message: `Conflict in ${conflict.path}: ${conflict.winner} overwrites ${conflict.losers.join(', ')}`
-  }));
 }

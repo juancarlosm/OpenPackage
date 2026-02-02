@@ -396,7 +396,7 @@ export function clearPlatformsCache(cwd?: string): void {
   }
 }
 
-function getPlatformsState(cwd?: string | null): PlatformsState {
+export function getPlatformsState(cwd?: string | null): PlatformsState {
   const key = cwd ?? null
   if (stateCache.has(key)) {
     return stateCache.get(key)!
@@ -545,14 +545,6 @@ export function getGlobalImportFlows(cwd?: string): Flow[] | undefined {
 }
 
 /**
- * @deprecated Use getGlobalExportFlows() for export flows or getGlobalImportFlows() for import flows
- */
-export function getGlobalFlows(cwd?: string): Flow[] | undefined {
-  // Return export flows for backward compatibility
-  return getPlatformsState(cwd).globalExportFlows
-}
-
-/**
  * Check if a platform uses flow-based configuration (export or import)
  */
 export function platformUsesFlows(platform: Platform, cwd?: string): boolean {
@@ -565,14 +557,6 @@ export function platformUsesFlows(platform: Platform, cwd?: string): boolean {
     // Platform not found - return false
     return false
   }
-}
-
-/**
- * Check if a platform uses legacy subdirs configuration
- * @deprecated Always returns false - subdirs support removed
- */
-export function platformUsesSubdirs(platform: Platform, cwd?: string): boolean {
-  return false
 }
 
 /**
@@ -607,30 +591,6 @@ export function getAllUniversalPatterns(cwd?: string): Set<string> {
 export function matchesUniversalPattern(filePath: string, cwd?: string): boolean {
   const patterns = getAllUniversalPatterns(cwd)
   return matchesAnyPattern(filePath, patterns)
-}
-
-/**
- * Get all unique universal subdirectory names defined across all platforms.
- * This is derived from universal patterns for backward compatibility.
- * 
- * @param cwd - Optional cwd for local config overrides
- * @returns Set of all universal subdir names
- * @deprecated Prefer using matchesUniversalPattern for file validation
- */
-export function getAllUniversalSubdirs(cwd?: string): Set<string> {
-  return new Set(getPlatformsState(cwd).universalSubdirs)
-}
-
-/**
- * Check if a string is a recognized universal subdir.
- * 
- * @param subdirName - Name to check
- * @param cwd - Optional cwd for local config overrides
- * @returns true if the subdir is defined in any platform
- * @deprecated Prefer using matchesUniversalPattern for file validation
- */
-export function isKnownUniversalSubdir(subdirName: string, cwd?: string): boolean {
-  return getPlatformsState(cwd).universalSubdirs.has(subdirName)
 }
 
 /**
@@ -954,50 +914,6 @@ export async function getDetectedPlatforms(cwd: string): Promise<Platform[]> {
 }
 
 /**
- * Create platform directories
- */
-/**
- * Create platform directories
- * @deprecated Subdirs support removed - flows create directories as needed
- * Only creates root directory for platforms now
- */
-export async function createPlatformDirectories(
-  cwd: string,
-  platforms: Platform[]
-): Promise<string[]> {
-  const state = getPlatformsState(cwd)
-  const created: string[] = []
-
-  for (const platform of platforms) {
-    const definition = state.defs[platform]
-    if (!definition) {
-      throw new Error(`Unknown platform: ${platform}`)
-    }
-    
-    // Only create root directory if rootDir is defined
-    if (definition.rootDir) {
-      const rootPath = join(cwd, definition.rootDir)
-      try {
-        const dirExists = await exists(rootPath)
-        if (!dirExists) {
-          await ensureDir(rootPath)
-          created.push(relative(cwd, rootPath))
-          logger.debug(`Created platform root directory: ${rootPath}`)
-        }
-      } catch (error) {
-        logger.error(
-          `Failed to create platform root directory (${rootPath}): ${error}`
-        )
-      }
-    }
-    
-    // Flow-based installations will create subdirectories as needed
-  }
-
-  return created
-}
-
-/**
  * Validate platform directory structure
  */
 export async function validatePlatformStructure(
@@ -1136,39 +1052,6 @@ export function isPlatformId(
 ): value is Platform {
   if (!value) return false
   return value in getPlatformsState(cwd).defs
-}
-
-/**
- * @deprecated Subdirs support removed - use flows instead
- * Always returns false for backward compatibility
- */
-export function isExtAllowed(
-  subdirDef: any,
-  ext: string
-): boolean {
-  return false
-}
-
-/**
- * @deprecated Subdirs support removed - use flows instead
- * Always returns original extension for backward compatibility
- */
-export function getWorkspaceExt(
-  subdirDef: any,
-  packageExt: string
-): string {
-  return packageExt
-}
-
-/**
- * @deprecated Subdirs support removed - use flows instead
- * Always returns original extension for backward compatibility
- */
-export function getPackageExt(
-  subdirDef: any,
-  workspaceExt: string
-): string {
-  return workspaceExt
 }
 
 /**

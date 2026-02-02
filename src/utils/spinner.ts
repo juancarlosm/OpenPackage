@@ -65,24 +65,5 @@ export class Spinner {
     process.stdout.write('\x1B[?25h');
   }
 
-  /**
-   * Convenience method to run an async operation with a spinner
-   */
-  static async run<T>(
-    message: string,
-    operation: () => Promise<T>
-  ): Promise<T> {
-    const spinner = new Spinner(message);
-    spinner.start();
-
-    try {
-      const result = await operation();
-      spinner.stop();
-      return result;
-    } catch (error) {
-      spinner.stop();
-      throw error;
-    }
-  }
 }
 

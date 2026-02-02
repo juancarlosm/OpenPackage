@@ -138,22 +138,6 @@ async function hasPluginContent(dirPath: string): Promise<boolean> {
 }
 
 /**
- * Check if a directory is an individual plugin.
- */
-export async function isIndividualPlugin(dirPath: string): Promise<boolean> {
-  const result = await detectPluginType(dirPath);
-  return result.isPlugin && result.type === 'individual';
-}
-
-/**
- * Check if a directory is a marketplace.
- */
-export async function isMarketplace(dirPath: string): Promise<boolean> {
-  const result = await detectPluginType(dirPath);
-  return result.isPlugin && result.type === 'marketplace';
-}
-
-/**
  * Validate that a plugin manifest can be parsed.
  * Returns true if the manifest is valid JSON.
  */

@@ -35,7 +35,7 @@ export interface ClaudePluginManifest {
 /**
  * Metadata resolution result with source information
  */
-export interface ResolvedPluginMetadata {
+interface ResolvedPluginMetadata {
   /** Resolved plugin manifest */
   manifest: ClaudePluginManifest;
   /** Source of metadata */

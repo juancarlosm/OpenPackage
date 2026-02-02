@@ -11,12 +11,6 @@ export class PackageNotFoundError extends OpenPackageError {
   }
 }
 
-export class PackageVersionNotFoundError extends OpenPackageError {
-  constructor(message: string) {
-    super(message, ErrorCodes.PACKAGE_NOT_FOUND);
-  }
-}
-
 export class VersionConflictError extends OpenPackageError {
   constructor(
     packageName: string,
@@ -32,39 +26,15 @@ export class VersionConflictError extends OpenPackageError {
   }
 }
 
-export class PackageAlreadyExistsError extends OpenPackageError {
-  constructor(packageName: string) {
-    super(`Package '${packageName}' already exists`, ErrorCodes.PACKAGE_ALREADY_EXISTS, { packageName });
-  }
-}
-
 export class InvalidPackageError extends OpenPackageError {
   constructor(reason: string, details?: any) {
     super(`Invalid package: ${reason}`, ErrorCodes.INVALID_PACKAGE, details);
   }
 }
 
-export class RegistryError extends OpenPackageError {
-  constructor(message: string, details?: any) {
-    super(`Registry error: ${message}`, ErrorCodes.REGISTRY_ERROR, details);
-  }
-}
-
-export class NetworkError extends OpenPackageError {
-  constructor(message: string, details?: any) {
-    super(`Network error: ${message}`, ErrorCodes.NETWORK_ERROR, details);
-  }
-}
-
 export class FileSystemError extends OpenPackageError {
   constructor(message: string, details?: any) {
     super(`File system error: ${message}`, ErrorCodes.FILE_SYSTEM_ERROR, details);
-  }
-}
-
-export class PermissionError extends OpenPackageError {
-  constructor(message: string, details?: any) {
-    super(`Permission error: ${message}`, ErrorCodes.PERMISSION_ERROR, details);
   }
 }
 
@@ -93,9 +63,7 @@ export class UserCancellationError extends Error {
 export function handleError(error: unknown): CommandResult {
   if (error instanceof OpenPackageError) {
     // For CLI UX, avoid noisy error logs by default; surface details only in verbose mode
-    if (!(error instanceof PackageVersionNotFoundError)) {
-      logger.debug(error.message, { code: error.code, details: error.details });
-    }
+    logger.debug(error.message, { code: error.code, details: error.details });
     return {
       success: false,
       error: error.message
@@ -138,18 +106,4 @@ export function withErrorHandling<T extends any[]>(
   };
 }
 
-/**
- * Assertion helper that throws a OpenPackageError if condition is false
- */
-export function assert(condition: boolean, message: string, code: ErrorCodes = ErrorCodes.VALIDATION_ERROR, details?: any): asserts condition {
-  if (!condition) {
-    throw new OpenPackageError(message, code, details);
-  }
-}
 
-/**
- * Type guard to check if an error is a OpenPackageError
- */
-export function isOpenPackageError(error: unknown): error is OpenPackageError {
-  return error instanceof OpenPackageError;
-}

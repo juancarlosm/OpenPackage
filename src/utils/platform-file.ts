@@ -7,9 +7,8 @@ import { basename, join } from 'path';
 import {
   getPlatformDefinition,
   getAllPlatforms,
-  getAllUniversalSubdirs,
+  getPlatformsState,
   isPlatformId,
-  getWorkspaceExt,
   type Platform
 } from '../core/platforms.js';
 import { DIR_PATTERNS, FILE_PATTERNS, type UniversalSubdir } from '../constants/index.js';
@@ -28,7 +27,8 @@ export function parseUniversalPath(
   options: { allowPlatformSuffix?: boolean; cwd?: string } = {}
 ): { universalSubdir: string; relPath: string; platformSuffix?: string } | null {
   // Check if path starts with universal subdirs (dynamically discovered)
-  const universalSubdirs = getAllUniversalSubdirs(options.cwd);
+  const state = getPlatformsState(options.cwd ?? null);
+  const universalSubdirs = state.universalSubdirs;
   const knownPlatforms = getAllPlatforms({ includeDisabled: true }) as readonly Platform[];
   const normalized = normalizePathForProcessing(path);
   const withoutPrefix = normalized; // Strict v2: do not strip legacy .openpackage/ prefix

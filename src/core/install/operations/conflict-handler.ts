@@ -28,52 +28,6 @@ async function getInstalledPackageVersion(cwd: string, packageName: string): Pro
 }
 
 /**
- * Check for existing package and handle conflict resolution
- */
-export async function checkAndHandlePackageConflict(
-  packageName: string,
-  newVersion: string,
-  resolvedPackages: ResolvedPackage[],
-  options: InstallOptions
-): Promise<{ shouldProceed: boolean; action: 'keep' | 'latest' | 'exact' | 'none'; version?: string; forceOverwrite?: boolean }> {
-  const cwd = process.cwd();
-  
-  // Check for existing package in markdown files
-  const existingCheck = await checkExistingPackageInMarkdownFiles(cwd, packageName);
-  
-  if (!existingCheck.found) {
-    // No existing package found, proceed without warning or prompts
-    logger.debug(`No existing package '${packageName}' found, proceeding with installation`);
-    return { shouldProceed: true, action: 'none', forceOverwrite: false };
-  }
-  
-  // Existing package found, get version info from dependency tree
-  const versionInfo = await getVersionInfoFromDependencyTree(packageName, resolvedPackages);
-  const existingVersion = existingCheck.version || await getInstalledPackageVersion(cwd, packageName);
-  
-  if (existingVersion) {
-    logger.debug(`Found existing package '${packageName}' v${existingVersion} in ${existingCheck.location}`);
-  } else {
-    logger.debug(`Found existing package '${packageName}' in ${existingCheck.location}`);
-  }
-  
-  if (options.dryRun) {
-    // In dry run mode, proceed without forcing; per-file logic will report decisions
-    return { shouldProceed: true, action: 'latest', forceOverwrite: false };
-  }
-  
-  if (options.force) {
-    // When --force is used, automatically overwrite
-    logger.info(`Force flag set - automatically overwriting package '${packageName}' v${existingVersion}`);
-    return { shouldProceed: true, action: 'latest', forceOverwrite: true };
-  }
-  
-  // Proceed without prompting; per-file frontmatter-aware logic will handle overwrite decisions
-  logger.info(`Proceeding without global prompt for '${packageName}'; per-file frontmatter will govern overwrites.`);
-  return { shouldProceed: true, action: 'latest', forceOverwrite: false };
-}
-
-/**
  * Check for conflicts with all packages in the dependency tree
  */
 export async function checkAndHandleAllPackageConflicts(

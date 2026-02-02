@@ -37,8 +37,6 @@ export interface LoadedPackage {
     /** For git sources: commit SHA of cached version */
     commitSha?: string;
     
-    /** For path sources: was this a tarball? */
-    wasTarball?: boolean;
   };
 }
 
@@ -59,11 +57,6 @@ export interface PackageSourceLoader {
     options: InstallOptions,
     cwd: string
   ): Promise<LoadedPackage>;
-  
-  /**
-   * Get display name for this source type
-   */
-  getDisplayName(source: PackageSource): string;
 }
 
 /**

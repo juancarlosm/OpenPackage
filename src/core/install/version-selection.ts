@@ -68,20 +68,6 @@ export interface UnifiedInstallVersionSelectionResult extends InstallVersionSele
   resolutionSource?: 'local' | 'remote';
 }
 
-export class RemoteResolutionRequiredError extends Error {
-  constructor(message: string, public details?: { packageName: string }) {
-    super(message);
-    this.name = 'RemoteResolutionRequiredError';
-  }
-}
-
-export class RemoteVersionLookupError extends Error {
-  constructor(message: string, public failure?: RemotePullFailure) {
-    super(message);
-    this.name = 'RemoteVersionLookupError';
-  }
-}
-
 interface RemoteVersionLookupOptions {
   profile?: string;
   apiKey?: string;
@@ -142,9 +128,8 @@ export async function gatherVersionSourcesForInstall(args: GatherVersionSourcesA
 
   if (args.mode === 'remote-primary') {
     if (remoteStatus !== 'success') {
-      throw new RemoteResolutionRequiredError(
-        remoteError ?? `Remote registry data required to resolve ${args.packageName}`,
-        { packageName: args.packageName }
+      throw new Error(
+        remoteError ?? `Remote registry data required to resolve ${args.packageName}`
       );
     }
 
@@ -174,30 +159,6 @@ export async function gatherVersionSourcesForInstall(args: GatherVersionSourcesA
     remoteError,
     fallbackToLocalOnly,
     remoteFailure
-  };
-}
-
-export async function selectVersionForInstall(args: InstallVersionSelectionArgs): Promise<InstallVersionSelectionResult> {
-  const sources = await gatherVersionSourcesForInstall(args);
-  
-  // Merge selection options with explicit prerelease intent if provided
-  const selectionOptions: VersionSelectionOptions = {
-    ...(args.selectionOptions ?? {}),
-    ...(args.explicitPrereleaseIntent ? { explicitPrereleaseIntent: true } : {})
-  };
-  
-  const selection = selectVersionWithWipPolicy(
-    sources.availableVersions,
-    args.constraint,
-    selectionOptions
-  );
-
-  return {
-    selectedVersion: selection.version,
-    selection,
-    sources,
-    constraint: args.constraint,
-    mode: args.mode
   };
 }
 
@@ -301,7 +262,7 @@ export async function selectInstallVersionUnified(
     const reason =
       fallbackSources.remoteError ??
       `Remote metadata lookup failed while resolving ${args.packageName}`;
-    throw new RemoteVersionLookupError(reason, fallbackSources.remoteFailure);
+    throw new Error(reason);
   }
 
   const fallbackAttempt = attemptWithSources(fallbackSources, args.mode);

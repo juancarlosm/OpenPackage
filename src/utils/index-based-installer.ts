@@ -20,7 +20,7 @@ import {
 } from '../constants/index.js';
 import { getPlatformRootFileNames, stripRootCopyPrefix } from './platform-root-files.js';
 import type { Platform } from '../core/platforms.js';
-import { getAllUniversalSubdirs } from '../core/platforms.js';
+import { getPlatformsState } from '../core/platforms.js';
 import { normalizePathForProcessing } from './path-normalization.js';
 import { formatPathForYaml } from './path-resolution.js';
 import {
@@ -740,7 +740,8 @@ function deriveGroupKey(registryPath: string, cwd?: string): string {
   }
 
   const first = segments[0];
-  const universalSubdirs = getAllUniversalSubdirs(cwd);
+  const state = getPlatformsState(cwd ?? null);
+  const universalSubdirs = state.universalSubdirs;
 
   if (universalSubdirs.has(first)) {
     if (segments.length >= 2) {

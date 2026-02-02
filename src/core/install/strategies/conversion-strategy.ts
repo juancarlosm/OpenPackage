@@ -30,7 +30,6 @@ import {
   createTempPackageDirectory,
   writeTempPackageFiles,
   writeConversionContext,
-  readConversionContext,
   cleanupTempDirectory
 } from './helpers/temp-directory.js';
 import { createContextFromFormat } from '../../conversion-context/index.js';

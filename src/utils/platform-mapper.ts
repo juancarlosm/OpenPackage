@@ -5,9 +5,6 @@ import {
   getDetectedPlatforms,
   getAllPlatforms,
   getPlatformDirectoryPathsForPlatform,
-  getWorkspaceExt,
-  getPackageExt,
-  isExtAllowed,
   type Platform,
   type PlatformPaths,
   type PlatformDefinition
@@ -315,57 +312,6 @@ function mapPathUsingFlowPattern(
 }
 
 /**
- * Resolve install targets for a universal file across all detected platforms
- */
-export async function resolveInstallTargets(
-  cwd: string,
-  file: { universalSubdir: UniversalSubdir; relPath: string; sourceExt: string }
-): Promise<Array<{ platform: Platform; absDir: string; absFile: string }>> {
-  const detectedPlatforms = await getDetectedPlatforms(cwd);
-  const targets: Array<{ platform: Platform; absDir: string; absFile: string }> = [];
-
-  for (const platform of detectedPlatforms) {
-    try {
-      const { relDir, relFile } = mapUniversalToPlatform(platform, file.universalSubdir, file.relPath, cwd);
-      targets.push({
-        platform,
-        absDir: join(cwd, relDir),
-        absFile: join(cwd, relFile)
-      });
-    } catch (error) {
-      // Skip platforms that don't support this subdir
-      continue;
-    }
-  }
-
-  return targets;
-}
-
-/**
- * Get all platform subdirectories for a given platform and working directory
- * Returns dynamic subdirs map for extensibility with custom universal subdirs
- */
-export function getAllPlatformSubdirs(
-  platform: Platform,
-  cwd: string
-): PlatformPaths {
-  return getPlatformDirectoryPathsForPlatform(platform, cwd)
-}
-
-/**
- * Get the appropriate target directory for saving a file based on its registry path
- * Uses platform definitions for scalable platform detection
- */
-export function resolveTargetDirectory(targetPath: string, registryPath: string): string {
-  const normalized = normalizePathForProcessing(registryPath);
-  const dir = dirname(normalized);
-  if (!dir || dir === '.' || dir === '') {
-    return targetPath;
-  }
-  return join(targetPath, dir);
-}
-
-/**
  * Map universal path to platform-specific path using flows configuration.
  * Handles glob patterns correctly by resolving them to concrete file paths.
  */
@@ -582,12 +528,4 @@ function resolveTargetPathFromGlob(sourcePath: string, fromPattern: string, toPa
   return toPattern;
 }
 
-/**
- * Get the appropriate target file path for saving
- * Handles platform-specific file naming conventions using platform definitions
- */
-export function resolveTargetFilePath(targetDir: string, registryPath: string): string {
-  const normalized = normalizePathForProcessing(registryPath);
-  const fileName = basename(normalized);
-  return join(targetDir, fileName || normalized);
-}
+

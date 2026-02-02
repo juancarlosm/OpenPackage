@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
 import { PackageNotFoundError, VersionConflictError } from '../utils/errors.js';
 import { hasExplicitPrereleaseIntent } from '../utils/version-ranges.js';
 import { listPackageVersions, getLatestPackageVersion, findPackageByName, hasPackageVersion } from './directory.js';
-import { selectInstallVersionUnified, RemoteVersionLookupError } from './install/version-selection.js';
+import { selectInstallVersionUnified } from './install/version-selection.js';
 import { InstallResolutionMode, type PackageRemoteResolutionOutcome } from './install/types.js';
 import { extractRemoteErrorReason } from '../utils/error-reasons.js';
 import { PACKAGE_PATHS } from '../constants/index.js';
@@ -448,8 +448,8 @@ export async function resolveDependencies(
       }
 
       let outcomeReason: PackageRemoteResolutionOutcome['reason'] = 'unknown';
-      if (error instanceof RemoteVersionLookupError && error.failure) {
-        outcomeReason = error.failure.reason;
+      if (error && typeof error === 'object' && 'failure' in error && error.failure) {
+        outcomeReason = (error.failure as { reason: PackageRemoteResolutionOutcome['reason'] }).reason;
       }
       remoteOutcomes.set(packageName, {
         name: packageName,

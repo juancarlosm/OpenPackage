@@ -55,9 +55,4 @@ export class RegistrySourceLoader implements PackageSourceLoader {
     }
   }
   
-  getDisplayName(source: PackageSource): string {
-    return source.version
-      ? `${source.packageName}@${source.version}`
-      : source.packageName;
-  }
 }

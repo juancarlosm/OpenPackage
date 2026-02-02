@@ -20,7 +20,7 @@ const transformedPluginCache = new Map<string, PackageWithContext>();
 /**
  * Cache a transformed plugin package with context for later retrieval.
  */
-export function cacheTransformedPlugin(pkg: Package, context?: any): void {
+function cacheTransformedPlugin(pkg: Package, context?: any): void {
   const key = `${pkg.metadata.name}@${pkg.metadata.version}`;
   const cached: PackageWithContext = context 
     ? { package: pkg, context }
@@ -38,18 +38,9 @@ export function getTransformedPlugin(name: string, version: string): PackageWith
 }
 
 /**
- * Clear the plugin cache (useful for testing).
- */
-export function clearPluginCache(): void {
-  transformedPluginCache.clear();
-}
-
-
-
-/**
  * Context for transforming a plugin with naming information.
  */
-export interface PluginTransformContext {
+interface PluginTransformContext {
   gitUrl?: string;
   path?: string;
   repoPath?: string;
@@ -182,7 +173,7 @@ export async function transformPluginToPackage(
  * @param pluginDir - Absolute path to plugin directory
  * @returns Array of package files with original paths
  */
-export async function extractPluginFiles(pluginDir: string): Promise<PackageFile[]> {
+async function extractPluginFiles(pluginDir: string): Promise<PackageFile[]> {
   const files: PackageFile[] = [];
   
   try {
@@ -224,40 +215,4 @@ export async function extractPluginFiles(pluginDir: string): Promise<PackageFile
   }
 }
 
-/**
- * Validate plugin structure by checking for expected directories.
- * This is a soft validation - missing directories are warnings, not errors.
- */
-export function validatePluginStructure(files: PackageFile[]): {
-  valid: boolean;
-  warnings: string[];
-} {
-  const warnings: string[] = [];
-  const paths = files.map(f => f.path);
-  
-  // Check for .claude-plugin directory
-  const hasManifest = paths.some(p => p.startsWith(`${DIR_PATTERNS.CLAUDE_PLUGIN}/`));
-  if (!hasManifest) {
-    warnings.push(`Plugin is missing ${DIR_PATTERNS.CLAUDE_PLUGIN}/ directory`);
-  }
-  
-  // Warn if no commands, agents, or skills (but this is valid)
-  const hasCommands = paths.some(p => p.startsWith('commands/'));
-  const hasAgents = paths.some(p => p.startsWith('agents/'));
-  const hasSkills = paths.some(p => p.startsWith('skills/'));
-  const hasHooks = paths.some(p => p.startsWith('hooks/'));
-  const hasMcp = paths.some(p => p === '.mcp.json');
-  const hasLsp = paths.some(p => p === '.lsp.json');
-  
-  if (!hasCommands && !hasAgents && !hasSkills && !hasHooks && !hasMcp && !hasLsp) {
-    warnings.push(
-      'Plugin does not contain any commands, agents, skills, hooks, MCP, or LSP configurations. ' +
-      'It may be empty or incomplete.'
-    );
-  }
-  
-  return {
-    valid: true,
-    warnings
-  };
-}
+

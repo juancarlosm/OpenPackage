@@ -331,84 +331,6 @@ export async function addPackageToYml(
   await writePackageYml(packageYmlPath, config);
 }
 
-/**
- * Copy the full package directory from the local registry into the project structure
- * Removes all existing files except the package index file before writing new files
- */
-export async function writeLocalPackageFromRegistry(
-  cwd: string,
-  packageName: string,
-  version: string
-): Promise<void> {
-  const pkg = await packageManager.loadPackage(packageName, version);
-  const localPackageDir = getLocalPackageDir(cwd, packageName);
-
-  await writePackageFilesToDirectory(localPackageDir, pkg.files, {
-    preserveIndexFile: true
-  });
-}
-
-/**
- * Copy a subset of package files from the local registry into the project cache (.openpackage/packages/<pkg>/),
- * always including openpackage.yml. Used for partial installs.
- */
-export async function writePartialLocalPackageFromRegistry(
-  cwd: string,
-  packageName: string,
-  version: string,
-  includePaths: string[]
-): Promise<void> {
-  const pkg = await packageManager.loadPackage(packageName, version);
-  const localPackageDir = getLocalPackageDir(cwd, packageName);
-
-  const normalizedIncludes = buildNormalizedIncludeSet(includePaths);
-
-  const filteredFiles = pkg.files.filter(file => {
-    const p = normalizePackagePath(file.path);
-    if (isManifestPath(p)) return true; // always keep manifest
-    if (p === PACKAGE_PATHS.INDEX_RELATIVE) return false; // never copy index from registry
-    if (!normalizedIncludes) return true;
-    return normalizedIncludes.has(p);
-  });
-
-  await writePackageFilesToDirectory(localPackageDir, filteredFiles, {
-    preserveIndexFile: true
-  });
-}
-
-/**
- * Update only the include list for an existing dependency in openpackage.yml.
- * - include: string[] => set/dedupe
- * - include: null     => clear include field
- * - include: undefined => no-op
- */
-export async function updatePackageDependencyInclude(
-  cwd: string,
-  packageName: string,
-  target: 'dependencies' | 'dev-dependencies',
-  include: string[] | null | undefined
-): Promise<void> {
-  if (include === undefined) return;
-
-  const packageYmlPath = getLocalPackageYmlPath(cwd);
-  if (!(await exists(packageYmlPath))) return;
-
-  const config = await parsePackageYml(packageYmlPath);
-  const arr = config[target];
-  if (!arr) return;
-
-  const idx = arr.findIndex(dep => arePackageNamesEquivalent(dep.name, packageName));
-  if (idx === -1) return;
-
-  const unique = include === null ? undefined : Array.from(new Set(include));
-  if (unique && unique.length > 0) {
-    arr[idx].include = unique;
-  } else {
-    delete arr[idx].include;
-  }
-
-  await writePackageYml(packageYmlPath, config);
-}
 
 /**
  * Check if a dependency matches a given package name, handling various naming formats.
@@ -541,22 +463,4 @@ function rangeIncludesVersion(range: string, version: string): boolean {
   }
 }
 
-/**
- * Check if a package is a path-based dependency in the workspace openpackage.yml.
- * Path-based dependencies should be skipped during save operations.
- */
-export async function isPathBasedDependency(cwd: string, packageName: string): Promise<boolean> {
-  const packageYmlPath = getLocalPackageYmlPath(cwd);
-  if (!(await exists(packageYmlPath))) {
-    return false;
-  }
 
-  try {
-    const config = await parsePackageYml(packageYmlPath);
-    const allDeps = [...(config.dependencies || []), ...(config['dev-dependencies'] || [])];
-    const dep = allDeps.find(d => arePackageNamesEquivalent(d.name, packageName));
-    return Boolean(dep?.path);
-  } catch {
-    return false;
-  }
-}

@@ -507,53 +507,6 @@ async function installGitPlugin(
 }
 
 /**
- * Load marketplace manifest from git cache.
- * The marketplace.json is part of the cloned repo content.
- * 
- * @param gitUrl - Git URL of marketplace repository
- * @param commitSha - Commit SHA of cached version
- * @returns Parsed marketplace manifest
- */
-export async function loadMarketplaceFromCache(
-  gitUrl: string,
-  commitSha: string
-): Promise<MarketplaceManifest> {
-  const { getGitCommitCacheDir } = await import('../../utils/git-cache.js');
-  
-  const commitDir = getGitCommitCacheDir(gitUrl, commitSha);
-  const manifestPath = join(commitDir, CLAUDE_PLUGIN_PATHS.MARKETPLACE_MANIFEST);
-  
-  if (!(await exists(manifestPath))) {
-    throw new ValidationError(
-      `Marketplace manifest not found in cache. ` +
-      `Expected at: ${manifestPath}. ` +
-      `The repository may need to be re-cloned.`
-    );
-  }
-  
-  logger.debug('Loading marketplace from cache', { gitUrl, commitSha, manifestPath });
-  
-  return await parseMarketplace(manifestPath, {
-    gitUrl,
-    repoPath: commitDir
-  });
-}
-
-/**
- * Find a plugin entry in marketplace by name.
- * 
- * @param marketplace - Parsed marketplace manifest
- * @param pluginName - Plugin name to find
- * @returns Plugin entry or undefined if not found
- */
-export function findPluginInMarketplace(
-  marketplace: MarketplaceManifest,
-  pluginName: string
-): MarketplacePluginEntry | undefined {
-  return marketplace.plugins.find(p => p.name === pluginName);
-}
-
-/**
  * Validate that requested plugin names exist in marketplace.
  *
  * @param marketplace - Parsed marketplace manifest

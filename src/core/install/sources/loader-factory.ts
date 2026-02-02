@@ -27,10 +27,3 @@ export function getLoaderForSource(source: PackageSource): PackageSourceLoader {
   
   return loader;
 }
-
-/**
- * Register a custom source loader
- */
-export function registerSourceLoader(loader: PackageSourceLoader): void {
-  loaders.unshift(loader); // Add to front for priority
-}

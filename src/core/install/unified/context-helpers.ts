@@ -1,13 +1,6 @@
 import type { InstallationContext } from './context.js';
 
 /**
- * Check if context is for apply mode
- */
-export function isApplyMode(ctx: InstallationContext): boolean {
-  return ctx.mode === 'apply';
-}
-
-/**
  * Check if context should resolve dependencies
  */
 export function shouldResolveDependencies(ctx: InstallationContext): boolean {

@@ -324,11 +324,6 @@ export function setupInstallCommand(program: Command): void {
         options.conflictStrategy = normalizedStrategy as InstallOptions['conflictStrategy'];
       }
 
-      // Normalize plugins option
-      if (options.plugins) {
-        options.plugins = normalizePluginsOption(options.plugins as any);
-      }
-
       // Execute install
       const result = await installCommand(packageName, options);
       

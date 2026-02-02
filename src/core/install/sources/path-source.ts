@@ -58,9 +58,7 @@ export class PathSourceLoader implements PackageSourceLoader {
           isPlugin: true,
           pluginType: pluginDetection.type as any  // Can be 'individual', 'marketplace', or 'marketplace-defined'
         } : undefined,
-        sourceMetadata: {
-          wasTarball: source.sourceType === 'tarball'
-        }
+        sourceMetadata: {}
       };
     } catch (error) {
       throw new SourceLoadError(
@@ -71,9 +69,4 @@ export class PathSourceLoader implements PackageSourceLoader {
     }
   }
   
-  getDisplayName(source: PackageSource): string {
-    return source.packageName
-      ? `${source.packageName} (from ${source.localPath})`
-      : basename(source.localPath || '');
-  }
 }

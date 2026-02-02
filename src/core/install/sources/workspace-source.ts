@@ -102,7 +102,4 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
     }
   }
   
-  getDisplayName(source: PackageSource): string {
-    return `${source.packageName} (workspace)`;
-  }
 }
