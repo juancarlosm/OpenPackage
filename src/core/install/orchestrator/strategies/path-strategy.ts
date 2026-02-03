@@ -1,0 +1,62 @@
+import type { InstallationContext, PackageSource } from '../../unified/context.js';
+import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
+import { BaseInstallStrategy } from './base.js';
+import { getLoaderForSource } from '../../sources/loader-factory.js';
+import { normalizePlatforms } from '../../../../utils/platform-mapper.js';
+
+export class PathInstallStrategy extends BaseInstallStrategy {
+  readonly name = 'path';
+  
+  canHandle(classification: InputClassification): boolean {
+    return classification.type === 'path';
+  }
+  
+  async buildContext(
+    classification: InputClassification,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<InstallationContext> {
+    if (classification.type !== 'path') {
+      throw new Error('PathStrategy cannot handle non-path classification');
+    }
+    
+    const source: PackageSource = {
+      type: 'path',
+      packageName: '',
+      localPath: classification.localPath,
+      sourceType: 'directory' // Could detect tarball here
+    };
+    
+    return {
+      source,
+      mode: 'install',
+      options,
+      platforms: normalizePlatforms(options.platforms) || [],
+      cwd,
+      targetDir: '.',
+      resolvedPackages: [],
+      warnings: [],
+      errors: []
+    };
+  }
+  
+  async preprocess(
+    context: InstallationContext,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<PreprocessResult> {
+    const loader = getLoaderForSource(context.source);
+    const loaded = await loader.load(context.source, options, cwd);
+    
+    context.source.packageName = loaded.packageName;
+    context.source.version = loaded.version;
+    context.source.contentRoot = loaded.contentRoot;
+    context.source.pluginMetadata = loaded.pluginMetadata;
+    
+    if (loaded.pluginMetadata?.pluginType === 'marketplace') {
+      return this.createMarketplaceResult(context);
+    }
+    
+    return this.createNormalResult(context);
+  }
+}

@@ -1,0 +1,357 @@
+import { relative } from 'path';
+import type { CommandResult, InstallOptions } from '../../../types/index.js';
+import type { InstallationContext } from '../unified/context.js';
+import type { 
+  NormalizedInstallOptions, 
+  InputClassification, 
+  PreprocessResult,
+  InstallStrategy 
+} from './types.js';
+import { 
+  promptBaseSelection, 
+  canPrompt, 
+  handleAmbiguityNonInteractive,
+  type BaseMatch 
+} from '../ambiguity-prompts.js';
+import {
+  parseMarketplace,
+  promptPluginSelection,
+  installMarketplacePlugins,
+  validatePluginNames
+} from '../marketplace-handler.js';
+import { Spinner } from '../../../utils/spinner.js';
+import { classifyInput } from '../preprocessing/input-classifier.js';
+import { assertTargetDirOutsideMetadata, validateResolutionFlags } from '../validators/index.js';
+import { runUnifiedInstallPipeline } from '../unified/pipeline.js';
+import { runMultiContextPipeline } from '../unified/multi-context-pipeline.js';
+import { createAllStrategies } from './strategies/index.js';
+import { logger } from '../../../utils/logger.js';
+
+/**
+ * InstallOrchestrator coordinates the entire install flow.
+ * 
+ * Responsibilities:
+ * 1. Classify input → select strategy
+ * 2. Build context via strategy
+ * 3. Preprocess (load, detect base, check special cases)
+ * 4. Route based on PreprocessResult:
+ *    - marketplace → marketplace handler
+ *    - ambiguous → ambiguity handler → pipeline
+ *    - multi-resource → multi-context pipeline
+ *    - normal → unified pipeline
+ */
+export class InstallOrchestrator {
+  private strategies: InstallStrategy[] = [];
+  
+  /**
+   * Register an install strategy.
+   */
+  registerStrategy(strategy: InstallStrategy): void {
+    this.strategies.push(strategy);
+    logger.debug('Registered install strategy', { name: strategy.name });
+  }
+  
+  /**
+   * Execute the install flow.
+   * 
+   * @param input - Package input (undefined for bulk install)
+   * @param options - Normalized install options
+   * @param cwd - Current working directory
+   */
+  async execute(
+    input: string | undefined,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<CommandResult> {
+    const targetDir = '.';
+    
+    // Step 1: Validate
+    assertTargetDirOutsideMetadata(targetDir);
+    validateResolutionFlags(options);
+    
+    // Step 2: Classify input
+    const classification = await classifyInput(input, options, cwd);
+    logger.info('Classified install input', { 
+      type: classification.type,
+      features: classification.features 
+    });
+    
+    // Step 3: Select strategy
+    const strategy = this.selectStrategy(classification);
+    if (!strategy) {
+      throw new Error(`No strategy found for input type: ${classification.type}`);
+    }
+    logger.debug('Selected install strategy', { strategy: strategy.name });
+    
+    // Step 4: Build context
+    const context = await strategy.buildContext(classification, options, cwd);
+    
+    // Step 5: Preprocess (load, detect base, check special handling)
+    const preprocessResult = await strategy.preprocess(context, options, cwd);
+    
+    // Step 6: Route based on result
+    return this.routeToHandler(preprocessResult, options, cwd);
+  }
+  
+  /**
+   * Select the appropriate strategy for the given classification.
+   */
+  private selectStrategy(classification: InputClassification): InstallStrategy | undefined {
+    for (const strategy of this.strategies) {
+      if (strategy.canHandle(classification)) {
+        return strategy;
+      }
+    }
+    return undefined;
+  }
+  
+  /**
+   * Route to appropriate handler based on preprocess result.
+   */
+  private async routeToHandler(
+    result: PreprocessResult,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<CommandResult> {
+    const { context, specialHandling } = result;
+    
+    switch (specialHandling) {
+      case 'marketplace':
+        return this.handleMarketplace(result, options, cwd);
+      
+      case 'ambiguous':
+        return this.handleAmbiguous(result, options, cwd);
+      
+      case 'multi-resource':
+        return this.handleMultiResource(result, options, cwd);
+      
+      default:
+        // Normal pipeline flow
+        return runUnifiedInstallPipeline(context);
+    }
+  }
+  
+  /**
+   * Handle marketplace installation.
+   * Delegates to marketplace-handler.ts
+   */
+  private async handleMarketplace(
+    result: PreprocessResult,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<CommandResult> {
+    const { context } = result;
+    
+    if (!context.source.pluginMetadata?.manifestPath) {
+      throw new Error('Marketplace manifest not found');
+    }
+    
+    const spinner = new Spinner('Loading marketplace');
+    spinner.start();
+    
+    const marketplace = await parseMarketplace(
+      context.source.pluginMetadata.manifestPath, 
+      { repoPath: context.source.contentRoot }
+    );
+    
+    spinner.stop();
+    
+    let selectedPlugins: string[];
+    
+    if (options.plugins && options.plugins.length > 0) {
+      // Non-interactive: validate provided plugin names
+      const { valid, invalid } = validatePluginNames(marketplace, options.plugins);
+      
+      if (invalid.length > 0) {
+        console.error(`Error: The following plugins were not found in marketplace '${marketplace.name}':`);
+        for (const name of invalid) {
+          console.error(`  - ${name}`);
+        }
+        console.error(`\nAvailable plugins: ${marketplace.plugins.map(p => p.name).join(', ')}`);
+        return {
+          success: false,
+          error: `Plugins not found: ${invalid.join(', ')}`
+        };
+      }
+      
+      if (valid.length === 0) {
+        console.log('No valid plugins specified. Installation cancelled.');
+        return { success: true, data: { installed: 0, skipped: 0 } };
+      }
+      
+      selectedPlugins = valid;
+      console.log(`✓ Marketplace: ${marketplace.name}`);
+      console.log(`Installing ${selectedPlugins.length} plugin${selectedPlugins.length === 1 ? '' : 's'}: ${selectedPlugins.join(', ')}`);
+    } else {
+      // Interactive: prompt user
+      selectedPlugins = await promptPluginSelection(marketplace);
+      
+      if (selectedPlugins.length === 0) {
+        console.log('No plugins selected. Installation cancelled.');
+        return { success: true, data: { installed: 0, skipped: 0 } };
+      }
+    }
+    
+    // Verify it's a git source
+    if (context.source.type !== 'git' || !context.source.gitUrl) {
+      throw new Error('Marketplace must be from a git source');
+    }
+    
+    const commitSha = (context.source as any)._commitSha || '';
+    if (!commitSha) {
+      throw new Error('Marketplace commit SHA not available');
+    }
+    
+    return await installMarketplacePlugins(
+      context.source.contentRoot!,
+      marketplace,
+      selectedPlugins,
+      context.source.gitUrl,
+      context.source.gitRef,
+      commitSha,
+      options,
+      cwd,
+      {
+        agents: options.agents,
+        skills: options.skills
+      }
+    );
+  }
+  
+  /**
+   * Handle ambiguous base resolution.
+   * Prompts user or auto-selects, then continues to pipeline.
+   */
+  private async handleAmbiguous(
+    result: PreprocessResult,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<CommandResult> {
+    const { context, ambiguousMatches } = result;
+    
+    if (!ambiguousMatches || ambiguousMatches.length === 0) {
+      // No ambiguity, proceed normally
+      return runUnifiedInstallPipeline(context);
+    }
+    
+    const repoRoot = context.source.contentRoot || cwd;
+    
+    // Format matches for prompts
+    const matches: BaseMatch[] = ambiguousMatches.map(m => ({
+      base: m.base,
+      pattern: m.pattern,
+      startIndex: m.startIndex,
+      exampleTarget: `${m.pattern} → <platforms>/${m.pattern.replace('**/', '').replace('*', 'file')}`
+    }));
+    
+    let selectedMatch: BaseMatch;
+    
+    if (options.force || !canPrompt()) {
+      selectedMatch = handleAmbiguityNonInteractive(matches);
+    } else {
+      const resourcePath = context.source.resourcePath || context.source.gitPath || '';
+      selectedMatch = await promptBaseSelection(resourcePath, matches, repoRoot);
+    }
+    
+    // Update context with selection
+    context.detectedBase = selectedMatch.base;
+    context.matchedPattern = selectedMatch.pattern;
+    context.baseSource = 'user-selection';
+    context.baseRelative = relative(repoRoot, selectedMatch.base) || '.';
+    
+    logger.info('Ambiguous base resolved', {
+      base: context.detectedBase,
+      pattern: context.matchedPattern
+    });
+    
+    return runUnifiedInstallPipeline(context);
+  }
+  
+  /**
+   * Handle multi-resource installation (bulk install or convenience filters).
+   */
+  private async handleMultiResource(
+    result: PreprocessResult,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<CommandResult> {
+    const { context, resourceContexts } = result;
+    
+    if (!resourceContexts || resourceContexts.length === 0) {
+      // Check if this is a bulk install with no packages
+      if (context.source.packageName === '__bulk__') {
+        console.log('⚠️  No packages found in openpackage.yml');
+        console.log('\n💡 Tips:');
+        console.log('  • Add packages to the "dependencies" array in openpackage.yml');
+        console.log('  • Add development packages to the "dev-dependencies" array');
+        console.log('  • Use "opkg install <package-name>" to install a specific package');
+        return { success: true, data: { installed: 0, skipped: 0 } };
+      }
+      
+      return {
+        success: false,
+        error: 'No resources matched the specified filters'
+      };
+    }
+    
+    // For bulk installs, show context
+    if (context.source.packageName === '__bulk__') {
+      console.log(`✓ Installing ${resourceContexts.length} package${resourceContexts.length === 1 ? '' : 's'} from openpackage.yml`);
+    }
+    
+    // Run bulk install with proper result aggregation
+    return this.runBulkInstall(resourceContexts);
+  }
+  
+  /**
+   * Run bulk installation for multiple packages.
+   */
+  private async runBulkInstall(contexts: InstallationContext[]): Promise<CommandResult> {
+    let totalInstalled = 0;
+    let totalSkipped = 0;
+    const results: Array<{ name: string; success: boolean; error?: string }> = [];
+    
+    for (const ctx of contexts) {
+      try {
+        const result = await runUnifiedInstallPipeline(ctx);
+        
+        if (result.success) {
+          totalInstalled++;
+          results.push({ name: ctx.source.packageName, success: true });
+        } else {
+          totalSkipped++;
+          results.push({ name: ctx.source.packageName, success: false, error: result.error });
+          console.log(`❌ ${ctx.source.packageName}: ${result.error}`);
+        }
+      } catch (error) {
+        totalSkipped++;
+        results.push({ name: ctx.source.packageName, success: false, error: String(error) });
+        console.log(`❌ ${ctx.source.packageName}: ${error}`);
+      }
+    }
+    
+    // Display summary
+    console.log(`✓ Installation complete: ${totalInstalled} installed${totalSkipped > 0 ? `, ${totalSkipped} failed` : ''}`);
+    
+    const allSuccessful = totalSkipped === 0;
+    return {
+      success: allSuccessful,
+      data: { installed: totalInstalled, skipped: totalSkipped, results },
+      error: allSuccessful ? undefined : `${totalSkipped} packages failed to install`
+    };
+  }
+}
+
+/**
+ * Create a configured orchestrator with all strategies registered.
+ */
+export function createOrchestrator(): InstallOrchestrator {
+  const orchestrator = new InstallOrchestrator();
+  
+  // Register all strategies
+  for (const strategy of createAllStrategies()) {
+    orchestrator.registerStrategy(strategy);
+  }
+  
+  return orchestrator;
+}

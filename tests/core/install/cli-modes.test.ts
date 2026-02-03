@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { determineResolutionMode } from '../../../src/utils/resolution-mode.js';
-import { validateResolutionFlags } from '../../../src/commands/install.js';
+import { validateResolutionFlags } from '../../../src/core/install/validators/index.js';
 
 const defaultMode = determineResolutionMode({});
 assert.equal(defaultMode, 'default');

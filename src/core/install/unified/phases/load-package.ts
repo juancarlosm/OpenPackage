@@ -14,6 +14,15 @@ import { join, relative } from 'path';
  * Load package from source
  */
 export async function loadPackagePhase(ctx: InstallationContext): Promise<void> {
+  // Skip if context already has loaded data (preprocessed by strategy)
+  if (ctx.source.contentRoot && ctx.source.packageName) {
+    logger.debug('Skipping load phase - context already preprocessed', {
+      packageName: ctx.source.packageName,
+      contentRoot: ctx.source.contentRoot
+    });
+    return;
+  }
+
   logger.debug(`Loading package from ${ctx.source.type} source`);
   
   const spinner = new Spinner('Loading package from source');

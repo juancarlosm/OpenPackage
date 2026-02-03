@@ -182,6 +182,16 @@ export interface InstallOptions {
    * Comma-separated or array of plugin names.
    */
   plugins?: string[];
+  
+  /**
+   * Agent filter: install only matching agents from source.
+   */
+  agents?: string[];
+  
+  /**
+   * Skill filter: install only matching skills from source.
+   */
+  skills?: string[];
 }
 
 export interface UninstallOptions {
