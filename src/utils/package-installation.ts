@@ -20,7 +20,7 @@ export async function detectPlatforms(targetDir: string): Promise<Platform[]> {
  * Prompt user for platform selection when no platforms are detected
  */
 export async function promptForPlatformSelection(): Promise<Platform[]> {
-  console.log('\n🤖 Platform Detection');
+  console.log('\n✓ Platform Detection');
   console.log('No AI development platform detected in this project.');
 
   return (await promptPlatformSelection()) as Platform[];

@@ -7,6 +7,7 @@ import { logger } from './logger.js';
 import { ValidationError } from './errors.js';
 import { exists, ensureDir } from './fs.js';
 import { DIR_PATTERNS, FILE_PATTERNS } from '../constants/index.js';
+import { Spinner } from './spinner.js';
 import {
   getGitCommitCacheDir,
   getGitCachePath,
@@ -87,12 +88,19 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
   
   logger.debug(`Cloning repository to cache`, { url, ref, subdir });
   
+  // Create spinner for git operations
+  const refDisplay = ref ? `#${ref}` : '';
+  const spinner = new Spinner(`Cloning repository from ${url}${refDisplay}`);
+  spinner.start();
+  
   try {
     // Clone repository
     if (ref && isSha(ref)) {
       // SHA: shallow clone default branch, then fetch the sha
       await runGit(['clone', '--depth', '1', url, tempClonePath]);
+      spinner.update(`Fetching commit ${ref}`);
       await runGit(['fetch', '--depth', '1', 'origin', ref], tempClonePath);
+      spinner.update(`Checking out commit ${ref}`);
       await runGit(['checkout', ref], tempClonePath);
     } else if (ref) {
       // Branch or tag
@@ -103,12 +111,15 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     }
     
     // Get the actual commit SHA
+    spinner.update('Resolving commit SHA');
     const commitSha = await getCurrentCommitSha(tempClonePath);
     const commitDir = getGitCommitCacheDir(url, commitSha);
     
     // Check if this commit is already cached
     if (await isCommitCached(url, commitSha)) {
       logger.debug(`Commit already cached, using existing`, { commitSha, commitDir });
+      
+      spinner.stop();
       
       // Clean up temp clone
       await rm(tempClonePath, { recursive: true, force: true });
@@ -188,6 +199,8 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       );
     }
     
+    spinner.stop();
+    
     const refPart = ref ? `#${ref}` : '';
     const subdirPart = subdir ? `&subdirectory=${subdir}` : '';
     logger.info(`Cloned git repository ${url}${refPart}${subdirPart} to cache [${commitSha}]`);
@@ -199,6 +212,7 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     };
     
   } catch (error) {
+    spinner.stop();
     // Clean up temp clone on error
     if (await exists(tempClonePath)) {
       await rm(tempClonePath, { recursive: true, force: true });
