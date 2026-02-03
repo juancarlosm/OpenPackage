@@ -214,6 +214,12 @@ export async function run(): Promise<void> {
     // Initialize OpenPackage directories
     await initializeOpenPackage();
     
+    // If no arguments provided (just 'opkg'), show help and exit successfully
+    if (process.argv.length <= 2) {
+      program.outputHelp();
+      process.exit(0);
+    }
+    
     // Parse command line arguments
     await program.parseAsync();
     
