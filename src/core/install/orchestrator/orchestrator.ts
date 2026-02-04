@@ -134,63 +134,81 @@ export class InstallOrchestrator {
           const interactive = canPrompt();
           context.platforms = await resolvePlatforms(cwd, options.platforms, { interactive });
         }
-        // For path/git sources, recursively install root and its dependencies via graph executor
+        // For path/git sources with manifests, install root first (updates manifest),
+        // then run executor for dependencies only (with skipManifestUpdate)
         const isPathOrGit = context.source.type === 'path' || context.source.type === 'git';
         const contentRoot = context.source.contentRoot;
         const rootManifestPath =
           isPathOrGit && contentRoot ? await getManifestPathAtContentRoot(contentRoot) : null;
         if (rootManifestPath) {
+          // Install root package first (this updates the workspace manifest)
           const rootResult = await runUnifiedInstallPipeline(context);
-          const platforms =
-            context.platforms.length > 0
-              ? context.platforms
-              : await resolvePlatforms(cwd, options.platforms, { interactive: canPrompt() });
-          const executor = new DependencyResolutionExecutor(cwd, {
-            graphOptions: {
-              workspaceRoot: cwd,
-              rootManifestPath,
-              includeDev: true,
-              maxDepth: 10
-            },
-            loaderOptions: {
-              cwd,
-              parallel: true,
-              cacheEnabled: true,
-              installOptions: { ...options, skipManifestUpdate: true }
-            },
-            plannerOptions: {
-              cwd,
-              platforms,
-              installOptions: { ...options, skipManifestUpdate: true },
-              force: options.force ?? false
-            },
-            dryRun: options.dryRun ?? false,
-            failFast: false
-          });
-          const execResult = await executor.execute();
-          const rootInstalled = (rootResult.data as { installed?: number })?.installed ?? 0;
-          const depInstalled = execResult.summary?.installed ?? 0;
-          const depSkipped = (execResult.summary?.skipped ?? 0) + (execResult.summary?.failed ?? 0);
-          if (execResult.summary) {
-            console.log(
-              `✓ Installation complete: ${rootInstalled + depInstalled} installed${depSkipped > 0 ? `, ${depSkipped} skipped` : ''}`
-            );
-          }
-          return {
-            success: rootResult.success && execResult.success,
-            data: {
-              packageName: context.source.packageName,
-              installed: rootInstalled + depInstalled,
-              skipped: depSkipped,
-              results: execResult.results
-            },
-            error: execResult.error ?? rootResult.error,
-            warnings: execResult.warnings ?? rootResult.warnings
-          };
+          // Then install dependencies via executor (skipManifestUpdate for deps)
+          return this.installDependenciesOnly(rootManifestPath, rootResult, context, options, cwd);
         }
         return runUnifiedInstallPipeline(context);
       }
     }
+  }
+
+  /**
+   * Install dependencies only (after root package is already installed).
+   * The root package is installed separately via unified pipeline to ensure manifest is updated.
+   */
+  private async installDependenciesOnly(
+    rootManifestPath: string,
+    rootResult: CommandResult,
+    context: InstallationContext,
+    options: NormalizedInstallOptions,
+    cwd: string
+  ): Promise<CommandResult> {
+    const platforms =
+      context.platforms.length > 0
+        ? context.platforms
+        : await resolvePlatforms(cwd, options.platforms, { interactive: canPrompt() });
+
+    const executor = new DependencyResolutionExecutor(cwd, {
+      graphOptions: {
+        workspaceRoot: cwd,
+        rootManifestPath,
+        includeRoot: false, // Root already installed, just deps
+        includeDev: true,
+        maxDepth: 10
+      },
+      loaderOptions: {
+        cwd,
+        parallel: true,
+        cacheEnabled: true,
+        installOptions: { ...options, skipManifestUpdate: true }
+      },
+      plannerOptions: {
+        cwd,
+        platforms,
+        installOptions: { ...options, skipManifestUpdate: true },
+        force: options.force ?? false
+      },
+      dryRun: options.dryRun ?? false,
+      failFast: false
+    });
+
+    const execResult = await executor.execute();
+    
+    // Combine root result with dependency results
+    const rootInstalled = (rootResult.data as { installed?: number })?.installed ?? 0;
+    const depInstalled = execResult.summary?.installed ?? 0;
+    const depSkipped = (execResult.summary?.skipped ?? 0) + (execResult.summary?.failed ?? 0);
+
+    return {
+      success: rootResult.success && execResult.success,
+      data: {
+        packageName: context.source.packageName,
+        installed: rootInstalled + depInstalled,
+        skipped: depSkipped,
+        results: execResult.results
+      },
+      error: execResult.error ?? rootResult.error,
+      warnings: execResult.warnings ?? rootResult.warnings
+    };
   }
   
   /**

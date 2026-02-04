@@ -1,6 +1,6 @@
 import * as semver from 'semver';
 import { PackageYml } from '../types/index.js';
-import { ResolvedPackage } from '../core/dependency-resolver.js';
+import type { ResolvedPackage } from '../core/dependency-resolver/types.js';
 import { arePackageNamesEquivalent } from './package-name.js';
 import { getLocalPackageYmlPath } from './paths.js';
 import { parsePackageYml } from './package-yml.js';

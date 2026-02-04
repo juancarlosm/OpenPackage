@@ -1,5 +1,5 @@
 import type { InstallationContext } from '../context.js';
-import { processConflictResolution } from '../../install-flow.js';
+import { checkAndHandleAllPackageConflicts } from '../../operations/conflict-handler.js';
 import { logger } from '../../../../utils/logger.js';
 
 /**
@@ -9,17 +9,17 @@ import { logger } from '../../../../utils/logger.js';
 export async function processConflictsPhase(ctx: InstallationContext): Promise<boolean> {
   logger.debug(`Processing conflicts for ${ctx.resolvedPackages.length} packages`);
   
-  const result = await processConflictResolution(ctx.resolvedPackages, ctx.options);
+  const conflictResult = await checkAndHandleAllPackageConflicts(ctx.resolvedPackages as any, ctx.options);
   
-  if ('cancelled' in result) {
+  if (!conflictResult.shouldProceed) {
     return false;
   }
   
   // Update resolved packages based on conflict resolution
-  ctx.resolvedPackages = result.finalResolvedPackages;
+  ctx.resolvedPackages = ctx.resolvedPackages.filter(pkg => !conflictResult.skippedPackages.includes(pkg.name));
   
   // Store conflict result in context for later use
-  (ctx as any).conflictResult = result.conflictResult;
+  (ctx as any).conflictResult = conflictResult;
   
   return true;
 }

@@ -1,5 +1,5 @@
 import type { RemotePackageMetadataSuccess, RemoteBatchPullResult, RemotePullFailure } from '../remote-pull.js';
-import type { ResolvedPackage } from '../dependency-resolver.js';
+import type { ResolvedPackage } from '../dependency-resolver/types.js';
 import type { PackageRemoteResolutionOutcome } from './types.js';
 import {
   fetchRemotePackageMetadata,

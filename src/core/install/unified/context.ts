@@ -1,6 +1,6 @@
 import type { Platform } from '../../platforms.js';
 import type { InstallOptions } from '../../../types/index.js';
-import type { ResolvedPackage } from '../../dependency-resolver.js';
+import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import type { WorkspaceIndex } from '../../../types/workspace-index.js';
 
 /**

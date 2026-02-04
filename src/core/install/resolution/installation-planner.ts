@@ -4,7 +4,7 @@
  */
 
 import type { PackageSource } from '../unified/context.js';
-import type { ResolvedPackage } from '../../dependency-resolver.js';
+import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import type { InstallationContext } from '../unified/context.js';
 import type {
   DependencyGraph,

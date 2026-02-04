@@ -5,6 +5,7 @@
 
 export { DependencyGraphBuilder } from './graph-builder.js';
 export { PackageLoader, clearLoadCache } from './package-loader.js';
+export { ensureContentRoot, clearContentRootCache } from './content-root-cache.js';
 export { InstallationPlanner } from './installation-planner.js';
 export { DependencyResolutionExecutor } from './executor.js';
 export { computeDependencyId, normalizeGitUrl } from './id-generator.js';
@@ -15,6 +16,11 @@ export {
   getDeclaredInDir,
   getManifestPathAtContentRoot
 } from './manifest-reader.js';
+export {
+  solveVersions,
+  versionSatisfiesAll,
+  intersectRanges
+} from './version-solver.js';
 
 export type {
   DependencyId,
@@ -38,3 +44,8 @@ export type {
   ParsedManifest,
   BaseDetectionResult
 } from './types.js';
+export type {
+  VersionSolution,
+  VersionConflict,
+  SolverOptions
+} from './version-solver.js';

@@ -5,9 +5,10 @@
 
 import type { PackageYml } from '../../../types/index.js';
 import type { InstallationContext } from '../unified/context.js';
-import type { ResolvedPackage } from '../../dependency-resolver.js';
+import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import type { InstallOptions } from '../../../types/index.js';
 import type { Platform } from '../../platforms.js';
+import type { VersionSolution } from './version-solver.js';
 
 /** Parsed manifest (openpackage.yml) - alias for PackageYml */
 export type ParsedManifest = PackageYml;
@@ -226,6 +227,12 @@ export interface GraphBuilderOptions {
    * deps uses dirname(rootManifestPath).
    */
   rootManifestPath?: string;
+  /**
+   * When true, include the root manifest package itself as a node in the graph.
+   * This makes the executor install the root package along with its dependencies
+   * in a single unified flow. Default: false.
+   */
+  includeRoot?: boolean;
 }
 
 /**
@@ -308,4 +315,6 @@ export interface ExecutionResult {
   graph?: DependencyGraph;
   /** Warnings accumulated during execution */
   warnings?: string[];
+  /** Version solution from semver constraint resolution */
+  versionSolution?: VersionSolution;
 }

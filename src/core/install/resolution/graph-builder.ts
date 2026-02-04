@@ -3,7 +3,7 @@
  * Phase 1: Recursively discovers all dependencies and builds the graph without installing.
  */
 
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import type {
   DependencyDeclaration,
   DependencyGraph,
@@ -18,7 +18,7 @@ import { readManifestAtPath, extractDependencies, getDeclaredInDir } from './man
 import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
 import { getLocalPackageYmlPath } from '../../../utils/paths.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
-import { loadPackageFromGit } from '../git-package-loader.js';
+import { ensureContentRoot } from './content-root-cache.js';
 import { logger } from '../../../utils/logger.js';
 
 const MAX_DEPTH_DEFAULT = 10;
@@ -91,6 +91,8 @@ export class DependencyGraphBuilder {
   /**
    * Build complete dependency graph from root manifest.
    * Uses workspace .openpackage/openpackage.yml unless options.rootManifestPath is set.
+   * When options.includeRoot is true, the root manifest package itself is included as
+   * the first node in the graph (installed before its dependencies).
    */
   async build(): Promise<DependencyGraph> {
     const manifestPath = this.options.rootManifestPath ?? getLocalPackageYmlPath(this.workspaceRoot);
@@ -106,6 +108,16 @@ export class DependencyGraphBuilder {
       return this.emptyGraph();
     }
 
+    const roots: import('./types.js').DependencyId[] = [];
+    let rootPackageNode: ResolutionDependencyNode | null = null;
+
+    if (this.options.includeRoot && this.options.rootManifestPath) {
+      rootPackageNode = await this.createRootPackageNode(manifest, manifestPath);
+      if (rootPackageNode) {
+        roots.push(rootPackageNode.id);
+      }
+    }
+
     const rootDeclarations = extractDependencies(
       manifest,
       manifestPath,
@@ -113,7 +125,6 @@ export class DependencyGraphBuilder {
       this.options.includeDev ?? true
     );
 
-    const roots: import('./types.js').DependencyId[] = [];
     for (const decl of rootDeclarations) {
       if (decl.depth >= this.maxDepth) {
         this.warnings.push(`Skipping dependency ${decl.name}: max depth ${this.maxDepth} reached`);
@@ -121,7 +132,12 @@ export class DependencyGraphBuilder {
       }
       const node = await this.discoverNode(decl);
       if (node) {
-        roots.push(node.id);
+        if (rootPackageNode) {
+          rootPackageNode.children.push(node.id);
+          node.parents.push(rootPackageNode.id);
+        } else {
+          roots.push(node.id);
+        }
       }
     }
 
@@ -141,6 +157,39 @@ export class DependencyGraphBuilder {
         warnings: this.warnings
       }
     };
+  }
+
+  private async createRootPackageNode(
+    manifest: import('../../../types/index.js').PackageYml,
+    manifestPath: string
+  ): Promise<ResolutionDependencyNode | null> {
+    const contentRoot = dirname(manifestPath);
+    const packageName = manifest.name || 'root';
+
+    const id: import('./types.js').DependencyId = {
+      key: `root:${contentRoot}`,
+      displayName: packageName,
+      sourceType: 'path'
+    };
+
+    const source: ResolvedSource = {
+      type: 'path',
+      absolutePath: contentRoot,
+      contentRoot,
+      manifestPath
+    };
+
+    const node: ResolutionDependencyNode = {
+      id,
+      declarations: [],
+      source,
+      children: [],
+      parents: [],
+      state: 'discovered'
+    };
+
+    this.nodes.set(id.key, node);
+    return node;
   }
 
   private emptyGraph(): DependencyGraph {
@@ -194,24 +243,15 @@ export class DependencyGraphBuilder {
     let contentRoot: string | undefined = source.contentRoot ?? source.absolutePath;
 
     if (source.type === 'git' && !contentRoot) {
-      try {
-        const result = await loadPackageFromGit({
-          url: source.gitUrl!,
-          ref: source.gitRef,
-          path: undefined,
-          resourcePath: source.resourcePath
-        });
-        if (result.isMarketplace) {
-          this.warnings.push(`Dependency '${declaration.name}' is a marketplace; skipping nested deps`);
-        } else {
-          contentRoot = source.resourcePath
-            ? join(result.sourcePath, source.resourcePath)
-            : result.sourcePath;
-          node.source.contentRoot = contentRoot;
-        }
-      } catch (error) {
-        logger.warn(`Failed to load git dependency '${declaration.name}': ${error}`);
-        this.warnings.push(`Failed to load ${declaration.name}: ${error}`);
+      const result = await ensureContentRoot(source);
+      if (result.isMarketplace) {
+        this.warnings.push(`Dependency '${declaration.name}' is a marketplace; skipping nested deps`);
+      } else if (result.contentRoot) {
+        contentRoot = result.contentRoot;
+        node.source.contentRoot = contentRoot;
+      } else {
+        logger.warn(`Failed to load git dependency '${declaration.name}'`);
+        this.warnings.push(`Failed to load ${declaration.name}`);
       }
     }
 

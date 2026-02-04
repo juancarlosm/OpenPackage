@@ -15,6 +15,7 @@ import type {
 import { getLoaderForSource } from '../sources/loader-factory.js';
 import type { LoadedPackage } from '../sources/base.js';
 import { logger } from '../../../utils/logger.js';
+import { getCachedContentRoot } from './content-root-cache.js';
 
 const loadCache = new Map<string, LoadedPackageData>();
 
@@ -167,6 +168,14 @@ export class PackageLoader {
     if (node.source.type === 'registry') {
       node.state = 'discovered';
       return;
+    }
+
+    // Use content root from graph-builder phase if available
+    if (node.source.type === 'git' && !node.source.contentRoot) {
+      const cached = getCachedContentRoot(node.source);
+      if (cached?.contentRoot) {
+        node.source.contentRoot = cached.contentRoot;
+      }
     }
 
     node.state = 'loading';

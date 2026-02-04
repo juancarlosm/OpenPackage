@@ -1,6 +1,6 @@
 import type { InstallationContext } from '../context.js';
-import { performIndexBasedInstallationPhases } from '../../install-flow.js';
-import { displayDependencyTree } from '../../../dependency-resolver.js';
+import { performIndexBasedInstallationPhases } from '../../operations/installation-executor.js';
+import { displayDependencyTree } from '../../../dependency-resolver/display.js';
 import { resolvePlatforms } from '../../platform-resolution.js';
 import { logger } from '../../../../utils/logger.js';
 

@@ -1,8 +1,103 @@
+import * as semver from 'semver';
 import type { InstallationContext } from '../context.js';
-import { resolveDependenciesForInstall } from '../../install-flow.js';
 import { pullMissingDependenciesIfNeeded } from '../../remote-flow.js';
 import { addWarning, addError } from '../context-helpers.js';
 import { logger } from '../../../../utils/logger.js';
+import { resolveDependencies } from '../../../dependency-resolver/resolver.js';
+import { gatherGlobalVersionConstraints, gatherRootVersionConstraints } from '../../../openpackage.js';
+import { VersionConflictError } from '../../../../utils/errors.js';
+import { promptVersionSelection } from '../../../../utils/prompts.js';
+import type { PackageRemoteResolutionOutcome } from '../../types.js';
+
+interface DependencyResolutionResult {
+  resolvedPackages: Awaited<ReturnType<typeof resolveDependencies>>['resolvedPackages'];
+  missingPackages: string[];
+  warnings?: string[];
+  remoteOutcomes?: Record<string, PackageRemoteResolutionOutcome>;
+}
+
+class VersionResolutionAbortError extends Error {
+  constructor(public packageName: string) {
+    super(`Unable to resolve version for ${packageName}`);
+    this.name = 'VersionResolutionAbortError';
+  }
+}
+
+async function resolveDependenciesForInstall(
+  packageName: string,
+  cwd: string,
+  version: string | undefined,
+  options: InstallationContext['options']
+): Promise<DependencyResolutionResult> {
+  const globalConstraints = await gatherGlobalVersionConstraints(cwd);
+  const rootConstraints = await gatherRootVersionConstraints(cwd);
+  const rootOverrides = new Map(rootConstraints);
+  const resolverWarnings = new Set<string>();
+
+  const resolverOptions = {
+    mode: options.resolutionMode ?? 'default',
+    profile: options.profile,
+    apiKey: options.apiKey,
+    onWarning: (message: string) => {
+      if (!resolverWarnings.has(message)) {
+        resolverWarnings.add(message);
+      }
+    }
+  };
+
+  const runResolution = async () => {
+    return await resolveDependencies(
+      packageName,
+      cwd,
+      true,
+      new Set(),
+      new Map(),
+      version,
+      new Map(),
+      globalConstraints,
+      rootOverrides,
+      resolverOptions
+    );
+  };
+
+  try {
+    const result = await runResolution();
+    return {
+      resolvedPackages: result.resolvedPackages,
+      missingPackages: result.missingPackages,
+      warnings: resolverWarnings.size > 0 ? Array.from(resolverWarnings) : undefined,
+      remoteOutcomes: result.remoteOutcomes
+    };
+  } catch (error) {
+    if (error instanceof VersionConflictError) {
+      const conflictDetails: any = (error as any).details || {};
+      const conflictName = conflictDetails.packageName || conflictDetails.pkg || packageName;
+      const available: string[] = conflictDetails.availableVersions || [];
+
+      let chosenVersion: string | null = null;
+      if (options.force) {
+        chosenVersion = [...available].sort((a, b) => semver.rcompare(a, b))[0] || null;
+      } else {
+        chosenVersion = await promptVersionSelection(conflictName, available, 'to install');
+      }
+
+      if (!chosenVersion) {
+        throw new VersionResolutionAbortError(conflictName);
+      }
+
+      rootOverrides.set(conflictName, [chosenVersion]);
+      const retryResult = await runResolution();
+      return {
+        resolvedPackages: retryResult.resolvedPackages,
+        missingPackages: retryResult.missingPackages,
+        warnings: resolverWarnings.size > 0 ? Array.from(resolverWarnings) : undefined,
+        remoteOutcomes: retryResult.remoteOutcomes
+      };
+    }
+
+    throw error;
+  }
+}
 
 /**
  * Resolve dependencies phase

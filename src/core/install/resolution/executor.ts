@@ -8,6 +8,9 @@ import { runUnifiedInstallPipeline } from '../unified/pipeline.js';
 import { DependencyGraphBuilder } from './graph-builder.js';
 import { PackageLoader } from './package-loader.js';
 import { InstallationPlanner } from './installation-planner.js';
+import { solveVersions, createInteractiveConflictHandler, type VersionSolution, type SolverOptions } from './version-solver.js';
+import { promptVersionSelection } from '../../../utils/prompts.js';
+import { canPrompt } from '../ambiguity-prompts.js';
 import type {
   DependencyGraph,
   ExecutorOptions,
@@ -37,6 +40,7 @@ export class DependencyResolutionExecutor {
   async execute(): Promise<ExecutionResult> {
     const results: PackageResult[] = [];
     let graph: DependencyGraph | undefined;
+    let versionSolution: VersionSolution | undefined;
 
     try {
       logger.info('Discovering dependencies');
@@ -50,6 +54,39 @@ export class DependencyResolutionExecutor {
       }
 
       logger.info(`Found ${graph.metadata.nodeCount} packages (max depth: ${graph.metadata.maxDepth})`);
+
+      const force = this.options.plannerOptions?.installOptions?.force ?? false;
+      
+      const solverOptions: SolverOptions = { force };
+      if (!force && canPrompt()) {
+        solverOptions.onConflict = createInteractiveConflictHandler(promptVersionSelection);
+      }
+      
+      versionSolution = await solveVersions(graph, solverOptions);
+
+      if (versionSolution.conflicts.length > 0 && !force) {
+        for (const conflict of versionSolution.conflicts) {
+          const ranges = conflict.ranges.join(', ');
+          const requesters = conflict.requestedBy.join(', ');
+          logger.error(`Version conflict for ${conflict.packageName}: ranges [${ranges}] requested by [${requesters}]`);
+        }
+        return {
+          success: false,
+          error: `Version conflicts detected for: ${versionSolution.conflicts.map(c => c.packageName).join(', ')}`,
+          results: [],
+          graph,
+          warnings: graph.metadata.warnings,
+          versionSolution
+        };
+      }
+
+      for (const [packageName, resolvedVersion] of versionSolution.resolved) {
+        for (const node of graph.nodes.values()) {
+          if (node.source.type === 'registry' && node.source.packageName === packageName) {
+            node.source.resolvedVersion = resolvedVersion;
+          }
+        }
+      }
 
       logger.info('Loading packages');
       await this.packageLoader.loadAll(graph);
@@ -69,7 +106,7 @@ export class DependencyResolutionExecutor {
       logger.info(`${plan.contexts.length} packages to install, ${plan.skipped.length} skipped`);
 
       if (this.options.dryRun) {
-        return this.createDryRunResult(plan, graph);
+        return this.createDryRunResult(plan, graph, versionSolution);
       }
 
       logger.info('Installing packages');
@@ -96,7 +133,7 @@ export class DependencyResolutionExecutor {
               error: result.error
             });
             if (this.options.failFast) {
-              return this.createFinalResult(results, plan, graph);
+              return this.createFinalResult(results, plan, graph, versionSolution);
             }
           }
         } catch (error) {
@@ -104,12 +141,12 @@ export class DependencyResolutionExecutor {
           const errMsg = error instanceof Error ? error.message : String(error);
           results.push({ id: node.id, success: false, error: errMsg });
           if (this.options.failFast) {
-            return this.createFinalResult(results, plan, graph);
+            return this.createFinalResult(results, plan, graph, versionSolution);
           }
         }
       }
 
-      return this.createFinalResult(results, plan, graph);
+      return this.createFinalResult(results, plan, graph, versionSolution);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       return {
@@ -117,7 +154,8 @@ export class DependencyResolutionExecutor {
         error: errMsg,
         results,
         graph,
-        warnings: graph?.metadata.warnings
+        warnings: graph?.metadata.warnings,
+        versionSolution
       };
     }
   }
@@ -149,7 +187,8 @@ export class DependencyResolutionExecutor {
 
   private createDryRunResult(
     plan: import('./types.js').InstallationPlan,
-    graph: DependencyGraph
+    graph: DependencyGraph,
+    versionSolution?: VersionSolution
   ): ExecutionResult {
     return {
       success: true,
@@ -161,14 +200,16 @@ export class DependencyResolutionExecutor {
         skipped: plan.skipped.length
       },
       graph,
-      warnings: graph.metadata.warnings
+      warnings: graph.metadata.warnings,
+      versionSolution
     };
   }
 
   private createFinalResult(
     results: PackageResult[],
     plan: import('./types.js').InstallationPlan,
-    graph: DependencyGraph
+    graph: DependencyGraph,
+    versionSolution?: VersionSolution
   ): ExecutionResult {
     const installed = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
@@ -184,7 +225,8 @@ export class DependencyResolutionExecutor {
       summary,
       graph,
       error: failed > 0 ? `${failed} packages failed to install` : undefined,
-      warnings: graph.metadata.warnings
+      warnings: graph.metadata.warnings,
+      versionSolution
     };
   }
 }

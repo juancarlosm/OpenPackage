@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { InstallOptions } from '../../../types/index.js';
-import { ResolvedPackage } from '../../dependency-resolver.js';
+import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import { checkExistingPackageInMarkdownFiles } from '../../openpackage.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
 import { exists } from '../../../utils/fs.js';
