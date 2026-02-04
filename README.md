@@ -76,9 +76,9 @@ Installs all files from a specified resource into the codebase at cwd, formatted
 
 ```bash title="Terminal"
 # Packages or Marketplaces
-opkg install gh@<user>/<repo> --plugins <plugin-name>
+opkg install gh@<user>/<repo>
 
-# Packages or Claude Code plugins hosted on GitHub
+# Packages or Claude Plugins hosted on GitHub
 opkg install gh@<user>/<repo> --plugins <plugin-name>
 
 # Agents and Skills hosted on GitHub
@@ -89,7 +89,7 @@ opkg install gh@<user>/<repo> --skills <agent-name>
 # GitHub URLs
 opkg install https://github.com/<user>/<repo>/<path-to-resource>
 
-# Local path to package or Claude Code plugin
+# Local path to package or Claude Plugin
 opkg install <path-to-dir>
 
 # Examples
