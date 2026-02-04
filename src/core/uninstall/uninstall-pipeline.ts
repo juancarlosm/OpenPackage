@@ -6,7 +6,7 @@ import { ValidationError } from '../../utils/errors.js';
 import { getLocalOpenPackageDir, getLocalPackageYmlPath } from '../../utils/paths.js';
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { removeWorkspaceIndexEntry } from '../../utils/workspace-index-ownership.js';
-import { applyRootFileRemovals, computeRootFileRemovalPlan } from '../../utils/root-file-uninstaller.js';
+import { processRootFileRemovals } from '../../utils/root-file-uninstaller.js';
 import { exists, remove, walkFiles } from '../../utils/fs.js';
 import { isDirKey } from '../../utils/package-index-yml.js';
 import { removePackageFromOpenpackageYml } from '../../utils/package-management.js';
@@ -18,9 +18,13 @@ import { getTargetPath } from '../../utils/workspace-index-helpers.js';
 import { buildPreservedDirectoriesSet } from '../../utils/directory-preservation.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';
 
-interface FileRemoval {
-  workspacePath: string;
-  key: string;
+interface ProcessFileMappingsOptions {
+  dryRun?: boolean;
+}
+
+interface ProcessFileMappingsResult {
+  removed: string[];
+  updated: string[];
 }
 
 function isRootFileKey(key: string, rootNames: Set<string>): boolean {
@@ -28,47 +32,66 @@ function isRootFileKey(key: string, rootNames: Set<string>): boolean {
   return rootNames.has(normalized);
 }
 
-async function expandFilesFromIndex(
-  targetDir: string,
+async function processFileMappings(
   filesMapping: Record<string, (string | WorkspaceIndexFileMapping)[]>,
-  rootNames: Set<string>
-): Promise<FileRemoval[]> {
-  const removals: FileRemoval[] = [];
+  targetDir: string,
+  packageName: string,
+  rootNames: Set<string>,
+  options: ProcessFileMappingsOptions = {}
+): Promise<ProcessFileMappingsResult> {
+  const removed: string[] = [];
+  const updated: string[] = [];
+  const seenPaths = new Set<string>();
 
-  for (const [rawKey, targets] of Object.entries(filesMapping || {})) {
-    if (!Array.isArray(targets) || targets.length === 0) continue;
+  for (const [rawKey, mappings] of Object.entries(filesMapping || {})) {
+    if (!Array.isArray(mappings) || mappings.length === 0) continue;
 
     const isDir = isDirKey(rawKey);
+
     if (isDir) {
-      for (const mapping of targets) {
+      for (const mapping of mappings) {
         const targetPath = getTargetPath(mapping);
         const absDir = path.join(targetDir, targetPath);
         if (!(await exists(absDir))) continue;
-        for await (const filePath of walkFiles(absDir)) {
-          removals.push({ workspacePath: filePath, key: rawKey });
+
+        if (options.dryRun) {
+          for await (const filePath of walkFiles(absDir)) {
+            if (!seenPaths.has(filePath)) {
+              seenPaths.add(filePath);
+              removed.push(filePath);
+            }
+          }
+        } else {
+          const result = await removeFileMapping(targetDir, mapping, packageName);
+          removed.push(...result.removed);
+          updated.push(...result.updated);
         }
       }
       continue;
     }
 
-    // file key
     if (isRootFileKey(rawKey, rootNames)) {
-      continue; // handled by root-file uninstaller
+      continue;
     }
 
-    for (const mapping of targets) {
+    for (const mapping of mappings) {
       const targetPath = getTargetPath(mapping);
-      removals.push({ workspacePath: path.join(targetDir, targetPath), key: rawKey });
+      const absPath = path.join(targetDir, targetPath);
+
+      if (options.dryRun) {
+        if (!seenPaths.has(absPath)) {
+          seenPaths.add(absPath);
+          removed.push(absPath);
+        }
+      } else {
+        const result = await removeFileMapping(targetDir, mapping, packageName);
+        removed.push(...result.removed);
+        updated.push(...result.updated);
+      }
     }
   }
 
-  // Dedupe by workspace path
-  const seen = new Set<string>();
-  return removals.filter(removal => {
-    if (seen.has(removal.workspacePath)) return false;
-    seen.add(removal.workspacePath);
-    return true;
-  });
+  return { removed, updated };
 }
 
 /**
@@ -162,40 +185,42 @@ export async function runUninstallPipeline(
   }
 
   const rootNames = getPlatformRootFileNames(getAllPlatforms(undefined, targetDir), targetDir);
-  const plannedRemovals = await expandFilesFromIndex(targetDir, pkgEntry.files || {}, rootNames);
-  const rootPlan = await computeRootFileRemovalPlan(targetDir, [packageName]);
 
   if (options.dryRun) {
-    console.log(`(dry-run) Would remove ${plannedRemovals.length} files for ${packageName}`);
-    for (const removal of plannedRemovals) {
-      console.log(` - ${removal.workspacePath}`);
+    const plannedRemovals = await processFileMappings(
+      pkgEntry.files || {},
+      targetDir,
+      packageName,
+      rootNames,
+      { dryRun: true }
+    );
+    const rootPlan = await processRootFileRemovals(targetDir, [packageName], { dryRun: true });
+    console.log(`(dry-run) Would remove ${plannedRemovals.removed.length} files for ${packageName}`);
+    for (const filePath of plannedRemovals.removed) {
+      console.log(` - ${filePath}`);
     }
-    if (rootPlan.toUpdate.length > 0) {
+    if (rootPlan.updated.length > 0) {
       console.log(`Root files to update:`);
-      rootPlan.toUpdate.forEach(f => console.log(` - ${f}`));
+      rootPlan.updated.forEach(f => console.log(` - ${f}`));
     }
     return {
       success: true,
       data: {
-        removedFiles: plannedRemovals.map(r => r.workspacePath),
-        rootFilesUpdated: rootPlan.toUpdate
+        removedFiles: plannedRemovals.removed,
+        rootFilesUpdated: rootPlan.updated
       }
     };
   }
 
-  const deleted: string[] = [];
-  const updated: string[] = [];
+  const { removed: deleted, updated } = await processFileMappings(
+    pkgEntry.files || {},
+    targetDir,
+    packageName,
+    rootNames,
+    { dryRun: false }
+  );
 
-  // Process file mappings using flow-aware removal
-  for (const [sourceKey, mappings] of Object.entries(pkgEntry.files || {})) {
-    for (const mapping of mappings) {
-      const result = await removeFileMapping(targetDir, mapping, packageName);
-      deleted.push(...result.removed);
-      updated.push(...result.updated);
-    }
-  }
-
-  const rootResult = await applyRootFileRemovals(targetDir, [packageName]);
+  const rootResult = await processRootFileRemovals(targetDir, [packageName]);
 
   // Update workspace index (migration will happen on write)
   removeWorkspaceIndexEntry(index, packageName);

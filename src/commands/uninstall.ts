@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { UninstallOptions } from '../types/index.js';
 import { withErrorHandling, ValidationError } from '../utils/errors.js';
 import { runUninstallPipeline } from '../core/uninstall/uninstall-pipeline.js';
-import { formatPathForDisplay } from '../utils/formatters.js';
+import { reportUninstallResult } from '../core/uninstall/uninstall-reporter.js';
 import { createExecutionContext } from '../core/execution-context.js';
 
 async function uninstallPackageCommand(
@@ -26,26 +26,11 @@ async function uninstallPackageCommand(
     throw new ValidationError(result.error || 'Uninstall failed');
   }
 
-  console.log(`✓ Uninstalled ${packageName}`);
-  
-  const removedFiles = result.data?.removedFiles ?? [];
-  const rootFilesUpdated = result.data?.rootFilesUpdated ?? [];
-  
-  if (removedFiles.length > 0) {
-    console.log(`✓ Removed files: ${removedFiles.length}`);
-    const sortedFiles = [...removedFiles].sort((a, b) => a.localeCompare(b));
-    for (const file of sortedFiles) {
-      console.log(`   ├── ${formatPathForDisplay(file)}`);
-    }
-  }
-  
-  if (rootFilesUpdated.length > 0) {
-    console.log(`✓ Updated root files: ${rootFilesUpdated.length}`);
-    const sortedFiles = [...rootFilesUpdated].sort((a, b) => a.localeCompare(b));
-    for (const file of sortedFiles) {
-      console.log(`   ├── ${formatPathForDisplay(file)} (updated)`);
-    }
-  }
+  reportUninstallResult({
+    packageName,
+    removedFiles: result.data?.removedFiles ?? [],
+    rootFilesUpdated: result.data?.rootFilesUpdated ?? []
+  });
 }
 
 export function setupUninstallCommand(program: Command): void {
