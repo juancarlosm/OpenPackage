@@ -38,7 +38,6 @@ program
   .description('OpenPackage - The Package Manager for AI Coding')
   .version(getVersion())
   .option('--cwd <dir>', 'set working directory')
-  .option('-g, --global', 'install to home directory (~/) instead of current workspace')
   .configureHelp({
     sortSubcommands: true,
     // Customize help to be concise
@@ -138,21 +137,7 @@ setupLogoutCommand(program);
 program.hook('preAction', async (thisCommand) => {
   const opts = program.opts();
   
-  // Global option trumps --cwd: change to home directory
-  if (opts.global) {
-    const { homedir } = await import('os');
-    const homeDir = homedir();
-    
-    if (opts.cwd) {
-      logger.info('--global option present, ignoring --cwd');
-    }
-    
-    process.chdir(homeDir);
-    logger.info(`Changed working directory to home: ${homeDir}`);
-    return;
-  }
-  
-  // Handle --cwd normally if --global is not set
+  // Only validate --cwd if provided (no directory changes)
   if (opts.cwd) {
     const resolvedCwd = path.resolve(process.cwd(), opts.cwd);
     try {
@@ -161,14 +146,15 @@ program.hook('preAction', async (thisCommand) => {
         throw new Error(`'${opts.cwd}' is not a directory`);
       }
       await fs.access(resolvedCwd, constants.R_OK | constants.W_OK);
-      process.chdir(resolvedCwd);
-      logger.info(`Changed working directory to: ${resolvedCwd}`);
+      logger.info(`Working directory will be: ${resolvedCwd}`);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       logger.error('Invalid --cwd provided', { error: errMsg, cwd: opts.cwd });
       console.error(`❌ Invalid --cwd '${opts.cwd}': Directory must exist, be accessible, and writable. Details: ${errMsg}`);
       process.exit(1);
     }
+  } else {
+    logger.debug(`Working directory: ${process.cwd()}`);
   }
 });
 

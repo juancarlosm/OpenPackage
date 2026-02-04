@@ -93,17 +93,17 @@ function serializeContent(data: any, format: FileFormat): string {
  * Remove specific keys from a merged file
  * Deletes the file if it becomes empty after removal
  * 
- * @param cwd - Workspace root
+ * @param targetDir - Target directory (workspace root or global home)
  * @param targetPath - Relative path to target file
  * @param keysToRemove - Dot-notated keys to remove
  * @returns true if file was deleted, false if updated
  */
 export async function removeKeysFromMergedFile(
-  cwd: string,
+  targetDir: string,
   targetPath: string,
   keysToRemove: string[]
 ): Promise<{ deleted: boolean; updated: boolean }> {
-  const absPath = join(cwd, targetPath);
+  const absPath = join(targetDir, targetPath);
 
   if (!(await exists(absPath))) {
     return { deleted: false, updated: false };
@@ -156,13 +156,13 @@ export async function removeKeysFromMergedFile(
  * Remove a file mapping during uninstall
  * Handles both simple file removal and key-based removal from merged files
  * 
- * @param cwd - Workspace root
+ * @param targetDir - Target directory (workspace root or global home)
  * @param mapping - File mapping from workspace index
  * @param packageName - Package being uninstalled (for logging)
  * @returns Paths that were removed or updated
  */
 export async function removeFileMapping(
-  cwd: string,
+  targetDir: string,
   mapping: string | WorkspaceIndexFileMapping,
   packageName: string
 ): Promise<{ removed: string[]; updated: string[] }> {
@@ -171,7 +171,7 @@ export async function removeFileMapping(
 
   if (typeof mapping === 'string') {
     // Simple file mapping - delete entire file
-    const absPath = join(cwd, mapping);
+    const absPath = join(targetDir, mapping);
     if (await exists(absPath)) {
       await remove(absPath);
       removed.push(mapping);
@@ -187,7 +187,7 @@ export async function removeFileMapping(
       logger.debug(`Skipping composite merge file (handled by root file logic): ${targetPath}`);
     } else if (mapping.keys && mapping.keys.length > 0) {
       // Remove specific keys from merged file
-      const result = await removeKeysFromMergedFile(cwd, targetPath, mapping.keys);
+      const result = await removeKeysFromMergedFile(targetDir, targetPath, mapping.keys);
       
       if (result.deleted) {
         removed.push(targetPath);
@@ -207,7 +207,7 @@ export async function removeFileMapping(
       // Don't delete - safer to leave it
     } else {
       // merge: 'replace' or no merge - delete entire file
-      const absPath = join(cwd, targetPath);
+      const absPath = join(targetDir, targetPath);
       if (await exists(absPath)) {
         await remove(absPath);
         removed.push(targetPath);

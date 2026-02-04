@@ -7,7 +7,7 @@ import { runUnifiedInstallPipeline } from './unified/pipeline.js';
 import { detectPluginType, detectPluginWithMarketplace, validatePluginManifest } from './plugin-detector.js';
 import { safePrompts } from '../../utils/prompts.js';
 import { Spinner } from '../../utils/spinner.js';
-import type { CommandResult, InstallOptions } from '../../types/index.js';
+import type { CommandResult, InstallOptions, ExecutionContext } from '../../types/index.js';
 import { CLAUDE_PLUGIN_PATHS } from '../../constants/index.js';
 import { runMultiContextPipeline } from './unified/multi-context-pipeline.js';
 import { getLoaderForSource } from './sources/loader-factory.js';
@@ -211,7 +211,7 @@ export async function installMarketplacePlugins(
   marketplaceGitRef: string | undefined,
   marketplaceCommitSha: string,
   options: InstallOptions,
-  cwd: string,
+  execContext: ExecutionContext,
   convenienceOptions?: { agents?: string[]; skills?: string[] }
 ): Promise<CommandResult> {
   logger.info('Installing marketplace plugins', { 
@@ -272,7 +272,7 @@ export async function installMarketplacePlugins(
           marketplaceGitRef,
           marketplaceCommitSha,
           options,
-          cwd,
+          execContext,
           convenienceOptions
         );
       } else if (isGitSource(normalizedSource)) {
@@ -281,7 +281,7 @@ export async function installMarketplacePlugins(
           pluginEntry,
           normalizedSource,
           options,
-          cwd,
+          execContext,
           convenienceOptions
         );
       } else {
@@ -339,7 +339,7 @@ async function installRelativePathPlugin(
   marketplaceGitRef: string | undefined,
   marketplaceCommitSha: string,
   options: InstallOptions,
-  cwd: string,
+  execContext: ExecutionContext,
   convenienceOptions?: { agents?: string[]; skills?: string[] }
 ): Promise<CommandResult> {
   const pluginSubdir = normalizedSource.relativePath!;
@@ -399,7 +399,7 @@ async function installRelativePathPlugin(
   // Build path context for the already-cloned plugin directory
   // Use path-based loading (efficient, no re-clone) with git source override for manifest
   const ctx = await buildPathInstallContext(
-    cwd,
+    execContext,
     pluginDir,
     {
       ...options,
@@ -483,7 +483,7 @@ async function installGitPlugin(
   pluginEntry: MarketplacePluginEntry,
   normalizedSource: NormalizedPluginSource,
   options: InstallOptions,
-  cwd: string,
+  execContext: ExecutionContext,
   convenienceOptions?: { agents?: string[]; skills?: string[] }
 ): Promise<CommandResult> {
   const gitUrl = normalizedSource.gitUrl!;
@@ -502,7 +502,7 @@ async function installGitPlugin(
   
   // Build git context
   const ctx = await buildGitInstallContext(
-    cwd,
+    execContext,
     gitUrl,
     {
       ...options,
@@ -523,7 +523,7 @@ async function installGitPlugin(
   const hasConvenienceOptions = Boolean(convenienceOptions?.agents?.length || convenienceOptions?.skills?.length);
   if (hasConvenienceOptions) {
     const loader = getLoaderForSource(ctx.source);
-    const loaded = await loader.load(ctx.source, options, cwd);
+    const loaded = await loader.load(ctx.source, options, execContext);
 
     ctx.source.packageName = loaded.packageName;
     ctx.source.version = loaded.version;
@@ -542,7 +542,7 @@ async function installGitPlugin(
       applyBaseDetection(ctx, loaded);
     }
 
-    const basePath = ctx.detectedBase || loaded.contentRoot || cwd;
+    const basePath = ctx.detectedBase || loaded.contentRoot || execContext.targetDir;
     const repoRoot = loaded.sourceMetadata?.repoPath || loaded.contentRoot || basePath;
     const resources = await resolveConvenienceResources(basePath, repoRoot, convenienceOptions ?? {});
 

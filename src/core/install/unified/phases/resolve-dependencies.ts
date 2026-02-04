@@ -109,7 +109,7 @@ export async function resolveDependenciesPhase(ctx: InstallationContext): Promis
     // Initial dependency resolution
     const result = await resolveDependenciesForInstall(
       ctx.source.packageName,
-      ctx.cwd,
+      ctx.targetDir,
       ctx.source.version,
       ctx.options
     );
@@ -139,7 +139,7 @@ export async function resolveDependenciesPhase(ctx: InstallationContext): Promis
       if (pullResult.pulledAny) {
         const refreshed = await resolveDependenciesForInstall(
           ctx.source.packageName,
-          ctx.cwd,
+          ctx.targetDir,
           ctx.source.version,
           ctx.options
         );

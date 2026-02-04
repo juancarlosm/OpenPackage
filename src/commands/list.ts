@@ -6,6 +6,7 @@ import { runListPipeline, type ListPackageReport } from '../core/list/list-pipel
 import { logger } from '../utils/logger.js';
 import { parsePackageYml } from '../utils/package-yml.js';
 import { getLocalPackageYmlPath } from '../utils/paths.js';
+import { createExecutionContext, getDisplayTargetDir } from '../core/execution-context.js';
 
 // ANSI escape codes for styling
 const DIM = '\x1b[2m';
@@ -68,12 +69,22 @@ function printDetailedView(pkg: ListPackageReport): void {
   }
 }
 
-async function listCommand(packageName?: string): Promise<CommandResult> {
-  const cwd = process.cwd();
-  logger.info(`Listing packages for directory: ${cwd}`);
+async function listCommand(packageName: string | undefined, options: { global?: boolean }, command: Command): Promise<CommandResult> {
+  // Get program-level options (for --cwd)
+  const programOpts = command.parent?.opts() || {};
+  
+  // Create execution context
+  const execContext = await createExecutionContext({
+    global: options.global,
+    cwd: programOpts.cwd
+  });
+  
+  const displayDir = getDisplayTargetDir(execContext);
+  logger.info(`Listing packages for directory: ${displayDir}`);
 
   try {
-    const result = await runListPipeline(packageName);
+    // Run list pipeline with execution context
+    const result = await runListPipeline(packageName, execContext);
     const packages = result.data?.packages ?? [];
 
     // If specific package requested, show detailed view
@@ -86,7 +97,7 @@ async function listCommand(packageName?: string): Promise<CommandResult> {
     }
 
     // Otherwise show tree view
-    const manifestPath = getLocalPackageYmlPath(cwd);
+    const manifestPath = getLocalPackageYmlPath(execContext.targetDir);
     let workspaceName = 'Unnamed';
     let workspaceVersion: string | undefined;
     
@@ -98,7 +109,7 @@ async function listCommand(packageName?: string): Promise<CommandResult> {
       logger.warn(`Failed to read workspace manifest: ${error}`);
     }
 
-    printTreeView(workspaceName, workspaceVersion, packages, cwd);
+    printTreeView(workspaceName, workspaceVersion, packages, displayDir);
 
     return { success: true, data: { packages } };
   } catch (error) {
@@ -114,7 +125,8 @@ export function setupListCommand(program: Command): void {
     .command('list')
     .description('Show installed packages and files')
     .argument('[package]', 'Optional package name to show installed per package')
-    .action(withErrorHandling(async (packageName?: string) => {
-      await listCommand(packageName);
+    .option('-g, --global', 'list packages installed in home directory (~/) instead of current workspace')
+    .action(withErrorHandling(async (packageName: string | undefined, options: { global?: boolean }, command: Command) => {
+      await listCommand(packageName, options, command);
     }));
 }

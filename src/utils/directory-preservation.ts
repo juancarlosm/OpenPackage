@@ -18,7 +18,7 @@ import { getAllPlatforms, getPlatformDefinition } from '../core/platforms.js';
  * - Future: glob patterns
  * 
  * @param pattern - Detection pattern from platform definition
- * @param cwd - Workspace root directory
+ * @param targetDir - Target directory (workspace root or global home)
  * @returns Absolute directory path to preserve, or null if pattern points to workspace root
  * 
  * @example
@@ -31,7 +31,7 @@ import { getAllPlatforms, getPlatformDefinition } from '../core/platforms.js';
  * extractDirectoryFromPattern("CLAUDE.md", "/workspace")
  *   → null (root file, don't preserve workspace root)
  */
-export function extractDirectoryFromPattern(pattern: string, cwd: string): string | null {
+export function extractDirectoryFromPattern(pattern: string, targetDir: string): string | null {
   // Normalize path separators
   const normalized = pattern.replace(/\\/g, '/');
   
@@ -52,11 +52,11 @@ export function extractDirectoryFromPattern(pattern: string, cwd: string): strin
   }
   
   // Convert to absolute path
-  const absPath = dirPath ? path.join(cwd, dirPath) : cwd;
+  const absPath = dirPath ? path.join(targetDir, dirPath) : targetDir;
   
   // Don't preserve the workspace root itself
   // Root files (like CLAUDE.md, AGENTS.md) have their own preservation logic
-  return absPath === cwd ? null : absPath;
+  return absPath === targetDir ? null : absPath;
 }
 
 /**
@@ -66,7 +66,7 @@ export function extractDirectoryFromPattern(pattern: string, cwd: string): strin
  * platform root directories (e.g., .cursor, .claude, .opencode) that should never
  * be removed, even if they become empty after uninstalling packages.
  * 
- * @param cwd - Workspace root directory
+ * @param targetDir - Target directory (workspace root or global home)
  * @returns Set of absolute directory paths to preserve
  * 
  * @example
@@ -79,25 +79,25 @@ export function extractDirectoryFromPattern(pattern: string, cwd: string): strin
  *       ...
  *     ])
  */
-export function buildPreservedDirectoriesSet(cwd: string): Set<string> {
+export function buildPreservedDirectoriesSet(targetDir: string): Set<string> {
   const preserved = new Set<string>();
-  const platforms = getAllPlatforms(undefined, cwd);
+  const platforms = getAllPlatforms(undefined, targetDir);
   
   for (const platform of platforms) {
-    const definition = getPlatformDefinition(platform, cwd);
+    const definition = getPlatformDefinition(platform, targetDir);
     
     // Primary: use detection patterns
     if (definition.detection && definition.detection.length > 0) {
       for (const pattern of definition.detection) {
-        const dirToPreserve = extractDirectoryFromPattern(pattern, cwd);
+        const dirToPreserve = extractDirectoryFromPattern(pattern, targetDir);
         if (dirToPreserve) {
           preserved.add(dirToPreserve);
         }
       }
     } else if (definition.rootDir) {
       // Fallback: use rootDir for platforms without detection patterns
-      const rootPath = path.join(cwd, definition.rootDir);
-      if (rootPath !== cwd) {
+      const rootPath = path.join(targetDir, definition.rootDir);
+      if (rootPath !== targetDir) {
         preserved.add(rootPath);
       }
     }

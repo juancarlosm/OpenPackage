@@ -1,7 +1,7 @@
 import path from 'path';
 import { readdir } from 'fs/promises';
 
-import type { CommandResult, UninstallOptions } from '../../types/index.js';
+import type { CommandResult, UninstallOptions, ExecutionContext } from '../../types/index.js';
 import { ValidationError } from '../../utils/errors.js';
 import { getLocalOpenPackageDir, getLocalPackageYmlPath } from '../../utils/paths.js';
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../utils/workspace-index-yml.js';
@@ -29,7 +29,7 @@ function isRootFileKey(key: string, rootNames: Set<string>): boolean {
 }
 
 async function expandFilesFromIndex(
-  cwd: string,
+  targetDir: string,
   filesMapping: Record<string, (string | WorkspaceIndexFileMapping)[]>,
   rootNames: Set<string>
 ): Promise<FileRemoval[]> {
@@ -41,8 +41,8 @@ async function expandFilesFromIndex(
     const isDir = isDirKey(rawKey);
     if (isDir) {
       for (const mapping of targets) {
-        const targetDir = getTargetPath(mapping);
-        const absDir = path.join(cwd, targetDir);
+        const targetPath = getTargetPath(mapping);
+        const absDir = path.join(targetDir, targetPath);
         if (!(await exists(absDir))) continue;
         for await (const filePath of walkFiles(absDir)) {
           removals.push({ workspacePath: filePath, key: rawKey });
@@ -58,7 +58,7 @@ async function expandFilesFromIndex(
 
     for (const mapping of targets) {
       const targetPath = getTargetPath(mapping);
-      removals.push({ workspacePath: path.join(cwd, targetPath), key: rawKey });
+      removals.push({ workspacePath: path.join(targetDir, targetPath), key: rawKey });
     }
   }
 
@@ -85,12 +85,12 @@ async function expandFilesFromIndex(
  * - Removes all empty parent directories
  * - Stops only at workspace root
  * 
- * @param cwd - Workspace root directory
+ * @param targetDir - Target directory (workspace root or global home)
  * @param deletedPaths - Absolute paths of deleted files
  * @param preservedDirs - Set of absolute directory paths to preserve (never remove)
  */
 async function cleanupEmptyParents(
-  cwd: string,
+  targetDir: string,
   deletedPaths: string[],
   preservedDirs: Set<string>
 ): Promise<void> {
@@ -101,7 +101,7 @@ async function cleanupEmptyParents(
     let current = path.dirname(deletedPath);
     
     // Walk up the directory tree
-    while (current.startsWith(cwd) && current !== cwd) {
+    while (current.startsWith(targetDir) && current !== targetDir) {
       // Stop at preserved directories (platform roots)
       if (preservedDirs.has(current)) {
         break;
@@ -123,7 +123,7 @@ async function cleanupEmptyParents(
       // Only remove if directory is empty and not preserved
       if (entries.length === 0 && !preservedDirs.has(dir)) {
         await remove(dir);
-        logger.debug(`Removed empty directory: ${path.relative(cwd, dir)}`);
+        logger.debug(`Removed empty directory: ${path.relative(targetDir, dir)}`);
       }
     } catch (error) {
       // Ignore errors (directory may not exist, permission issues, etc.)
@@ -139,29 +139,31 @@ export interface UninstallPipelineResult {
 
 export async function runUninstallPipeline(
   packageName: string,
-  options: UninstallOptions = {}
+  options: UninstallOptions = {},
+  execContext: ExecutionContext
 ): Promise<CommandResult<UninstallPipelineResult>> {
-  const cwd = process.cwd();
-  const openpkgDir = getLocalOpenPackageDir(cwd);
-  const manifestPath = getLocalPackageYmlPath(cwd);
+  // Use targetDir for uninstall operations
+  const targetDir = execContext.targetDir;
+  const openpkgDir = getLocalOpenPackageDir(targetDir);
+  const manifestPath = getLocalPackageYmlPath(targetDir);
 
   if (!(await exists(openpkgDir)) || !(await exists(manifestPath))) {
     throw new ValidationError(
-      `No .openpackage/openpackage.yml found in ${cwd}.`
+      `No .openpackage/openpackage.yml found in ${targetDir}.`
     );
   }
 
   // Look up package by exact name provided by user (no normalization)
-  const { index, path: indexPath } = await readWorkspaceIndex(cwd);
+  const { index, path: indexPath } = await readWorkspaceIndex(targetDir);
   const pkgEntry = index.packages?.[packageName];
 
   if (!pkgEntry) {
     return { success: false, error: `Package '${packageName}' not found in workspace index.` };
   }
 
-  const rootNames = getPlatformRootFileNames(getAllPlatforms(undefined, cwd), cwd);
-  const plannedRemovals = await expandFilesFromIndex(cwd, pkgEntry.files || {}, rootNames);
-  const rootPlan = await computeRootFileRemovalPlan(cwd, [packageName]);
+  const rootNames = getPlatformRootFileNames(getAllPlatforms(undefined, targetDir), targetDir);
+  const plannedRemovals = await expandFilesFromIndex(targetDir, pkgEntry.files || {}, rootNames);
+  const rootPlan = await computeRootFileRemovalPlan(targetDir, [packageName]);
 
   if (options.dryRun) {
     console.log(`(dry-run) Would remove ${plannedRemovals.length} files for ${packageName}`);
@@ -187,26 +189,26 @@ export async function runUninstallPipeline(
   // Process file mappings using flow-aware removal
   for (const [sourceKey, mappings] of Object.entries(pkgEntry.files || {})) {
     for (const mapping of mappings) {
-      const result = await removeFileMapping(cwd, mapping, packageName);
+      const result = await removeFileMapping(targetDir, mapping, packageName);
       deleted.push(...result.removed);
       updated.push(...result.updated);
     }
   }
 
-  const rootResult = await applyRootFileRemovals(cwd, [packageName]);
+  const rootResult = await applyRootFileRemovals(targetDir, [packageName]);
 
   // Update workspace index (migration will happen on write)
   removeWorkspaceIndexEntry(index, packageName);
   await writeWorkspaceIndex({ path: indexPath, index });
 
   // Update openpackage.yml (migration will happen on write)
-  await removePackageFromOpenpackageYml(cwd, packageName);
+  await removePackageFromOpenpackageYml(targetDir, packageName);
 
   // Cleanup empty directories (preserve platform roots from detection patterns)
-  const preservedDirs = buildPreservedDirectoriesSet(cwd);
+  const preservedDirs = buildPreservedDirectoriesSet(targetDir);
   // Convert relative paths to absolute paths for cleanup
-  const deletedAbsolutePaths = deleted.map(relativePath => path.join(cwd, relativePath));
-  await cleanupEmptyParents(cwd, deletedAbsolutePaths, preservedDirs);
+  const deletedAbsolutePaths = deleted.map(relativePath => path.join(targetDir, relativePath));
+  await cleanupEmptyParents(targetDir, deletedAbsolutePaths, preservedDirs);
 
   logger.info(`Uninstalled ${packageName}: removed ${deleted.length} files, updated ${updated.length} merged files`);
 

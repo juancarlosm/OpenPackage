@@ -8,6 +8,7 @@ import type { CommandResult, InstallOptions } from '../types/index.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { createOrchestrator } from '../core/install/orchestrator/index.js';
 import { normalizeInstallOptions } from '../core/install/preprocessing/index.js';
+import { createExecutionContext } from '../core/execution-context.js';
 
 /**
  * Setup install command
@@ -22,6 +23,7 @@ export function setupInstallCommand(program: Command): void {
       'name of the package to install (optional - installs workspace-level files and all packages from openpackage.yml if not specified). ' +
       'Supports package@version syntax.'
     )
+    .option('-g, --global', 'install to home directory (~/) instead of current workspace')
     .option('--dry-run', 'preview changes without applying them')
     .option('--force', 'overwrite existing files')
     .option('--conflicts <strategy>', 'conflict handling strategy: keep-both, overwrite, skip, or ask')
@@ -40,16 +42,24 @@ export function setupInstallCommand(program: Command): void {
         agents?: string[]; 
         skills?: string[];
         conflicts?: string;
-      }
+      },
+      command: Command
     ) => {
-      const cwd = process.cwd();
+      // Get program-level options (for --cwd)
+      const programOpts = command.parent?.opts() || {};
+      
+      // Create execution context
+      const execContext = await createExecutionContext({
+        global: options.global,
+        cwd: programOpts.cwd
+      });
       
       // Normalize all options at CLI boundary
       const normalizedOptions = normalizeInstallOptions(options);
       
-      // Create and execute orchestrator
+      // Create and execute orchestrator with execution context
       const orchestrator = createOrchestrator();
-      const result = await orchestrator.execute(packageName, normalizedOptions, cwd);
+      const result = await orchestrator.execute(packageName, normalizedOptions, execContext);
       
       // Handle result
       if (!result.success) {

@@ -4,6 +4,7 @@
  */
 
 import type { PackageSource } from '../unified/context.js';
+import type { ExecutionContext } from '../../../types/index.js';
 import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import type { InstallationContext } from '../unified/context.js';
 import type {
@@ -87,7 +88,10 @@ function buildResolvedPackage(node: ResolutionDependencyNode): ResolvedPackage {
 }
 
 export class InstallationPlanner {
-  constructor(private readonly options: InstallationPlannerOptions) {}
+  constructor(
+    private readonly execContext: ExecutionContext,
+    private readonly options: InstallationPlannerOptions
+  ) {}
 
   /**
    * Create installation plan from loaded graph.
@@ -96,7 +100,6 @@ export class InstallationPlanner {
   async createPlan(graph: DependencyGraph): Promise<InstallationPlan> {
     const contexts: InstallationContext[] = [];
     const skipped: SkippedPackage[] = [];
-    const cwd = this.options.cwd;
     const force = this.options.force ?? false;
 
     for (const id of graph.installationOrder) {
@@ -113,7 +116,7 @@ export class InstallationPlanner {
         continue;
       }
 
-      const alreadyInstalled = await getInstalledPackageVersion(node.loaded.name, cwd);
+      const alreadyInstalled = await getInstalledPackageVersion(node.loaded.name, this.execContext.targetDir);
       if (alreadyInstalled && !force) {
         skipped.push({ id: node.id, reason: 'already-installed' });
         continue;
@@ -142,12 +145,12 @@ export class InstallationPlanner {
     const installOptions = this.options.installOptions ?? {};
     const resolvedPackage = buildResolvedPackage(node);
     const ctx: InstallationContext = {
+      execution: this.execContext,
+      targetDir: this.execContext.targetDir,
       source,
       mode: 'install',
       options: installOptions as InstallationContext['options'],
       platforms,
-      cwd: this.options.cwd,
-      targetDir: '.',
       resolvedPackages: [resolvedPackage],
       warnings: [],
       errors: [],

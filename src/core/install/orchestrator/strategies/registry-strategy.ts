@@ -5,6 +5,7 @@
  * and resolution behavior is centralized there.
  */
 import type { InstallationContext, PackageSource } from '../../unified/context.js';
+import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
 import { normalizePlatforms } from '../../../../utils/platform-mapper.js';
@@ -19,7 +20,7 @@ export class RegistryInstallStrategy extends BaseInstallStrategy {
   async buildContext(
     classification: InputClassification,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<InstallationContext> {
     if (classification.type !== 'registry') {
       throw new Error('RegistryStrategy cannot handle non-registry classification');
@@ -33,12 +34,12 @@ export class RegistryInstallStrategy extends BaseInstallStrategy {
     };
     
     return {
+      execution: execContext,
+      targetDir: execContext.targetDir,
       source,
       mode: 'install',
       options,
       platforms: normalizePlatforms(options.platforms) || [],
-      cwd,
-      targetDir: '.',
       resolvedPackages: [],
       warnings: [],
       errors: []
@@ -48,7 +49,7 @@ export class RegistryInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult> {
     // Registry sources are handled by the pipeline's load phase
     return this.createNormalResult(context);

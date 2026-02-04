@@ -5,6 +5,7 @@
  * pipeline can skip re-loading.
  */
 import type { InstallationContext, PackageSource } from '../../unified/context.js';
+import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
@@ -20,7 +21,7 @@ export class PathInstallStrategy extends BaseInstallStrategy {
   async buildContext(
     classification: InputClassification,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<InstallationContext> {
     if (classification.type !== 'path') {
       throw new Error('PathStrategy cannot handle non-path classification');
@@ -34,12 +35,12 @@ export class PathInstallStrategy extends BaseInstallStrategy {
     };
     
     return {
+      execution: execContext,
+      targetDir: execContext.targetDir,
       source,
       mode: 'install',
       options,
       platforms: normalizePlatforms(options.platforms) || [],
-      cwd,
-      targetDir: '.',
       resolvedPackages: [],
       warnings: [],
       errors: []
@@ -49,10 +50,10 @@ export class PathInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult> {
     const loader = getLoaderForSource(context.source);
-    const loaded = await loader.load(context.source, options, cwd);
+    const loaded = await loader.load(context.source, options, execContext);
     
     context.source.packageName = loaded.packageName;
     context.source.version = loaded.version;

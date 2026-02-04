@@ -1,4 +1,5 @@
 import type { InstallationContext } from '../../unified/context.js';
+import type { ExecutionContext } from '../../../../types/index.js';
 import type { 
   NormalizedInstallOptions, 
   InputClassification, 
@@ -18,13 +19,13 @@ export abstract class BaseInstallStrategy implements InstallStrategy {
   abstract buildContext(
     classification: InputClassification,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<InstallationContext>;
   
   abstract preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult>;
   
   /**

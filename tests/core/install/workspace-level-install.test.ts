@@ -17,6 +17,7 @@ import { exists, readTextFile } from '../../../src/utils/fs.js';
 import { createWorkspacePackageYml } from '../../../src/utils/package-management.js';
 import { parsePackageYml } from '../../../src/utils/package-yml.js';
 import { readWorkspaceIndex } from '../../../src/utils/workspace-index-yml.js';
+import { createExecutionContext } from '../../../src/core/execution-context.js';
 
 // Create temporary test workspace
 const testDir = join(tmpdir(), `opkg-test-workspace-${Date.now()}`);
@@ -53,7 +54,9 @@ async function cleanup() {
 async function testBuildWorkspaceRootContext() {
   console.log('Testing buildWorkspaceRootInstallContext...');
   
-  const ctx = await buildWorkspaceRootInstallContext(testDir, {}, 'install');
+  // Create execution context
+  const execContext = await createExecutionContext({ cwd: testDir });
+  const ctx = await buildWorkspaceRootInstallContext(execContext, {}, 'install');
   
   assert.ok(ctx, 'Context should be created');
   assert.equal(ctx!.source.type, 'workspace', 'Source type should be workspace');
@@ -68,7 +71,9 @@ async function testBuildWorkspaceRootContext() {
 async function testBulkInstallIncludesWorkspace() {
   console.log('Testing bulk install includes workspace...');
 
-  const result = await buildInstallContext(testDir, undefined, {}) as BulkInstallContextsResult;
+  // Create execution context
+  const execContext = await createExecutionContext({ cwd: testDir });
+  const result = await buildInstallContext(execContext, undefined, {}) as BulkInstallContextsResult;
 
   assert.ok(result && 'workspaceContext' in result && 'dependencyContexts' in result, 'Should return bulk result with workspaceContext and dependencyContexts');
   assert.ok(result.workspaceContext != null, 'Should have workspace context');
@@ -104,7 +109,9 @@ async function testWorkspacePackageNotInManifest() {
 async function testContextCreationForApply() {
   console.log('Testing context creation for apply mode...');
   
-  const ctx = await buildWorkspaceRootInstallContext(testDir, {}, 'apply');
+  // Create execution context
+  const execContext = await createExecutionContext({ cwd: testDir });
+  const ctx = await buildWorkspaceRootInstallContext(execContext, {}, 'apply');
   
   assert.ok(ctx, 'Context should be created for apply mode');
   assert.equal(ctx!.mode, 'apply', 'Mode should be apply');

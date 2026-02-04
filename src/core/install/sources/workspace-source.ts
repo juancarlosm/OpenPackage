@@ -1,7 +1,7 @@
 import { join } from 'path';
 import type { PackageSourceLoader, LoadedPackage } from './base.js';
 import type { PackageSource } from '../unified/context.js';
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import { SourceLoadError } from './base.js';
 import { readWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
 import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
@@ -19,7 +19,7 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
   async load(
     source: PackageSource,
     options: InstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<LoadedPackage> {
     if (!source.packageName) {
       throw new SourceLoadError(source, 'Package name is required for workspace sources');
@@ -51,8 +51,8 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
       }
       
       // Standard workspace source loading (from index)
-      // Read workspace index
-      const { index } = await readWorkspaceIndex(cwd);
+      // Read workspace index (use targetDir for workspace location)
+      const { index } = await readWorkspaceIndex(execContext.targetDir);
       const entry = index.packages?.[source.packageName];
       
       if (!entry?.path) {
@@ -63,8 +63,8 @@ export class WorkspaceSourceLoader implements PackageSourceLoader {
         );
       }
       
-      // Resolve package path
-      const resolved = resolveDeclaredPath(entry.path, cwd);
+      // Resolve package path (relative to targetDir)
+      const resolved = resolveDeclaredPath(entry.path, execContext.targetDir);
       const contentRoot = join(resolved.absolute, '/');
       
       // Load package metadata (handles regular packages and plugins)

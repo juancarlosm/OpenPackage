@@ -388,16 +388,16 @@ const stateCache = new Map<string | null, PlatformsState>()
  * Clear the platforms cache. Useful for testing.
  * @param cwd Optional path to clear cache for. If not provided, clears all cache.
  */
-export function clearPlatformsCache(cwd?: string): void {
-  if (cwd !== undefined) {
-    stateCache.delete(cwd)
+export function clearPlatformsCache(targetDir?: string): void {
+  if (targetDir !== undefined) {
+    stateCache.delete(targetDir)
   } else {
     stateCache.clear()
   }
 }
 
-export function getPlatformsState(cwd?: string | null): PlatformsState {
-  const key = cwd ?? null
+export function getPlatformsState(targetDir?: string | null): PlatformsState {
+  const key = targetDir ?? null
   if (stateCache.has(key)) {
     return stateCache.get(key)!
   }
@@ -525,31 +525,31 @@ export function getPlatformsState(cwd?: string | null): PlatformsState {
 }
 
 export function getPlatformDefinitions(
-  cwd?: string
+  targetDir?: string
 ): Record<Platform, PlatformDefinition> {
-  return getPlatformsState(cwd).defs
+  return getPlatformsState(targetDir).defs
 }
 
 /**
  * Get global export flows that apply to all platforms (install/apply)
  */
-export function getGlobalExportFlows(cwd?: string): Flow[] | undefined {
-  return getPlatformsState(cwd).globalExportFlows
+export function getGlobalExportFlows(targetDir?: string): Flow[] | undefined {
+  return getPlatformsState(targetDir).globalExportFlows
 }
 
 /**
  * Get global import flows that apply to all platforms (save)
  */
-export function getGlobalImportFlows(cwd?: string): Flow[] | undefined {
-  return getPlatformsState(cwd).globalImportFlows
+export function getGlobalImportFlows(targetDir?: string): Flow[] | undefined {
+  return getPlatformsState(targetDir).globalImportFlows
 }
 
 /**
  * Check if a platform uses flow-based configuration (export or import)
  */
-export function platformUsesFlows(platform: Platform, cwd?: string): boolean {
+export function platformUsesFlows(platform: Platform, targetDir?: string): boolean {
   try {
-    const def = getPlatformDefinition(platform, cwd)
+    const def = getPlatformDefinition(platform, targetDir)
     const hasExport = def.export !== undefined && def.export.length > 0
     const hasImport = def.import !== undefined && def.import.length > 0
     return hasExport || hasImport
@@ -564,15 +564,15 @@ export function platformUsesFlows(platform: Platform, cwd?: string): boolean {
  * These patterns define which files are considered universal package content.
  * This is the source of truth for determining what belongs in a package.
  * 
- * @param cwd - Optional cwd for local config overrides
+ * @param targetDir - Optional target directory for local config overrides
  * @returns Set of glob patterns from all platform flows
  * 
  * @example
  * // Returns: Set(["rules/**\/*.md", "mcp.jsonc", "commands/*.md", ...])
  * const patterns = getAllUniversalPatterns()
  */
-export function getAllUniversalPatterns(cwd?: string): Set<string> {
-  return new Set(getPlatformsState(cwd).universalPatterns)
+export function getAllUniversalPatterns(targetDir?: string): Set<string> {
+  return new Set(getPlatformsState(targetDir).universalPatterns)
 }
 
 /**
@@ -580,7 +580,7 @@ export function getAllUniversalPatterns(cwd?: string): Set<string> {
  * This is the primary method for determining if a file is universal content.
  * 
  * @param filePath - File path to check (normalized, no leading slash)
- * @param cwd - Optional cwd for local config overrides
+ * @param targetDir - Optional target directory for local config overrides
  * @returns true if path matches any universal pattern
  * 
  * @example
@@ -588,30 +588,30 @@ export function getAllUniversalPatterns(cwd?: string): Set<string> {
  * matchesUniversalPattern("rules/typescript.md") // true
  * matchesUniversalPattern("random-file.txt") // false
  */
-export function matchesUniversalPattern(filePath: string, cwd?: string): boolean {
-  const patterns = getAllUniversalPatterns(cwd)
+export function matchesUniversalPattern(filePath: string, targetDir?: string): boolean {
+  const patterns = getAllUniversalPatterns(targetDir)
   return matchesAnyPattern(filePath, patterns)
 }
 
 /**
  * Get lookup map from platform directory name to platform ID.
  */
-export function getPlatformDirLookup(cwd?: string): Record<string, Platform> {
-  return getPlatformsState(cwd).dirLookup
+export function getPlatformDirLookup(targetDir?: string): Record<string, Platform> {
+  return getPlatformsState(targetDir).dirLookup
 }
 
 /**
  * Get lookup map from platform alias to platform ID.
  */
-export function getPlatformAliasLookup(cwd?: string): Record<string, Platform> {
-  return getPlatformsState(cwd).aliasLookup
+export function getPlatformAliasLookup(targetDir?: string): Record<string, Platform> {
+  return getPlatformsState(targetDir).aliasLookup
 }
 
 /**
  * Get all known platform root files.
  */
-export function getPlatformRootFiles(cwd?: string): string[] {
-  return getPlatformsState(cwd).rootFiles
+export function getPlatformRootFiles(targetDir?: string): string[] {
+  return getPlatformsState(targetDir).rootFiles
 }
 
 
@@ -637,9 +637,9 @@ export interface PlatformDirectoryPaths {
  */
 export function getPlatformDefinition(
   name: Platform,
-  cwd?: string
+  targetDir?: string
 ): PlatformDefinition {
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
   const def = state.defs[name]
   if (!def) {
     throw new Error(`Unknown platform: ${name}`)
@@ -725,9 +725,9 @@ export function deriveRootDirFromFlows(definition: PlatformDefinition): string {
  */
 export function getAllPlatforms(
   options?: { includeDisabled?: boolean },
-  cwd?: string
+  targetDir?: string
 ): Platform[] {
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
   if (options?.includeDisabled) {
     return state.allPlatforms
   }
@@ -736,13 +736,13 @@ export function getAllPlatforms(
 
 export function resolvePlatformName(
   input: string | undefined,
-  cwd?: string
+  targetDir?: string
 ): Platform | undefined {
   if (!input) {
     return undefined
   }
 
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
   const normalized = input.toLowerCase()
   if (normalized in state.defs) {
     return normalized as Platform
@@ -757,12 +757,12 @@ export function resolvePlatformName(
  */
 export function resolvePlatformKey(
   key: string,
-  cwd?: string
+  targetDir?: string
 ): Platform | null {
   if (!key) return null
 
   const normalized = key.toLowerCase()
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
 
   if (normalized in state.defs) {
     return normalized as Platform
@@ -776,7 +776,7 @@ export function resolvePlatformKey(
  */
 function buildDirectoryPaths(
   definition: PlatformDefinition, 
-  cwd: string
+  targetDir: string
 ): PlatformPaths {
   const subdirsPaths: Record<string, string> = {}
   
@@ -802,7 +802,7 @@ function buildDirectoryPaths(
           const targetPath = toPattern.split('/').slice(0, -1).join('/')
           
           if (targetPath) {
-            subdirsPaths[firstComponent] = join(cwd, targetPath)
+            subdirsPaths[firstComponent] = join(targetDir, targetPath)
           }
         }
       }
@@ -812,21 +812,21 @@ function buildDirectoryPaths(
   const rootDir = deriveRootDirFromFlows(definition);
   
   return {
-    rootDir: join(cwd, rootDir),
-    rootFile: definition.rootFile ? join(cwd, definition.rootFile) : undefined,
+    rootDir: join(targetDir, rootDir),
+    rootFile: definition.rootFile ? join(targetDir, definition.rootFile) : undefined,
     subdirs: subdirsPaths
   }
 }
 
 /**
- * Get platform directory paths for a given working directory
+ * Get platform directory paths for a given target directory
  */
-export function getPlatformDirectoryPaths(cwd: string): PlatformDirectoryPaths {
-  const state = getPlatformsState(cwd)
+export function getPlatformDirectoryPaths(targetDir: string): PlatformDirectoryPaths {
+  const state = getPlatformsState(targetDir)
   const paths: PlatformDirectoryPaths = {}
 
   for (const platform of state.enabledPlatforms) {
-    paths[platform] = buildDirectoryPaths(state.defs[platform], cwd)
+    paths[platform] = buildDirectoryPaths(state.defs[platform], targetDir)
   }
 
   return paths
@@ -838,14 +838,14 @@ export function getPlatformDirectoryPaths(cwd: string): PlatformDirectoryPaths {
  */
 export function getPlatformDirectoryPathsForPlatform(
   platform: Platform,
-  cwd: string
+  targetDir: string
 ): PlatformPaths {
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
   const definition = state.defs[platform]
   if (!definition) {
     throw new Error(`Unknown platform: ${platform}`)
   }
-  return buildDirectoryPaths(definition, cwd)
+  return buildDirectoryPaths(definition, targetDir)
 }
 
 /**
@@ -854,9 +854,9 @@ export function getPlatformDirectoryPathsForPlatform(
  * AGENTS.md is skipped as it's universal/ambiguous.
  */
 export async function detectAllPlatforms(
-  cwd: string
+  targetDir: string
 ): Promise<PlatformDetectionResult[]> {
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
   const detectionPromises = state.enabledPlatforms.map(
     async (platform) => {
       const definition = state.defs[platform]
@@ -865,7 +865,7 @@ export async function detectAllPlatforms(
       if (definition.detection && definition.detection.length > 0) {
         // Check if any detection pattern matches
         for (const pattern of definition.detection) {
-          const testPath = join(cwd, pattern)
+          const testPath = join(targetDir, pattern)
           if (await exists(testPath)) {
             return {
               name: platform,
@@ -884,12 +884,12 @@ export async function detectAllPlatforms(
       let detected = false
       
       if (definition.rootDir) {
-        const rootDirPath = join(cwd, definition.rootDir)
+        const rootDirPath = join(targetDir, definition.rootDir)
         detected = await exists(rootDirPath)
       }
       
       if (!detected && definition.rootFile && definition.rootFile !== FILE_PATTERNS.AGENTS_MD) {
-        const rootFilePath = join(cwd, definition.rootFile)
+        const rootFilePath = join(targetDir, definition.rootFile)
         detected = await exists(rootFilePath)
       }
 
@@ -957,9 +957,9 @@ export async function validatePlatformStructure(
 export function getPlatformSubdirExts(
   platform: Platform,
   universalSubdir: string,
-  cwd?: string
+  targetDir?: string
 ): string[] {
-  const state = getPlatformsState(cwd)
+  const state = getPlatformsState(targetDir)
   const definition = state.defs[platform]
   if (!definition) {
     throw new Error(`Unknown platform: ${platform}`)
@@ -1008,10 +1008,10 @@ export function getPlatformSubdirExts(
  * Get all universal subdirs that exist for a platform
  */
 export function getPlatformUniversalSubdirs(
-  cwd: string,
+  targetDir: string,
   platform: Platform
 ): Array<{ dir: string; label: string; leaf: string }> {
-  const paths = getPlatformDirectoryPathsForPlatform(platform, cwd)
+  const paths = getPlatformDirectoryPathsForPlatform(platform, targetDir)
   const subdirs: Array<{ dir: string; label: string; leaf: string }> = []
 
   for (const [label, dir] of Object.entries(paths.subdirs)) {
@@ -1028,8 +1028,8 @@ export function getPlatformUniversalSubdirs(
 /**
  * Check if a normalized path represents a universal subdir
  */
-export function isUniversalSubdirPath(normalizedPath: string, cwd?: string): boolean {
-  const state = getPlatformsState(cwd)
+export function isUniversalSubdirPath(normalizedPath: string, targetDir?: string): boolean {
+  const state = getPlatformsState(targetDir)
   for (const subdir of state.universalSubdirs) {
     if (
       normalizedPath.startsWith(`${subdir}/`) ||
@@ -1048,10 +1048,10 @@ export function isUniversalSubdirPath(normalizedPath: string, cwd?: string): boo
  */
 export function isPlatformId(
   value: string | undefined,
-  cwd?: string
+  targetDir?: string
 ): value is Platform {
   if (!value) return false
-  return value in getPlatformsState(cwd).defs
+  return value in getPlatformsState(targetDir).defs
 }
 
 /**
@@ -1065,30 +1065,30 @@ export function isPlatformId(
  * @param fullPath - Full absolute path to the file
  * @param sourceDir - Source directory name (e.g., '.cursor', 'ai')
  * @param registryPath - Registry path (e.g., 'rules/file.md')
- * @param cwd - Optional cwd for local platform config overrides
+ * @param targetDir - Optional target directory for local platform config overrides
  * @returns Platform ID, 'ai', or undefined if cannot be determined
  */
 export function inferPlatformFromWorkspaceFile(
   fullPath: string,
   sourceDir: string,
   registryPath: string,
-  cwd?: string
+  targetDir?: string
 ): Platform | undefined {
   // First try to get platform from full path using existing mapper
-  const mapping = mapPlatformFileToUniversal(fullPath, cwd)
+  const mapping = mapPlatformFileToUniversal(fullPath, targetDir)
   if (mapping?.platform) {
     return mapping.platform
   }
 
   // Look up platform from source directory
-  const fromSource = getPlatformDirLookup(cwd)[sourceDir]
+  const fromSource = getPlatformDirLookup(targetDir)[sourceDir]
   if (fromSource) {
     return fromSource
   }
 
   // Fallback: check registry path for platform suffix
   const parsed = parseUniversalPath(registryPath, { allowPlatformSuffix: true })
-  if (parsed?.platformSuffix && isPlatformId(parsed.platformSuffix, cwd)) {
+  if (parsed?.platformSuffix && isPlatformId(parsed.platformSuffix, targetDir)) {
     return parsed.platformSuffix
   }
 

@@ -50,7 +50,7 @@ export async function runUnifiedInstallPipeline(
     // Phase 0: Ensure workspace manifest exists (auto-create if needed)
     // Only for install mode, not apply mode (apply requires existing installation)
     if (ctx.mode === 'install') {
-      await createWorkspacePackageYml(ctx.cwd);
+      await createWorkspacePackageYml(ctx.targetDir);
     }
     
     // Phase 1: Load package from source (always)

@@ -1,4 +1,4 @@
-import type { PackageYml } from '../../../types/index.js';
+import type { PackageYml, ExecutionContext } from '../../../types/index.js';
 import type { PackageSource } from '../unified/context.js';
 import type { InstallOptions } from '../../../types/index.js';
 
@@ -53,11 +53,15 @@ export interface PackageSourceLoader {
   
   /**
    * Load package from the source
+   * 
+   * @param source - Package source information
+   * @param options - Install options
+   * @param execContext - Execution context (uses sourceCwd for resolving inputs)
    */
   load(
     source: PackageSource,
     options: InstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<LoadedPackage>;
 }
 

@@ -1,6 +1,6 @@
 import path from 'path';
 
-import type { CommandResult } from '../../types/index.js';
+import type { CommandResult, ExecutionContext } from '../../types/index.js';
 import { ValidationError } from '../../utils/errors.js';
 import { getLocalOpenPackageDir, getLocalPackageYmlPath } from '../../utils/paths.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
@@ -39,12 +39,12 @@ export interface ListPipelineResult {
  * Does not compare content - only checks if expected files exist
  */
 async function checkPackageStatus(
-  cwd: string,
+  targetDir: string,
   pkgName: string,
   entry: WorkspaceIndexPackage,
   includeFileList: boolean = false
 ): Promise<ListPackageReport> {
-  const resolved = resolveDeclaredPath(entry.path, cwd);
+  const resolved = resolveDeclaredPath(entry.path, targetDir);
   const sourceRoot = resolved.absolute;
 
   // Check if source path exists
@@ -74,7 +74,7 @@ async function checkPackageStatus(
 
     for (const mapping of targets) {
       const targetPath = getTargetPath(mapping);
-      const absPath = path.join(cwd, targetPath);
+      const absPath = path.join(targetDir, targetPath);
       totalFiles++;
       
       const fileExists = await exists(absPath);
@@ -106,18 +106,22 @@ async function checkPackageStatus(
   };
 }
 
-export async function runListPipeline(packageName?: string): Promise<CommandResult<ListPipelineResult>> {
-  const cwd = process.cwd();
-  const openpkgDir = getLocalOpenPackageDir(cwd);
-  const manifestPath = getLocalPackageYmlPath(cwd);
+export async function runListPipeline(
+  packageName: string | undefined,
+  execContext: ExecutionContext
+): Promise<CommandResult<ListPipelineResult>> {
+  // Use targetDir for list operations
+  const targetDir = execContext.targetDir;
+  const openpkgDir = getLocalOpenPackageDir(targetDir);
+  const manifestPath = getLocalPackageYmlPath(targetDir);
 
   if (!(await exists(openpkgDir)) || !(await exists(manifestPath))) {
     throw new ValidationError(
-      `No .openpackage/openpackage.yml found in ${cwd}.`
+      `No .openpackage/openpackage.yml found in ${targetDir}.`
     );
   }
 
-  const { index } = await readWorkspaceIndex(cwd);
+  const { index } = await readWorkspaceIndex(targetDir);
   const packages = index.packages || {};
   const reports: ListPackageReport[] = [];
 
@@ -141,7 +145,7 @@ export async function runListPipeline(packageName?: string): Promise<CommandResu
     }
 
     try {
-      const report = await checkPackageStatus(cwd, packageName, pkgEntry, true);
+      const report = await checkPackageStatus(targetDir, packageName, pkgEntry, true);
       reports.push(report);
     } catch (error) {
       logger.warn(`Failed to check package ${packageName}: ${error}`);
@@ -165,7 +169,7 @@ export async function runListPipeline(packageName?: string): Promise<CommandResu
       }
 
       try {
-        const report = await checkPackageStatus(cwd, pkgName, pkgEntry, false);
+        const report = await checkPackageStatus(targetDir, pkgName, pkgEntry, false);
         reports.push(report);
       } catch (error) {
         logger.warn(`Failed to check package ${pkgName}: ${error}`);

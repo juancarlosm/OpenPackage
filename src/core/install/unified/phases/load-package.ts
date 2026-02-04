@@ -38,7 +38,7 @@ export async function loadPackagePhase(ctx: InstallationContext): Promise<void> 
     spinner.start();
     
     // Load package
-    const loaded = await loader.load(ctx.source, ctx.options, ctx.cwd);
+    const loaded = await loader.load(ctx.source, ctx.options, ctx.execution);
     
     spinner.stop();
 

@@ -1,5 +1,5 @@
 import type { InputClassification } from '../orchestrator/types.js';
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import { parseResourceArg, type ResourceSpec } from '../../../utils/resource-arg-parser.js';
 import { classifyPackageInput } from '../../../utils/package-input.js';
 import { logger } from '../../../utils/logger.js';
@@ -13,13 +13,13 @@ import { logger } from '../../../utils/logger.js';
  * 
  * @param input - Raw user input (undefined for bulk install)
  * @param options - Install options (to check for convenience filters)
- * @param cwd - Current working directory
+ * @param execContext - Execution context (uses sourceCwd for resolving inputs)
  * @returns Unified input classification
  */
 export async function classifyInput(
   input: string | undefined,
   options: InstallOptions & { agents?: string[]; skills?: string[] },
-  cwd: string
+  execContext: ExecutionContext
 ): Promise<InputClassification> {
   // No input = bulk install
   if (!input) {
@@ -44,7 +44,7 @@ export async function classifyInput(
 
   if (shouldTryResourceParsing) {
     try {
-      const resourceSpec = await parseResourceArg(input, cwd);
+      const resourceSpec = await parseResourceArg(input, execContext.sourceCwd);
       return resourceSpecToClassification(resourceSpec, hasConvenienceFilters);
     } catch (error) {
       // If resource parsing fails and no convenience options, fall through to legacy
@@ -56,7 +56,7 @@ export async function classifyInput(
   }
 
   // Fall back to legacy classification
-  const legacy = await classifyPackageInput(input, cwd);
+  const legacy = await classifyPackageInput(input, execContext.sourceCwd);
   return legacyToClassification(legacy, hasConvenienceFilters);
 }
 

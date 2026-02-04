@@ -49,11 +49,11 @@ function getUniqueRootFilenames(): string[] {
 /**
  * Compute which root files would be updated after stripping sections
  */
-export async function computeRootFileRemovalPlan(cwd: string, packageNames: string[]): Promise<{ toUpdate: string[] }> {
+export async function computeRootFileRemovalPlan(targetDir: string, packageNames: string[]): Promise<{ toUpdate: string[] }> {
   const toUpdate: string[] = [];
   const rootFiles = getUniqueRootFilenames();
   for (const filename of rootFiles) {
-    const absPath = join(cwd, filename);
+    const absPath = join(targetDir, filename);
     if (!(await exists(absPath))) continue;
     const original = await readTextFile(absPath);
     const { changed, content } = stripMultiplePackageSections(original, packageNames);
@@ -67,11 +67,11 @@ export async function computeRootFileRemovalPlan(cwd: string, packageNames: stri
 /**
  * Apply root-file updates for provided packages
  */
-export async function applyRootFileRemovals(cwd: string, packageNames: string[]): Promise<{ updated: string[] }> {
+export async function applyRootFileRemovals(targetDir: string, packageNames: string[]): Promise<{ updated: string[] }> {
   const updated: string[] = [];
   const rootFiles = getUniqueRootFilenames();
   for (const filename of rootFiles) {
-    const absPath = join(cwd, filename);
+    const absPath = join(targetDir, filename);
     if (!(await exists(absPath))) continue;
     const original = await readTextFile(absPath);
     const { changed, content } = stripMultiplePackageSections(original, packageNames);

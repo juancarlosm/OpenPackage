@@ -3,7 +3,7 @@
  * Phase 2: Loads package content using existing source loaders.
  */
 
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { PackageSource } from '../unified/context.js';
 import type {
   DependencyGraph,
@@ -119,7 +119,10 @@ function groupByDepth(graph: DependencyGraph): Map<number, ResolutionDependencyN
 }
 
 export class PackageLoader {
-  constructor(private readonly options: PackageLoaderOptions) {}
+  constructor(
+    private readonly execContext: ExecutionContext,
+    private readonly options: PackageLoaderOptions
+  ) {}
 
   /**
    * Load all packages in the graph.
@@ -128,7 +131,6 @@ export class PackageLoader {
   async loadAll(graph: DependencyGraph): Promise<void> {
     const cacheEnabled = this.options.cacheEnabled !== false;
     const parallel = this.options.parallel !== false;
-    const cwd = this.options.cwd;
     const installOptions: InstallOptions = this.options.installOptions ?? {};
 
     const byDepth = groupByDepth(graph);
@@ -140,11 +142,11 @@ export class PackageLoader {
 
       if (parallel && loadables.length > 1) {
         await Promise.all(
-          loadables.map((node) => this.loadNode(node, graph, cwd, installOptions, cacheEnabled))
+          loadables.map((node) => this.loadNode(node, graph, installOptions, cacheEnabled))
         );
       } else {
         for (const node of loadables) {
-          await this.loadNode(node, graph, cwd, installOptions, cacheEnabled);
+          await this.loadNode(node, graph, installOptions, cacheEnabled);
         }
       }
     }
@@ -153,7 +155,6 @@ export class PackageLoader {
   private async loadNode(
     node: ResolutionDependencyNode,
     graph: DependencyGraph,
-    cwd: string,
     installOptions: InstallOptions,
     cacheEnabled: boolean
   ): Promise<void> {
@@ -181,9 +182,9 @@ export class PackageLoader {
     node.state = 'loading';
 
     try {
-      const packageSource = toPackageSource(node, cwd);
+      const packageSource = toPackageSource(node, this.execContext.targetDir);
       const loader = getLoaderForSource(packageSource);
-      const loaded = await loader.load(packageSource, installOptions, cwd);
+      const loaded = await loader.load(packageSource, installOptions, this.execContext);
 
       if (!loaded.metadata && loaded.pluginMetadata?.pluginType === 'marketplace') {
         logger.warn(`Skipping marketplace node ${node.id.displayName} in resolution loader`);

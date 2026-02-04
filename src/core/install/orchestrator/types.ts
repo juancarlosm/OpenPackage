@@ -1,4 +1,4 @@
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { InstallResolutionMode } from '../types.js';
 import type { InstallationContext } from '../unified/context.js';
 
@@ -52,14 +52,14 @@ export interface InstallStrategy {
   buildContext(
     classification: InputClassification,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<InstallationContext>;
   
   /** Preprocess context (load source, detect base, etc.) */
   preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult>;
 }
 
