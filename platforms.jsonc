@@ -234,8 +234,14 @@
         }
       },
       {
-        "from": "agents/**/*.md",
-        "to": ".claude/agents/**/*.md",
+        "from": { 
+          "pattern": "agents/**/*.md",
+          "schema": "./schemas/formats/universal-agent.schema.json"
+        },
+        "to": { 
+          "pattern": ".claude/agents/**/*.md",
+          "schema": "./schemas/formats/claude-agent.schema.json"
+        },
         // Apply transformations when source is NOT Claude plugin
         "when": {
           "$ne": ["$$source", "claude-plugin"]
@@ -374,8 +380,14 @@
         "to": "commands/**/*.md"
       },
       {
-        "from": ".claude/agents/**/*.md",
-        "to": "agents/**/*.md",
+        "from": { 
+          "pattern": ".claude/agents/**/*.md",
+          "schema": "./schemas/formats/claude-agent.schema.json"
+        },
+        "to": { 
+          "pattern": "agents/**/*.md",
+          "schema": "./schemas/formats/universal-agent.schema.json"
+        },
         "map": [
           // Reverse model transformation: Claude short names → "anthropic/model-id"
           {
@@ -775,7 +787,10 @@
         }
       },
       {
-        "from": "agents/**/*.md",
+        "from": { 
+          "pattern": "agents/**/*.md",
+          "schema": "./schemas/formats/universal-agent.schema.json"
+        },
         "to": {
           "$switch": {
             "field": "$$targetRoot",

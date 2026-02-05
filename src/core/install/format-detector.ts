@@ -9,6 +9,7 @@ import { dirname } from 'path';
 import type { Platform } from '../platforms.js';
 import type { PackageFile } from '../../types/index.js';
 import type { PackageConversionContext } from '../../types/conversion-context.js';
+import type { EnhancedPackageFormat } from './detection-types.js';
 import { getAllPlatforms, isPlatformId } from '../platforms.js';
 import { logger } from '../../utils/logger.js';
 import { createContextFromFormat } from '../conversion-context/index.js';
@@ -319,4 +320,122 @@ export function detectPackageFormatWithContext(files: PackageFile[]): {
   const context = createContextFromFormat(format);
   
   return { format, context };
+}
+
+/**
+ * Enhanced Package Format Detection (Two-Tier Strategy)
+ * 
+ * Implements comprehensive format detection with two tiers:
+ * 
+ * Tier 1 (Fast Path): Package-Level Markers
+ * - Checks for explicit format markers from platforms.jsonc (e.g., .claude-plugin/plugin.json)
+ * - Returns immediately if clear marker found
+ * - Fastest path for well-structured packages
+ * 
+ * Tier 2 (Detailed Path): Per-File Detection
+ * - Falls back when no clear markers exist
+ * - Analyzes each file's frontmatter against platform schemas
+ * - Groups files by detected format
+ * - Determines overall package format from distribution
+ * 
+ * @param files - List of package files (with optional content/frontmatter)
+ * @param targetDir - Optional target directory for local platform config
+ * @returns Enhanced package format with comprehensive analysis
+ */
+export async function detectEnhancedPackageFormat(
+  files: PackageFile[],
+  targetDir?: string
+): Promise<EnhancedPackageFormat> {
+  logger.debug('Starting enhanced package format detection', {
+    fileCount: files.length
+  });
+  
+  // Import detection modules dynamically to avoid circular deps
+  const { detectPlatformMarkers, getPrimaryPlatformFromMarkers, isPurePlatformSpecific } = 
+    await import('./package-marker-detector.js');
+  const { detectFileFormats } = await import('./file-format-detector.js');
+  const { 
+    analyzeFormatDistribution, 
+    calculatePackageConfidence,
+    determinePackageFormat: determineFromDistribution,
+    groupFilesByPlatform
+  } = await import('./format-distribution-analyzer.js');
+  
+  // Tier 1: Check for package-level markers (fast path)
+  const markers = detectPlatformMarkers(files, targetDir);
+  
+  // Pure platform-specific package with single marker
+  if (isPurePlatformSpecific(markers)) {
+    const primaryPlatform = getPrimaryPlatformFromMarkers(markers)!;
+    
+    logger.debug('Fast path: Pure platform-specific package detected', {
+      platform: primaryPlatform,
+      markers: markers.matches
+    });
+    
+    return {
+      packageFormat: primaryPlatform,
+      detectionMethod: 'package-marker',
+      confidence: 1.0,
+      markers: {
+        matchedPatterns: markers.matches.map(m => ({
+          platformId: m.platformId,
+          pattern: m.matchedPattern
+        })),
+        hasOpenPackageYml: markers.hasOpenPackageYml,
+        hasPackageYml: markers.hasPackageYml
+      },
+      analysis: {
+        totalFiles: files.length,
+        analyzedFiles: 0, // Fast path - didn't analyze files
+        skippedFiles: files.length,
+        formatDistribution: new Map([[primaryPlatform, files.length]])
+      }
+    };
+  }
+  
+  // Tier 2: Per-file detection (detailed path)
+  logger.debug('Detailed path: Performing per-file detection');
+  
+  // Detect format for each file
+  const fileFormats = detectFileFormats(files, targetDir);
+  
+  // Analyze distribution
+  const distribution = analyzeFormatDistribution(fileFormats);
+  const confidence = calculatePackageConfidence(distribution, fileFormats);
+  const packageFormat = determineFromDistribution(distribution);
+  const formatGroups = groupFilesByPlatform(fileFormats);
+  
+  // Count analyzed vs skipped files
+  const analyzedFiles = fileFormats.size;
+  const skippedFiles = files.length - analyzedFiles;
+  
+  logger.debug('Per-file detection complete', {
+    packageFormat,
+    confidence,
+    analyzedFiles,
+    distribution: Array.from(distribution.counts.entries())
+  });
+  
+  return {
+    packageFormat,
+    detectionMethod: 'per-file',
+    confidence,
+    fileFormats,
+    formatGroups,
+    markers: markers.matches.length > 0 ? {
+      matchedPatterns: markers.matches.map(m => ({
+        platformId: m.platformId,
+        pattern: m.matchedPattern
+      })),
+      hasOpenPackageYml: markers.hasOpenPackageYml,
+      hasPackageYml: markers.hasPackageYml
+    } : undefined,
+    analysis: {
+      totalFiles: files.length,
+      analyzedFiles,
+      skippedFiles,
+      formatDistribution: distribution.counts
+    }
+  };
 }

@@ -1,6 +1,7 @@
 import type { CommandResult } from '../../../types/index.js';
 import type { InstallationContext } from './context.js';
 import { loadPackagePhase } from './phases/load-package.js';
+import { convertPhase } from './phases/convert.js';
 import { resolveDependenciesPhase } from './phases/resolve-dependencies.js';
 import { processConflictsPhase } from './phases/conflicts.js';
 import { executeInstallationPhase } from './phases/execute.js';
@@ -58,6 +59,9 @@ export async function runUnifiedInstallPipeline(
     
     // Assert context is complete after load phase
     assertPipelineContextComplete(ctx);
+
+    // Phase 1.5: Convert package format if needed (Phase 4 integration)
+    await convertPhase(ctx);
 
     // Phase 2: Resolve dependencies (skip for apply mode)
     if (shouldResolveDependencies(ctx)) {
