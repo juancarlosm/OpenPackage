@@ -39,7 +39,7 @@ export async function reportResultsPhase(
     success: true,
     data: {
       packageName: ctx.source.packageName,
-      targetDir: getInstallRootDir(ctx.cwd),
+      targetDir: getInstallRootDir(ctx.targetDir),
       resolvedPackages: ctx.resolvedPackages,
       totalPackages: ctx.resolvedPackages.length,
       installed: installResult.installedCount,

@@ -1,6 +1,6 @@
 import type { PackageSourceLoader, LoadedPackage } from './base.js';
 import type { PackageSource } from '../unified/context.js';
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import { SourceLoadError } from './base.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
 import { resolvePackageContentRoot } from '../local-source-resolution.js';
@@ -17,7 +17,7 @@ export class RegistrySourceLoader implements PackageSourceLoader {
   async load(
     source: PackageSource,
     options: InstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<LoadedPackage> {
     if (!source.packageName) {
       throw new SourceLoadError(source, 'Package name is required for registry sources');
@@ -28,9 +28,9 @@ export class RegistrySourceLoader implements PackageSourceLoader {
     }
     
     try {
-      // Resolve content root
+      // Resolve content root (use targetDir for registry location)
       const contentRoot = await resolvePackageContentRoot({
-        cwd,
+        cwd: execContext.targetDir,
         packageName: source.packageName,
         version: source.version
       });

@@ -31,7 +31,7 @@ export async function executeInstallationPhase(
   if (ctx.platforms.length === 0) {
     const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
     ctx.platforms = await resolvePlatforms(
-      ctx.cwd,
+      ctx.targetDir,
       ctx.options.platforms,
       { interactive: canPrompt }
     );
@@ -44,7 +44,7 @@ export async function executeInstallationPhase(
   
   // Execute installation
   const outcome = await performIndexBasedInstallationPhases({
-    cwd: ctx.cwd,
+    cwd: ctx.targetDir,
     packages: ctx.resolvedPackages,
     platforms: ctx.platforms,
     conflictResult,

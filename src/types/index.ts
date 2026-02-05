@@ -8,6 +8,7 @@ import type { Platform } from '../core/platforms.js';
 export * from './flows.js';
 export * from './platform-flows.js';
 export * from './conversion-context.js';
+export * from './execution-context.js';
 
 // Core application types
 export interface OpenPackageDirectories {

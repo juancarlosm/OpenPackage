@@ -21,7 +21,7 @@ export async function updateManifestPhase(ctx: InstallationContext): Promise<voi
     const fields = buildManifestFields(ctx, mainPackage);
     
     await addPackageToYml(
-      ctx.cwd,
+      ctx.targetDir,
       ctx.source.packageName,
       mainPackage.version,
       ctx.options.dev ?? false,
@@ -80,7 +80,7 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
     case 'path':
       // Path packages get path field
       // Use centralized path formatting for consistency with workspace index
-      fields.path = formatPathForYaml(ctx.source.localPath || '', ctx.cwd);
+      fields.path = formatPathForYaml(ctx.source.localPath || '', ctx.targetDir);
       break;
     
     case 'git':

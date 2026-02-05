@@ -1,7 +1,7 @@
 import { resolve, basename } from 'path';
 import type { PackageSourceLoader, LoadedPackage } from './base.js';
 import type { PackageSource } from '../unified/context.js';
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import { SourceLoadError } from './base.js';
 import { loadPackageFromPath } from '../path-package-loader.js';
 import { detectPluginType } from '../plugin-detector.js';
@@ -22,14 +22,15 @@ export class PathSourceLoader implements PackageSourceLoader {
   async load(
     source: PackageSource,
     options: InstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<LoadedPackage> {
     if (!source.localPath) {
       throw new SourceLoadError(source, 'Local path is required for path sources');
     }
     
     try {
-      const resolvedPath = resolve(cwd, source.localPath);
+      // Resolve paths using sourceCwd for input resolution
+      const resolvedPath = resolve(execContext.sourceCwd, source.localPath);
       
       // Phase 5: If manifest base is present, skip detection (reproducibility)
       let detectedBaseInfo: any = null;
@@ -52,7 +53,7 @@ export class PathSourceLoader implements PackageSourceLoader {
         });
       } else if (source.resourcePath) {
         // NEW: If a resource path was specified, detect base
-        const platformsState = getPlatformsState(cwd);
+        const platformsState = getPlatformsState(execContext.targetDir);
         const platformsConfig = platformsState.config;
         
         logger.debug('Detecting base for path resource', {

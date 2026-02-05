@@ -47,41 +47,33 @@ function getUniqueRootFilenames(): string[] {
 }
 
 /**
- * Compute which root files would be updated after stripping sections
+ * Process root file removals: strip package sections from root files.
+ * When dryRun is true, returns the list of files that would be updated without writing.
+ * When dryRun is false (default), writes the changes and returns the updated files.
  */
-export async function computeRootFileRemovalPlan(cwd: string, packageNames: string[]): Promise<{ toUpdate: string[] }> {
-  const toUpdate: string[] = [];
-  const rootFiles = getUniqueRootFilenames();
-  for (const filename of rootFiles) {
-    const absPath = join(cwd, filename);
-    if (!(await exists(absPath))) continue;
-    const original = await readTextFile(absPath);
-    const { changed, content } = stripMultiplePackageSections(original, packageNames);
-    if (!changed) continue;
-    // Always update root files, never delete them (even if empty)
-    toUpdate.push(filename);
-  }
-  return { toUpdate };
-}
-
-/**
- * Apply root-file updates for provided packages
- */
-export async function applyRootFileRemovals(cwd: string, packageNames: string[]): Promise<{ updated: string[] }> {
+export async function processRootFileRemovals(
+  targetDir: string,
+  packageNames: string[],
+  options: { dryRun?: boolean } = {}
+): Promise<{ updated: string[] }> {
   const updated: string[] = [];
   const rootFiles = getUniqueRootFilenames();
+
   for (const filename of rootFiles) {
-    const absPath = join(cwd, filename);
+    const absPath = join(targetDir, filename);
     if (!(await exists(absPath))) continue;
+
     const original = await readTextFile(absPath);
     const { changed, content } = stripMultiplePackageSections(original, packageNames);
     if (!changed) continue;
-    // Always update root files, never delete them (even if empty)
-    await writeTextFile(absPath, content);
+
+    if (!options.dryRun) {
+      await writeTextFile(absPath, content);
+      logger.debug(`Updated root file: ${absPath}`);
+    }
+
     updated.push(filename);
-    logger.debug(`Updated root file: ${absPath}`);
   }
+
   return { updated };
 }
-
-

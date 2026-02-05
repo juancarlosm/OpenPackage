@@ -233,14 +233,14 @@ export interface GraphBuilderOptions {
    * in a single unified flow. Default: false.
    */
   includeRoot?: boolean;
+  /** Skip git cache (for --remote flag) */
+  skipCache?: boolean;
 }
 
 /**
  * Options for the package loader.
  */
 export interface PackageLoaderOptions {
-  /** Current working directory (workspace root) */
-  cwd: string;
   /** Enable parallel loading for same-depth nodes */
   parallel?: boolean;
   /** Enable in-memory cache of loaded packages */
@@ -253,8 +253,6 @@ export interface PackageLoaderOptions {
  * Options for the installation planner.
  */
 export interface InstallationPlannerOptions {
-  /** Current working directory */
-  cwd: string;
   /** Resolved platforms (shared across all packages) */
   platforms: Platform[];
   /** Install options */

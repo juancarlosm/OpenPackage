@@ -9,13 +9,13 @@ import { getPlatformDefinition, type Platform } from '../core/platforms.js';
 /**
  * Get all platform root file names (including universal AGENTS.md) for the given platforms.
  * @param platforms - Array of platforms to collect root files from
- * @param cwd - Optional cwd for platform config overrides
+ * @param targetDir - Optional target directory for platform config overrides
  * @returns Set of root file names
  */
-export function getPlatformRootFileNames(platforms: Platform[], cwd?: string): Set<string> {
+export function getPlatformRootFileNames(platforms: Platform[], targetDir?: string): Set<string> {
   const names = new Set<string>([FILE_PATTERNS.AGENTS_MD]);
   for (const platform of platforms) {
-    const def = getPlatformDefinition(platform, cwd);
+    const def = getPlatformDefinition(platform, targetDir);
     if (def.rootFile) {
       names.add(def.rootFile);
     }

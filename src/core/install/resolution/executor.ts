@@ -3,7 +3,7 @@
  * Orchestrates discovery, loading, planning, and execution.
  */
 
-import type { CommandResult } from '../../../types/index.js';
+import type { CommandResult, ExecutionContext } from '../../../types/index.js';
 import { runUnifiedInstallPipeline } from '../unified/pipeline.js';
 import { DependencyGraphBuilder } from './graph-builder.js';
 import { PackageLoader } from './package-loader.js';
@@ -26,12 +26,12 @@ export class DependencyResolutionExecutor {
   private planner: InstallationPlanner;
 
   constructor(
-    private readonly cwd: string,
+    private readonly execContext: ExecutionContext,
     private readonly options: ExecutorOptions
   ) {
-    this.graphBuilder = new DependencyGraphBuilder(cwd, options.graphOptions);
-    this.packageLoader = new PackageLoader(options.loaderOptions);
-    this.planner = new InstallationPlanner(options.plannerOptions);
+    this.graphBuilder = new DependencyGraphBuilder(execContext.targetDir, options.graphOptions);
+    this.packageLoader = new PackageLoader(execContext, options.loaderOptions);
+    this.planner = new InstallationPlanner(execContext, options.plannerOptions);
   }
 
   /**

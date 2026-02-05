@@ -1,5 +1,5 @@
 import type { Platform } from '../../platforms.js';
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import type { WorkspaceIndex } from '../../../types/workspace-index.js';
 
@@ -86,6 +86,14 @@ export interface PackageSource {
  * Each phase documents which fields it mutates.
  */
 export interface InstallationContext {
+  // === Execution Context (single source of truth for directories) ===
+  /** Execution context containing sourceCwd, targetDir, and isGlobal */
+  execution: ExecutionContext;
+  
+  // === Convenience Aliases ===
+  /** Alias to execution.targetDir for easier access */
+  targetDir: string;
+  
   // === Configuration (set during context creation) ===
   /** Package source details */
   source: PackageSource;
@@ -98,12 +106,6 @@ export interface InstallationContext {
   
   /** Target platforms for installation */
   platforms: Platform[];
-  
-  /** Current working directory */
-  cwd: string;
-  
-  /** Target directory for installation (usually '.') */
-  targetDir: string;
   
   // === State (updated during pipeline execution) ===
   /** Resolved dependency tree (updated in resolve phase) */

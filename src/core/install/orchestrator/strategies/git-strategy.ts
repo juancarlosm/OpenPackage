@@ -1,4 +1,5 @@
 import type { InstallationContext, PackageSource } from '../../unified/context.js';
+import type { ExecutionContext } from '../../../../types/index.js';
 import type { 
   NormalizedInstallOptions, 
   InputClassification, 
@@ -22,7 +23,7 @@ export class GitInstallStrategy extends BaseInstallStrategy {
   async buildContext(
     classification: InputClassification,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<InstallationContext> {
     if (classification.type !== 'git') {
       throw new Error('GitStrategy cannot handle non-git classification');
@@ -37,12 +38,12 @@ export class GitInstallStrategy extends BaseInstallStrategy {
     };
     
     return {
+      execution: execContext,
+      targetDir: execContext.targetDir,
       source,
       mode: 'install',
       options,
       platforms: normalizePlatforms(options.platforms) || [],
-      cwd,
-      targetDir: '.',
       resolvedPackages: [],
       warnings: [],
       errors: []
@@ -52,11 +53,11 @@ export class GitInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult> {
     // Load the source
     const loader = getLoaderForSource(context.source);
-    const loaded = await loader.load(context.source, options, cwd);
+    const loaded = await loader.load(context.source, options, execContext);
     
     // Update context with loaded info
     context.source.packageName = loaded.packageName;
@@ -108,7 +109,7 @@ export class GitInstallStrategy extends BaseInstallStrategy {
     
     // Apply convenience filters (--agents, --skills)
     if (options.agents?.length || options.skills?.length) {
-      return this.handleConvenienceFilters(context, loaded, options, cwd);
+      return this.handleConvenienceFilters(context, loaded, options, execContext);
     }
     
     // Warn about unused --plugins flag
@@ -126,9 +127,9 @@ export class GitInstallStrategy extends BaseInstallStrategy {
     context: InstallationContext,
     loaded: any,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult> {
-    const basePath = context.detectedBase || loaded.contentRoot || cwd;
+    const basePath = context.detectedBase || loaded.contentRoot || execContext.targetDir;
     const repoRoot = loaded.sourceMetadata?.repoPath || loaded.contentRoot || basePath;
 
     const resources = await resolveConvenienceResources(basePath, repoRoot, {

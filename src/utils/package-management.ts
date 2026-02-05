@@ -21,9 +21,9 @@ import { isManifestPath, normalizePackagePath } from './manifest-paths.js';
  * Ensure local OpenPackage directory structure exists
  * Shared utility for both install and save commands
  */
-export async function ensureLocalOpenPackageStructure(cwd: string): Promise<void> {
-  const openpackageDir = getLocalOpenPackageDir(cwd);
-  const packagesDir = getLocalPackagesDir(cwd);
+export async function ensureLocalOpenPackageStructure(targetDir: string): Promise<void> {
+  const openpackageDir = getLocalOpenPackageDir(targetDir);
+  const packagesDir = getLocalPackagesDir(targetDir);
   
   await Promise.all([
     ensureDir(openpackageDir),
@@ -37,11 +37,11 @@ export async function ensureLocalOpenPackageStructure(cwd: string): Promise<void
  * @param force - If true, overwrite existing openpackage.yml
  * @returns the openpackage.yml if it was created, null if it already existed and force=false
  */
-export async function createWorkspacePackageYml(cwd: string, force: boolean = false): Promise<PackageYml | null> {
-  await ensureLocalOpenPackageStructure(cwd);
+export async function createWorkspacePackageYml(targetDir: string, force: boolean = false): Promise<PackageYml | null> {
+  await ensureLocalOpenPackageStructure(targetDir);
 
-  const packageYmlPath = getLocalPackageYmlPath(cwd);
-  const projectName = basename(cwd);
+  const packageYmlPath = getLocalPackageYmlPath(targetDir);
+  const projectName = basename(targetDir);
   const basicPackageYml: PackageYml = {
     name: projectName,
     dependencies: [],
@@ -82,15 +82,15 @@ export interface EnsurePackageWithYmlResult {
  * This is for NESTED packages only. Root packages use different flow.
  */
 export async function ensurePackageWithYml(
-  cwd: string,
+  targetDir: string,
   packageName: string,
   options: EnsurePackageWithYmlOptions = {}
 ): Promise<EnsurePackageWithYmlResult> {
-  await ensureLocalOpenPackageStructure(cwd);
+  await ensureLocalOpenPackageStructure(targetDir);
 
   const normalizedName = normalizePackageName(packageName);
-  const packageDir = getPackageFilesDir(cwd, 'nested', normalizedName);
-  const packageYmlPath = getPackageYmlPath(cwd, 'nested', normalizedName);
+  const packageDir = getPackageFilesDir(targetDir, 'nested', normalizedName);
+  const packageYmlPath = getPackageYmlPath(targetDir, 'nested', normalizedName);
 
   await ensureDir(packageDir);
 
@@ -136,8 +136,8 @@ export async function ensurePackageWithYml(
     }
 
     await writePackageYml(packageYmlPath, packageConfig);
-    logger.info(
-      `Created new package '${packageConfig.name}${packageConfig.version ? `@${packageConfig.version}` : ''}' at ${relative(cwd, packageDir)}`
+      logger.info(
+      `Created new package '${packageConfig.name}${packageConfig.version ? `@${packageConfig.version}` : ''}' at ${relative(targetDir, packageDir)}`
     );
   }
 
@@ -161,7 +161,7 @@ export async function ensurePackageWithYml(
  * Shared utility for both install and save commands
  */
 export async function addPackageToYml(
-  cwd: string,
+  targetDir: string,
   packageName: string,
   packageVersion: string | undefined,
   isDev: boolean = false,
@@ -173,7 +173,7 @@ export async function addPackageToYml(
   gitPath?: string,  // Git subdirectory path (for plugins in marketplaces)
   base?: string  // Phase 4: Base path for resource-based installation
 ): Promise<void> {
-  const packageYmlPath = getLocalPackageYmlPath(cwd);
+  const packageYmlPath = getLocalPackageYmlPath(targetDir);
   
   if (!(await exists(packageYmlPath))) {
     return; // If no openpackage.yml exists, ignore this step
@@ -397,10 +397,10 @@ function doesDependencyMatchPackageName(
  * Remove a dependency entry from openpackage.yml (both dependencies and dev-dependencies).
  */
 export async function removePackageFromOpenpackageYml(
-  cwd: string,
+  targetDir: string,
   packageName: string
 ): Promise<boolean> {
-  const packageYmlPath = getLocalPackageYmlPath(cwd);
+  const packageYmlPath = getLocalPackageYmlPath(targetDir);
   if (!(await exists(packageYmlPath))) return false;
 
   try {

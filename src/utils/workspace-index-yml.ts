@@ -15,8 +15,8 @@ export interface WorkspaceIndexRecord {
   index: WorkspaceIndex;
 }
 
-export function getWorkspaceIndexPath(cwd: string): string {
-  return join(getLocalOpenPackageDir(cwd), FILE_PATTERNS.OPENPACKAGE_INDEX_YML);
+export function getWorkspaceIndexPath(targetDir: string): string {
+  return join(getLocalOpenPackageDir(targetDir), FILE_PATTERNS.OPENPACKAGE_INDEX_YML);
 }
 
 function sortAndDedupeStrings(values: string[]): string[] {
@@ -147,8 +147,8 @@ function sanitizeWorkspaceIndexData(data: any): WorkspaceIndex | null {
   return { packages };
 }
 
-export async function readWorkspaceIndex(cwd: string): Promise<WorkspaceIndexRecord> {
-  const indexPath = getWorkspaceIndexPath(cwd);
+export async function readWorkspaceIndex(targetDir: string): Promise<WorkspaceIndexRecord> {
+  const indexPath = getWorkspaceIndexPath(targetDir);
 
   if (!(await exists(indexPath))) {
     return {

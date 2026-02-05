@@ -5,6 +5,7 @@
  * off to the multi-context pipeline via the orchestrator.
  */
 import type { InstallationContext } from '../../unified/context.js';
+import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
 import { buildInstallContext, type BulkInstallContextsResult } from '../../unified/context-builders.js';
@@ -19,18 +20,18 @@ export class BulkInstallStrategy extends BaseInstallStrategy {
   async buildContext(
     classification: InputClassification,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<InstallationContext> {
     // Bulk install returns multiple contexts, but we need to return one
     // The actual multi-context handling is done in preprocess
     // Return a placeholder context
     return {
+      execution: execContext,
+      targetDir: execContext.targetDir,
       source: { type: 'workspace', packageName: '__bulk__' },
       mode: 'install',
       options,
       platforms: [],
-      cwd,
-      targetDir: '.',
       resolvedPackages: [],
       warnings: [],
       errors: []
@@ -40,10 +41,10 @@ export class BulkInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    cwd: string
+    execContext: ExecutionContext
   ): Promise<PreprocessResult> {
     // Build workspace + dependency contexts from openpackage.yml
-    const raw = await buildInstallContext(cwd, undefined, options);
+    const raw = await buildInstallContext(execContext, undefined, options);
 
     const bulk = raw as BulkInstallContextsResult;
     if (bulk?.dependencyContexts && 'workspaceContext' in bulk) {

@@ -1,5 +1,5 @@
 import { basename, join, relative } from 'path';
-import type { InstallOptions } from '../../../types/index.js';
+import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { InstallationContext, PackageSource } from './context.js';
 import { classifyPackageInput } from '../../../utils/package-input.js';
 import { normalizePlatforms } from '../../../utils/platform-mapper.js';
@@ -24,7 +24,7 @@ export interface BulkInstallContextsResult {
  * Build context for registry-based installation
  */
 export async function buildRegistryInstallContext(
-  cwd: string,
+  execContext: ExecutionContext,
   packageName: string,
   options: InstallOptions & { version?: string; registryPath?: string }
 ): Promise<InstallationContext> {
@@ -36,12 +36,12 @@ export async function buildRegistryInstallContext(
   };
   
   return {
+    execution: execContext,
+    targetDir: execContext.targetDir,
     source,
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
-    cwd,
-    targetDir: '.',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -52,7 +52,7 @@ export async function buildRegistryInstallContext(
  * Build context for path-based installation
  */
 export async function buildPathInstallContext(
-  cwd: string,
+  execContext: ExecutionContext,
   sourcePath: string,
   options: InstallOptions & { sourceType: 'directory' | 'tarball' }
 ): Promise<InstallationContext> {
@@ -66,12 +66,12 @@ export async function buildPathInstallContext(
   };
   
   return {
+    execution: execContext,
+    targetDir: execContext.targetDir,
     source,
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
-    cwd,
-    targetDir: '.',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -82,7 +82,7 @@ export async function buildPathInstallContext(
  * Build context for git-based installation
  */
 export async function buildGitInstallContext(
-  cwd: string,
+  execContext: ExecutionContext,
   gitUrl: string,
   options: InstallOptions & { gitRef?: string; gitPath?: string }
 ): Promise<InstallationContext> {
@@ -95,12 +95,12 @@ export async function buildGitInstallContext(
   };
   
   return {
+    execution: execContext,
+    targetDir: execContext.targetDir,
     source,
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
-    cwd,
-    targetDir: '.',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -112,10 +112,12 @@ export async function buildGitInstallContext(
  * Used when installing/applying workspace-level files from .openpackage/
  */
 export async function buildWorkspaceRootInstallContext(
-  cwd: string,
+  execContext: ExecutionContext,
   options: InstallOptions,
   mode: 'install' | 'apply' = 'install'
 ): Promise<InstallationContext | null> {
+  const cwd = execContext.targetDir;
+  
   // Ensure .openpackage/ structure exists
   await ensureLocalOpenPackageStructure(cwd);
   
@@ -151,12 +153,12 @@ export async function buildWorkspaceRootInstallContext(
   };
   
   return {
+    execution: execContext,
+    targetDir: execContext.targetDir,
     source,
     mode,
     options: mode === 'apply' ? { ...options, force: true } : options,
     platforms: normalizePlatforms(options.platforms) || [],
-    cwd,
-    targetDir: '.',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -169,31 +171,31 @@ export async function buildWorkspaceRootInstallContext(
  * Build context from package input (auto-detect type)
  */
 export async function buildInstallContext(
-  cwd: string,
+  execContext: ExecutionContext,
   packageInput: string | undefined,
   options: InstallOptions
 ): Promise<InstallationContext | InstallationContext[] | BulkInstallContextsResult> {
   // No input = bulk install (returns workspace + dependency contexts separately)
   if (!packageInput) {
-    return buildBulkInstallContexts(cwd, options);
+    return buildBulkInstallContexts(execContext, options);
   }
   
-  // Classify input to determine source type
-  const classification = await classifyPackageInput(packageInput, cwd);
+  // Classify input to determine source type (use sourceCwd for input resolution)
+  const classification = await classifyPackageInput(packageInput, execContext.sourceCwd);
   
   switch (classification.type) {
     case 'registry':
-      return buildRegistryInstallContext(cwd, classification.name!, options);
+      return buildRegistryInstallContext(execContext, classification.name!, options);
     
     case 'directory':
     case 'tarball':
-      return buildPathInstallContext(cwd, classification.resolvedPath!, {
+      return buildPathInstallContext(execContext, classification.resolvedPath!, {
         ...options,
         sourceType: classification.type
       });
     
     case 'git':
-      return buildGitInstallContext(cwd, classification.gitUrl!, {
+      return buildGitInstallContext(execContext, classification.gitUrl!, {
         ...options,
         gitRef: classification.gitRef,
         gitPath: classification.gitPath
@@ -209,13 +211,14 @@ export async function buildInstallContext(
  * Returns workspace root and dependency contexts separately so the orchestrator can run workspace as a distinct stage.
  */
 async function buildBulkInstallContexts(
-  cwd: string,
+  execContext: ExecutionContext,
   options: InstallOptions
 ): Promise<BulkInstallContextsResult> {
+  const cwd = execContext.targetDir;
   const dependencyContexts: InstallationContext[] = [];
 
   // First, try to build workspace root context (run as distinct stage, not in dependency loop)
-  const workspaceContext = await buildWorkspaceRootInstallContext(cwd, options, 'install');
+  const workspaceContext = await buildWorkspaceRootInstallContext(execContext, options, 'install');
 
   // Ensure workspace manifest exists before reading
   await createWorkspacePackageYml(cwd);
@@ -324,12 +327,12 @@ async function buildBulkInstallContexts(
       
       // Phase 5: Create context with base field from manifest if present
       const context: InstallationContext = {
+        execution: execContext,
+        targetDir: execContext.targetDir,
         source,
         mode: 'install',
         options,
         platforms: normalizePlatforms(options.platforms) || [],
-        cwd,
-        targetDir: '.',
         resolvedPackages: [],
         warnings: [],
         errors: []
@@ -354,7 +357,7 @@ async function buildBulkInstallContexts(
  * Build context from a ResourceSpec (Phase 3: Resource Model)
  */
 export async function buildResourceInstallContext(
-  cwd: string,
+  execContext: ExecutionContext,
   resourceSpec: any, // ResourceSpec from resource-arg-parser
   options: InstallOptions
 ): Promise<InstallationContext> {
@@ -389,7 +392,7 @@ export async function buildResourceInstallContext(
     case 'filepath':
       // Local path source
       const absolutePath = resourceSpec.absolutePath!;
-      const relativePath = relative(cwd, absolutePath).replace(/\\/g, '/');
+      const relativePath = relative(execContext.sourceCwd, absolutePath).replace(/\\/g, '/');
       const resourcePath = relativePath.startsWith('..') ? basename(absolutePath) : relativePath;
       source = {
         type: 'path',
@@ -405,12 +408,12 @@ export async function buildResourceInstallContext(
   }
   
   return {
+    execution: execContext,
+    targetDir: execContext.targetDir,
     source,
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
-    cwd,
-    targetDir: '.',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -447,7 +450,7 @@ export function buildResourceInstallContexts(
   resourceSpecs: ResourceInstallationSpec[],
   repoRoot: string
 ): InstallationContext[] {
-  const detectedBase = baseContext.detectedBase ?? baseContext.source.contentRoot ?? baseContext.cwd;
+  const detectedBase = baseContext.detectedBase ?? baseContext.source.contentRoot ?? baseContext.targetDir;
   const baseRelative = baseContext.baseRelative ?? (relative(repoRoot, detectedBase) || '.');
 
   return resourceSpecs.map(spec => {
