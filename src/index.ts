@@ -104,7 +104,7 @@ program
       
       // All commands section - ultra compact
       output += 'All commands:\n\n';
-      output += '    install, uninstall, list,\n';
+      output += '    install, uninstall, list (ls),\n';
       output += '    new, add, remove, set, pack, publish,\n';
       output += '    login, logout\n\n';
       
