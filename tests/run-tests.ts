@@ -26,6 +26,9 @@ const testFiles: string[] = [
   'tests/core/workspace/workspace-index-yml.test.ts',
   'tests/core/workspace/workspace-bootstrap.test.ts',
   
+  // Core - List
+  'tests/core/list/untracked-files.test.ts',
+  
   // Core - Source Resolution
   'tests/core/source-resolution/source-mutability.test.ts',
   'tests/core/source-resolution/source-resolution.test.ts',
@@ -41,6 +44,7 @@ const testFiles: string[] = [
   'tests/commands/status.test.ts',
   'tests/commands/install-plugins-flag.test.ts',
   'tests/commands/install-plugins-integration.test.ts',
+  'tests/commands/list-untracked.test.ts',
   
   // Utils
   'tests/utils/version-selection.test.ts',

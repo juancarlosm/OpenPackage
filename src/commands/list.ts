@@ -12,6 +12,7 @@ interface ListOptions {
   global?: boolean;
   all?: boolean;
   files?: boolean;
+  untracked?: boolean;
 }
 
 // ANSI escape codes for styling
@@ -83,6 +84,50 @@ function printTreeView(
   });
 }
 
+function printUntrackedFiles(
+  result: import('../core/list/untracked-files-scanner.js').UntrackedScanResult,
+  cwd: string
+): void {
+  if (result.totalFiles === 0) {
+    console.log('No untracked files detected.');
+    return;
+  }
+  
+  console.log(`Untracked files in ${cwd}`);
+  console.log(`Found ${result.totalFiles} file(s) matching platform patterns but not tracked in index\n`);
+  
+  // Group by platform
+  const sortedPlatforms = Array.from(result.platformGroups.keys()).sort();
+  
+  for (const platform of sortedPlatforms) {
+    const files = result.platformGroups.get(platform)!;
+    console.log(`${platform}:`);
+    
+    // Sub-group by category
+    const categoryMap = new Map<string, typeof files>();
+    for (const file of files) {
+      if (!categoryMap.has(file.category)) {
+        categoryMap.set(file.category, []);
+      }
+      categoryMap.get(file.category)!.push(file);
+    }
+    
+    // Sort categories
+    const sortedCategories = Array.from(categoryMap.keys()).sort();
+    
+    for (const category of sortedCategories) {
+      const categoryFiles = categoryMap.get(category)!;
+      console.log(`  ${category}/`);
+      
+      for (const file of categoryFiles) {
+        console.log(`    ${dim(file.workspacePath)}`);
+      }
+    }
+    
+    console.log(''); // Empty line between platforms
+  }
+}
+
 async function listCommand(packageName: string | undefined, options: ListOptions, command: Command): Promise<CommandResult> {
   // Get program-level options (for --cwd)
   const programOpts = command.parent?.opts() || {};
@@ -94,15 +139,28 @@ async function listCommand(packageName: string | undefined, options: ListOptions
   });
   
   const displayDir = getDisplayTargetDir(execContext);
-  logger.info(`Listing packages for directory: ${displayDir}`);
+  
+  // Special handling for --untracked
+  if (options.untracked) {
+    logger.info(`Scanning for untracked files in: ${displayDir}`);
+  } else {
+    logger.info(`Listing packages for directory: ${displayDir}`);
+  }
 
   try {
     // Run list pipeline with execution context
     const result = await runListPipeline(packageName, execContext, {
       includeFiles: options.files,
-      all: options.all
+      all: options.all,
+      untracked: options.untracked
     });
     
+    // Handle --untracked output
+    if (options.untracked && result.data?.untrackedFiles) {
+      printUntrackedFiles(result.data.untrackedFiles, displayDir);
+      return { success: true, data: { packages: [], tree: [] } };
+    }
+
     const packages = result.data?.packages ?? [];
     const tree = result.data?.tree ?? [];
     const targetPackage = result.data?.targetPackage;
@@ -157,6 +215,7 @@ export function setupListCommand(program: Command): void {
     .option('-g, --global', 'list packages installed in home directory (~/) instead of current workspace')
     .option('-a, --all', 'show full dependency tree including transitive dependencies')
     .option('-f, --files', 'show files installed from each package')
+    .option('-u, --untracked', 'show files detected by platforms but not tracked in index')
     .action(withErrorHandling(async (packageName: string | undefined, options: ListOptions, command: Command) => {
       await listCommand(packageName, options, command);
     }));

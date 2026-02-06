@@ -11,6 +11,8 @@ import { logger } from '../../utils/logger.js';
 import { getTargetPath } from '../../utils/workspace-index-helpers.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 import { arePackageNamesEquivalent } from '../../utils/package-name.js';
+import { scanUntrackedFiles, type UntrackedScanResult } from './untracked-files-scanner.js';
+import { getWorkspaceIndexPath } from '../../utils/workspace-index-yml.js';
 
 export type PackageSyncState = 'synced' | 'partial' | 'missing';
 
@@ -41,6 +43,8 @@ export interface ListPipelineOptions {
   includeFiles?: boolean;
   /** Build full recursive dependency tree */
   all?: boolean;
+  /** Scan for untracked files that match platform patterns */
+  untracked?: boolean;
 }
 
 export interface ListPipelineResult {
@@ -49,6 +53,8 @@ export interface ListPipelineResult {
   rootPackageNames?: string[];
   /** When a specific package is targeted, this contains its info for the header */
   targetPackage?: ListPackageReport;
+  /** Untracked files scan result (when --untracked option used) */
+  untrackedFiles?: UntrackedScanResult;
 }
 
 /**
@@ -188,10 +194,35 @@ export async function runListPipeline(
   execContext: ExecutionContext,
   options: ListPipelineOptions = {}
 ): Promise<CommandResult<ListPipelineResult>> {
-  const { includeFiles = false, all = false } = options;
+  const { includeFiles = false, all = false, untracked = false } = options;
   
   // Use targetDir for list operations
   const targetDir = execContext.targetDir;
+  const indexPath = getWorkspaceIndexPath(targetDir);
+
+  // For --untracked, only require workspace index (not manifest)
+  if (untracked) {
+    if (!(await exists(indexPath))) {
+      throw new ValidationError(
+        `No workspace index found at ${indexPath}. Cannot scan for untracked files.`
+      );
+    }
+
+    // Run untracked scan and return
+    const untrackedResult = await scanUntrackedFiles(targetDir);
+    
+    return {
+      success: true,
+      data: {
+        packages: [],
+        tree: [],
+        rootPackageNames: [],
+        untrackedFiles: untrackedResult
+      }
+    };
+  }
+
+  // Regular list operation - require both index and manifest
   const openpkgDir = getLocalOpenPackageDir(targetDir);
   const manifestPath = getLocalPackageYmlPath(targetDir);
 
