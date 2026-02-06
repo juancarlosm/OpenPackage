@@ -10,11 +10,12 @@
 import { minimatch } from 'minimatch';
 import { logger } from '../../utils/logger.js';
 import { getPlatformDefinition } from '../platforms.js';
-import { getPatternFromFlow } from './schema-registry.js';
+import { getPatternFromFlow, schemaRegistry } from './schema-registry.js';
 import { applyMapPipeline, createMapContext } from '../flows/map-pipeline/index.js';
 import { defaultTransformRegistry } from '../flows/flow-transforms.js';
 import { splitFrontmatter, dumpYaml } from '../../utils/markdown-frontmatter.js';
 import { basename, dirname, extname } from 'path';
+import { scoreAgainstSchema } from './file-format-detector.js';
 import type { Flow } from '../../types/flows.js';
 import type { 
   PackageFile,
@@ -223,6 +224,32 @@ export function convertSingleFile(
   const matchedFlow = findMatchingFlow(file.path, flows);
   
   if (!matchedFlow) {
+    // Fallback: schema-based flow match
+    // This handles cases where platform-formatted content exists at a universal path
+    // (e.g. Claude-formatted agent in `agents/` rather than `.claude/agents/`).
+    const schemaFlow = findBestSchemaMatchingFlow(file, flows, platformId);
+    if (schemaFlow) {
+      try {
+        const converted = applyFlowToFile(file, schemaFlow, platformId);
+        return {
+          original: file,
+          converted,
+          success: true,
+          appliedFlow: schemaFlow,
+          transformed: true
+        };
+      } catch (error) {
+        logger.error(`Failed to convert file (schema fallback): ${file.path}`, error);
+        return {
+          original: file,
+          success: false,
+          error: error instanceof Error ? error : new Error(String(error)),
+          appliedFlow: schemaFlow,
+          transformed: false
+        };
+      }
+    }
+
     logger.debug(`No matching flow for file: ${file.path}`);
     // No flow matched - return file unchanged (assume already universal)
     return {
@@ -282,6 +309,47 @@ function findMatchingFlow(filePath: string, flows: Flow[]): Flow | null {
   }
   
   return null;
+}
+
+/**
+ * Fallback: Find the best schema-matching flow for a file.
+ *
+ * Uses the flow's `from` schema (if present) to score against frontmatter.
+ * Only considered when glob/path matching fails.
+ */
+function findBestSchemaMatchingFlow(
+  file: PackageFile,
+  flows: Flow[],
+  platformId: PlatformId
+): Flow | null {
+  // Parse frontmatter (if needed)
+  let frontmatter = file.frontmatter;
+  if (!frontmatter && file.content) {
+    const parsed = splitFrontmatter(file.content);
+    frontmatter = parsed.frontmatter || {};
+  }
+
+  if (!frontmatter || Object.keys(frontmatter).length === 0) {
+    return null;
+  }
+
+  let best: { flow: Flow; score: number } | null = null;
+
+  for (const flow of flows) {
+    const schema = schemaRegistry.getSchemaForFlow(flow, 'from');
+    if (!schema) continue;
+
+    const match = scoreAgainstSchema(frontmatter, schema, flow, file.path, platformId);
+
+    // Ignore extremely weak matches to reduce accidental conversions
+    if (match.score <= 0.2) continue;
+
+    if (!best || match.score > best.score) {
+      best = { flow, score: match.score };
+    }
+  }
+
+  return best?.flow ?? null;
 }
 
 /**
@@ -352,7 +420,8 @@ function applyFlowToFile(
   let transformedContent = file.content;
   if (transformedFrontmatter && body !== undefined) {
     const serialized = dumpYaml(transformedFrontmatter);
-    transformedContent = `---\n${serialized}---\n${body}`;
+    const yamlBlock = serialized.endsWith('\n') ? serialized : `${serialized}\n`;
+    transformedContent = `---\n${yamlBlock}---\n${body}`;
   }
   
   return {

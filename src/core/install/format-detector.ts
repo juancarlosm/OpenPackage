@@ -377,6 +377,10 @@ export async function detectEnhancedPackageFormat(
       packageFormat: primaryPlatform,
       detectionMethod: 'package-marker',
       confidence: 1.0,
+      // For marker fast-path, we still need format groups so conversion can run.
+      // Group everything under the detected platform; individual files can be no-ops
+      // if no import flow matches (e.g. plugin manifests).
+      formatGroups: new Map([[primaryPlatform, files.map(f => f.path)]]),
       markers: {
         matchedPatterns: markers.matches.map(m => ({
           platformId: m.platformId,

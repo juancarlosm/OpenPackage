@@ -10,6 +10,7 @@ import { reportResultsPhase } from './phases/report.js';
 import { shouldResolveDependencies, shouldUpdateManifest } from './context-helpers.js';
 import { logger } from '../../../utils/logger.js';
 import { createWorkspacePackageYml } from '../../../utils/package-management.js';
+import { cleanupTempDirectory } from '../strategies/helpers/temp-directory.js';
 
 function assertPipelineContextComplete(ctx: InstallationContext): void {
   if (!ctx.source.type) {
@@ -47,6 +48,7 @@ export async function runUnifiedInstallPipeline(
     packageName: ctx.source.packageName
   });
   
+  let tempConversionRoot: string | null = null;
   try {
     // Phase 0: Ensure workspace manifest exists (auto-create if needed)
     // Only for install mode, not apply mode (apply requires existing installation)
@@ -60,21 +62,24 @@ export async function runUnifiedInstallPipeline(
     // Assert context is complete after load phase
     assertPipelineContextComplete(ctx);
 
-    // Phase 1.5: Convert package format if needed (Phase 4 integration)
-    await convertPhase(ctx);
-
     // Phase 2: Resolve dependencies (skip for apply mode)
     if (shouldResolveDependencies(ctx)) {
       await resolveDependenciesPhase(ctx);
     }
+
+    // Phase 3: Convert package format if needed (Phase 4 integration)
+    // Run AFTER dependency resolution so the final root package contentRoot is updated.
+    await convertPhase(ctx);
+
+    tempConversionRoot = (ctx as any)._tempConversionRoot ?? null;
     
-    // Phase 3: Process conflicts (always)
+    // Phase 4: Process conflicts (always)
     const shouldProceed = await processConflictsPhase(ctx);
     if (!shouldProceed) {
       return createCancellationResult(ctx);
     }
     
-    // Phase 4: Execute installation (always)
+    // Phase 5: Execute installation (always)
     const installResult = await executeInstallationPhase(ctx);
     
     // Check for complete failure
@@ -85,12 +90,12 @@ export async function runUnifiedInstallPipeline(
       };
     }
     
-    // Phase 5: Update manifest (skip for apply)
+    // Phase 6: Update manifest (skip for apply)
     if (shouldUpdateManifest(ctx)) {
       await updateManifestPhase(ctx);
     }
     
-    // Phase 6: Report results (always)
+    // Phase 7: Report results (always)
     return await reportResultsPhase(ctx, installResult);
     
   } catch (error) {
@@ -101,6 +106,9 @@ export async function runUnifiedInstallPipeline(
       error: error instanceof Error ? error.message : String(error),
       warnings: ctx.warnings.length > 0 ? ctx.warnings : undefined
     };
+  } finally {
+    // Cleanup any temp conversion directory created during convert phase
+    await cleanupTempDirectory(tempConversionRoot);
   }
 }
 

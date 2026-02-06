@@ -15,6 +15,10 @@ import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 import type { PackageFile as DetectionPackageFile } from '../../detection-types.js';
+import { minimatch } from 'minimatch';
+import { getPlatformDefinitions, matchesUniversalPattern } from '../../../platforms.js';
+import { getPatternFromFlow } from '../../schema-registry.js';
+import { createTempPackageDirectory, writeTempPackageFiles } from '../../strategies/helpers/temp-directory.js';
 
 /**
  * Convert phase - detect format and pre-convert if needed
@@ -47,7 +51,10 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
   
   try {
     // Load package files
-    const files = await loadPackageFiles(ctx.source.contentRoot);
+    const files = await loadPackageFiles(ctx.source.contentRoot, {
+      targetDir: ctx.targetDir,
+      matchedPattern: ctx.matchedPattern
+    });
     
     if (files.length === 0) {
       logger.warn('No files found in package, skipping conversion');
@@ -90,6 +97,21 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
         fileCount: conversionResult.files.length,
         detectionMethod: conversionResult.formatDetection.detectionMethod
       });
+
+      // IMPORTANT: Downstream installation reads from `contentRoot` on disk (not in-memory pkg.files).
+      // Write converted files to a temp directory and update contentRoot so installers use the converted output.
+      const tempRoot = await createTempPackageDirectory('opkg-preconverted-');
+      await writeTempPackageFiles(conversionResult.files, tempRoot);
+
+      // Track temp dir for cleanup in the pipeline
+      (ctx as any)._tempConversionRoot = tempRoot;
+
+      // Update content roots so installation uses converted files
+      ctx.source.contentRoot = tempRoot;
+      const rootPkg = ctx.resolvedPackages.find((p: any) => p.isRoot);
+      if (rootPkg) {
+        rootPkg.contentRoot = tempRoot;
+      }
       
       // Store converted files in package metadata for downstream use
       if (ctx.resolvedPackages.length > 0) {
@@ -141,10 +163,44 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
  * @param contentRoot - Package content root path
  * @returns Array of package files with paths and content
  */
-async function loadPackageFiles(contentRoot: string): Promise<DetectionPackageFile[]> {
+async function loadPackageFiles(
+  contentRoot: string,
+  opts: { targetDir: string; matchedPattern?: string }
+): Promise<DetectionPackageFile[]> {
   const files: DetectionPackageFile[] = [];
   
-  async function walk(dir: string, baseDir: string): Promise<void> {
+  function isRelevantPath(relPath: string, targetDir: string, matchedPattern?: string): boolean {
+    const normalized = relPath.replace(/\\/g, '/').replace(/^\.\/?/, '');
+    const matchesMatchedPattern = matchedPattern ? minimatch(normalized, matchedPattern) : true;
+    if (!matchesMatchedPattern) {
+      return false;
+    }
+
+    const isUniversal = matchesUniversalPattern(normalized, targetDir);
+    let importMatch: { platformId: string; pattern: string } | null = null;
+
+    if (!isUniversal) {
+      // Platform-specific paths (declared by import flow "from" patterns in platforms.jsonc)
+      const platforms = getPlatformDefinitions(targetDir);
+      for (const [platformId, def] of Object.entries(platforms)) {
+        const importFlows = def.import || [];
+        for (const flow of importFlows) {
+          const pattern = getPatternFromFlow(flow as any, 'from');
+          if (pattern && minimatch(normalized, pattern)) {
+            importMatch = { platformId, pattern };
+            break;
+          }
+        }
+        if (importMatch) break;
+      }
+    }
+
+    const relevant = isUniversal || importMatch !== null;
+
+    return relevant;
+  }
+
+  async function walk(dir: string, baseDir: string, opts: { targetDir: string; matchedPattern?: string }): Promise<void> {
     const entries = await readdir(dir, { withFileTypes: true });
     
     for (const entry of entries) {
@@ -159,12 +215,15 @@ async function loadPackageFiles(contentRoot: string): Promise<DetectionPackageFi
           continue;
         }
         
-        await walk(fullPath, baseDir);
+        await walk(fullPath, baseDir, opts);
       } else {
+        const relativePath = fullPath.substring(baseDir.length + 1).replace(/\\/g, '/');
+        if (!isRelevantPath(relativePath, opts.targetDir, opts.matchedPattern)) {
+          continue;
+        }
         // Load file content
         try {
           const content = await readFile(fullPath, 'utf-8');
-          const relativePath = fullPath.substring(baseDir.length + 1);
           
           files.push({
             path: relativePath,
@@ -177,7 +236,7 @@ async function loadPackageFiles(contentRoot: string): Promise<DetectionPackageFi
     }
   }
   
-  await walk(contentRoot, contentRoot);
+  await walk(contentRoot, contentRoot, opts);
   
   return files;
 }
