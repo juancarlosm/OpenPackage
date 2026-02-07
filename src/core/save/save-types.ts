@@ -59,6 +59,12 @@ export interface SaveCandidate {
   
   /** Whether the file is markdown */
   isMarkdown?: boolean;
+  
+  /** Merge strategy used during installation (for workspace files) */
+  mergeStrategy?: 'deep' | 'shallow' | 'replace' | 'composite';
+  
+  /** Keys contributed by this package (for merged files) */
+  mergeKeys?: string[];
 }
 
 /**

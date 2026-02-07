@@ -1,4 +1,6 @@
 import { FILE_PATTERNS } from '../../constants/index.js';
+import { calculateConvertedHash, convertSourceToWorkspace } from './save-conversion-helper.js';
+import { logger } from '../../utils/logger.js';
 import type { SaveCandidate, SaveCandidateGroup, ResolutionStrategy } from './save-types.js';
 
 /**
@@ -80,12 +82,14 @@ export interface ConflictAnalysis {
  * 
  * @param group - The candidate group to analyze
  * @param force - Whether force mode is enabled (auto-select newest)
+ * @param workspaceRoot - Workspace root for conversion context
  * @returns Complete conflict analysis with recommended strategy
  */
-export function analyzeGroup(
+export async function analyzeGroup(
   group: SaveCandidateGroup,
-  force: boolean
-): ConflictAnalysis {
+  force: boolean,
+  workspaceRoot: string
+): Promise<ConflictAnalysis> {
   const registryPath = group.registryPath;
   const hasLocal = !!group.local;
   const workspaceCandidates = group.workspace;
@@ -122,15 +126,39 @@ export function analyzeGroup(
     };
   }
   
-  // Deduplicate workspace candidates by content hash
-  // Multiple workspace files with identical content are treated as one
-  const uniqueWorkspace = deduplicateCandidates(workspaceCandidates);
+  // Deduplicate workspace candidates by converted content hash (merge-aware)
+  // Multiple workspace files with identical content (after conversion/extraction) are treated as one
+  const uniqueWorkspace = await deduplicateCandidatesWithMerge(workspaceCandidates, workspaceRoot);
   
-  // Check if workspace content is identical to source
+  // Check if workspace content is identical to source (after conversion)
   // Only applicable when there's exactly one unique workspace candidate
   const localMatchesWorkspace = hasLocal && uniqueWorkspace.length === 1 
-    ? uniqueWorkspace[0].contentHash === group.local!.contentHash
+    ? await checkConvertedParity(uniqueWorkspace[0], group.local!, workspaceRoot)
     : false;
+  
+  if (hasLocal && uniqueWorkspace.length > 1) {
+    const parityResults = await Promise.all(
+      uniqueWorkspace.map(async candidate => ({
+        workspacePath: candidate.displayPath,
+        platform: candidate.platform || 'none',
+        matchesLocal: await checkConvertedParity(candidate, group.local!, workspaceRoot)
+      }))
+    );
+    
+    if (parityResults.every(result => result.matchesLocal)) {
+      return {
+        registryPath,
+        type: 'no-change-needed',
+        workspaceCandidateCount,
+        uniqueWorkspaceCandidates: uniqueWorkspace,
+        hasLocalCandidate: hasLocal,
+        localMatchesWorkspace: true,
+        isRootFile,
+        hasPlatformCandidates,
+        recommendedStrategy: 'skip'
+      };
+    }
+  }
   
   // No change needed: workspace content is identical to source
   if (localMatchesWorkspace) {
@@ -180,26 +208,140 @@ export function analyzeGroup(
 }
 
 /**
- * Deduplicate candidates by content hash
+ * Check if workspace candidate matches local candidate after conversion
  * 
- * Returns only candidates with unique content, preserving the order of first occurrence.
- * This is useful when multiple workspace locations contain identical files.
+ * Helper function for conversion-aware and merge-aware parity checking.
+ * For merged files, extracts package contribution before comparing.
+ * For platform-specific files, converts workspace content to universal format before comparing.
+ * 
+ * @param workspace - Workspace candidate
+ * @param local - Local (source) candidate
+ * @param workspaceRoot - Workspace root for conversion
+ * @returns True if converted hashes match
+ */
+async function checkConvertedParity(
+  workspace: SaveCandidate,
+  local: SaveCandidate,
+  workspaceRoot: string
+): Promise<boolean> {
+  // Check if this is a merged file
+  if (workspace.mergeStrategy && workspace.mergeKeys && workspace.mergeKeys.length > 0) {
+    const { extractPackageContribution, extractContentByKeys } = await import('./save-merge-extractor.js');
+    const extractResult = await extractPackageContribution(workspace);
+    
+    if (extractResult.success && extractResult.extractedHash) {
+      if (workspace.platform && workspace.platform !== 'ai') {
+        const forward = await convertSourceToWorkspace(
+          local.content,
+          workspace.platform as any,
+          local.registryPath,
+          workspace.displayPath,
+          workspaceRoot
+        );
+        if (forward.success && forward.convertedContent) {
+          const localConvertedExtract = await extractContentByKeys(
+            forward.convertedContent,
+            workspace.mergeKeys
+          );
+          if (localConvertedExtract.success && localConvertedExtract.extractedHash) {
+            return extractResult.extractedHash === localConvertedExtract.extractedHash;
+          }
+        }
+      }
+      const localExtract = await extractContentByKeys(local.content, workspace.mergeKeys);
+      if (localExtract.success && localExtract.extractedHash) {
+        return extractResult.extractedHash === localExtract.extractedHash;
+      }
+      return extractResult.extractedHash === local.contentHash;
+    }
+    // If extraction failed, fall through to conversion
+  }
+  
+  // Otherwise, use conversion-based comparison
+  const convertedHash = await calculateConvertedHash(workspace, workspaceRoot);
+  return convertedHash === local.contentHash;
+}
+
+/**
+ * Deduplicate candidates by converted content hash (merge-aware)
+ * 
+ * Returns only candidates with unique content after conversion to universal format.
+ * For merged files, extracts package contribution before deduplication.
+ * This enables proper deduplication of platform-specific files that are semantically identical.
  * 
  * **Example**:
  * ```
  * Input: [
- *   { hash: "abc", path: ".cursor/tools/search.md" },
- *   { hash: "abc", path: ".claude/tools/search.md" },  // duplicate hash
- *   { hash: "def", path: ".windsurf/tools/search.md" }
+ *   { hash: "abc", path: ".cursor/mcp.json", platform: "cursor" },
+ *   { hash: "def", path: ".claude/.mcp.json", platform: "claude" },  // different raw hash
+ *   { hash: "ghi", path: ".windsurf/mcp.json", platform: "windsurf" }
  * ]
+ * After conversion to universal format, cursor and claude both convert to same hash "xyz"
  * Output: [
- *   { hash: "abc", path: ".cursor/tools/search.md" },  // first occurrence
- *   { hash: "def", path: ".windsurf/tools/search.md" }
+ *   { hash: "abc", path: ".cursor/mcp.json", platform: "cursor" },  // first occurrence
+ *   { hash: "ghi", path: ".windsurf/mcp.json", platform: "windsurf" }
  * ]
  * ```
  * 
  * @param candidates - Array of candidates to deduplicate
- * @returns Array of candidates with unique content hashes
+ * @param workspaceRoot - Workspace root for conversion context
+ * @returns Array of candidates with unique converted content hashes
+ */
+async function deduplicateCandidatesWithMerge(
+  candidates: SaveCandidate[],
+  workspaceRoot: string
+): Promise<SaveCandidate[]> {
+  const seen = new Set<string>();
+  const unique: SaveCandidate[] = [];
+  
+  for (const candidate of candidates) {
+    // For merged files, try to extract package contribution first
+    let hash = candidate.contentHash;
+    let usedMergeExtraction = false;
+    
+    if (candidate.mergeStrategy && candidate.mergeKeys && candidate.mergeKeys.length > 0) {
+      const { extractPackageContribution } = await import('./save-merge-extractor.js');
+      const extractResult = await extractPackageContribution(candidate);
+      
+      if (extractResult.success && extractResult.extractedHash) {
+        hash = extractResult.extractedHash;
+        usedMergeExtraction = true;
+      } else {
+        // Fall back to conversion
+        hash = await calculateConvertedHash(candidate, workspaceRoot);
+      }
+    } else {
+      // Use converted hash for deduplication
+      hash = await calculateConvertedHash(candidate, workspaceRoot);
+    }
+    
+    logger.debug(
+      `Dedup check for ${candidate.displayPath}: hash=${hash}, ` +
+      `rawHash=${candidate.contentHash}, seen=${seen.has(hash)}`
+    );
+    
+    if (seen.has(hash)) {
+      logger.debug(`  Skipping duplicate: ${candidate.displayPath}`);
+      continue;
+    }
+    seen.add(hash);
+    unique.push(candidate);
+  }
+  
+  logger.debug(`Deduplication: ${candidates.length} → ${unique.length} unique candidates`);
+  
+  return unique;
+}
+
+/**
+ * Deduplicate candidates by converted content hash (sync version for backward compatibility)
+ * 
+ * This is a simplified synchronous version that doesn't handle merge extraction.
+ * Used by existing tests. For production code, use the merge-aware async version
+ * via analyzeGroup.
+ * 
+ * @param candidates - Array of candidates to deduplicate
+ * @returns Array of candidates with unique raw content hashes
  */
 export function deduplicateCandidates(
   candidates: SaveCandidate[]
@@ -208,10 +350,12 @@ export function deduplicateCandidates(
   const unique: SaveCandidate[] = [];
   
   for (const candidate of candidates) {
-    if (seen.has(candidate.contentHash)) {
+    const hash = candidate.contentHash;
+    
+    if (seen.has(hash)) {
       continue;
     }
-    seen.add(candidate.contentHash);
+    seen.add(hash);
     unique.push(candidate);
   }
   

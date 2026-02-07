@@ -36,12 +36,14 @@ import type { SaveCandidate, SaveCandidateGroup, ResolutionResult } from './save
  * @param group - The candidate group being resolved
  * @param analysis - Conflict analysis with recommended strategy
  * @param packageRoot - Package source absolute path (for parity checking)
+ * @param workspaceRoot - Workspace root for conversion
  * @returns ResolutionResult with selection and platform-specific candidates, or null if skip
  */
 export async function executeResolution(
   group: SaveCandidateGroup,
   analysis: ConflictAnalysis,
-  packageRoot: string
+  packageRoot: string,
+  workspaceRoot: string
 ): Promise<ResolutionResult | null> {
   const strategy = analysis.recommendedStrategy;
   
@@ -70,7 +72,8 @@ export async function executeResolution(
         sortedCandidates,
         analysis.isRootFile,
         group,
-        packageRoot
+        packageRoot,
+        workspaceRoot
       );
     
     default:
@@ -198,6 +201,7 @@ function resolveForce(
  * @param isRootFile - Whether this is a root package file
  * @param group - Complete candidate group (for parity checking)
  * @param packageRoot - Package source absolute path (for parity checking)
+ * @param workspaceRoot - Workspace root for conversion
  * @returns ResolutionResult with user selections
  */
 async function resolveInteractive(
@@ -205,14 +209,16 @@ async function resolveInteractive(
   candidates: SaveCandidate[],
   isRootFile: boolean,
   group: SaveCandidateGroup,
-  packageRoot: string
+  packageRoot: string,
+  workspaceRoot: string
 ): Promise<ResolutionResult> {
   const result = await resolveInteractively({
     registryPath,
     workspaceCandidates: candidates,
     isRootFile,
     group,
-    packageRoot
+    packageRoot,
+    workspaceRoot
   });
   
   return {

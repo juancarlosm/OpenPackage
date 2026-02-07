@@ -14,7 +14,7 @@
  * - Parses markdown frontmatter when applicable
  */
 
-import { join } from 'path';
+import { join, relative } from 'path';
 import { exists, getStats, readTextFile, walkFiles } from '../../utils/fs.js';
 import { calculateFileHash } from '../../utils/hash-utils.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
@@ -61,6 +61,8 @@ interface BuildCandidateOptions {
   workspaceRoot: string;
   inferPlatform?: boolean;
   parseMarkdown?: boolean;
+  mergeStrategy?: 'deep' | 'shallow' | 'replace' | 'composite';
+  mergeKeys?: string[];
 }
 
 /**
@@ -77,16 +79,6 @@ export async function buildCandidates(
 ): Promise<CandidateBuildResult> {
   const errors: CandidateBuildError[] = [];
   
-  // Extract all registry paths from mappings
-  const mappedRegistryPaths = Object.keys(options.filesMapping);
-  
-  // Build local candidates (from package source)
-  logger.debug(`Building local candidates from package source`);
-  const localCandidates = await buildLocalCandidates(
-    options.packageRoot,
-    mappedRegistryPaths
-  );
-  
   // Build workspace candidates (from workspace paths)
   logger.debug(`Building workspace candidates from workspace paths`);
   const { candidates: workspaceCandidates, errors: workspaceErrors } = await buildWorkspaceCandidates(
@@ -96,6 +88,13 @@ export async function buildCandidates(
   );
   
   errors.push(...workspaceErrors);
+  
+  // Build local candidates by discovering all files in source
+  // This way we don't depend on workspace index keys matching source file names
+  logger.debug(`Building local candidates from package source (discovery mode)`);
+  const localCandidates = await buildLocalCandidatesFromSource(
+    options.packageRoot
+  );
   
   logger.debug(
     `Built ${localCandidates.length} local candidates, ${workspaceCandidates.length} workspace candidates`
@@ -109,36 +108,37 @@ export async function buildCandidates(
 }
 
 /**
- * Build local (source) candidates for mapped registry paths only
+ * Build local (source) candidates by discovering all files in source directory
  * 
- * Only loads files that exist in the index mapping - we don't discover
- * unmapped files in the source.
+ * Discovers all files in the package source, creating candidates for each.
+ * This approach doesn't depend on workspace index keys matching source file names.
  * 
  * @param packageRoot - Absolute path to package root
- * @param mappedRegistryPaths - Registry paths from workspace index
  * @returns Array of local candidates
  */
-async function buildLocalCandidates(
-  packageRoot: string,
-  mappedRegistryPaths: string[]
+async function buildLocalCandidatesFromSource(
+  packageRoot: string
 ): Promise<SaveCandidate[]> {
   const candidates: SaveCandidate[] = [];
   
-  for (const rawKey of mappedRegistryPaths) {
-    const normalizedKey = normalizePathForProcessing(rawKey);
-    if (!normalizedKey) continue;
+  // Walk all files in package source
+  for await (const absPath of walkFiles(packageRoot)) {
+    const relPath = relative(packageRoot, absPath);
+    const normalizedPath = normalizePathForProcessing(relPath);
     
-    // Skip directory keys - we'll enumerate their contents separately
-    if (normalizedKey.endsWith('/')) continue;
+    if (!normalizedPath) continue;
     
-    const absLocal = join(packageRoot, normalizedKey);
-    if (!(await exists(absLocal))) {
-      // File doesn't exist in source yet - this is fine (will be created)
-      logger.debug(`Local file not found (will be created): ${normalizedKey}`);
+    // Skip .openpackage directory and openpackage.yml (metadata, not content)
+    if (normalizedPath.startsWith('.openpackage/') || normalizedPath === 'openpackage.yml') {
       continue;
     }
     
-    const candidate = await buildCandidate('local', absLocal, normalizedKey, {
+    // Skip hidden/temp files (except platform-specific like .cursor, .claude)
+    if (normalizedPath.startsWith('.') && !normalizedPath.match(/^\.(cursor|claude|opencode|windsurf|roo|factory|kilo|qwen|warp|codex|pi|kilocode|agent|augment)/)) {
+      continue;
+    }
+    
+    const candidate = await buildCandidate('local', absPath, normalizedPath, {
       packageRoot,
       workspaceRoot: packageRoot, // Not used for local candidates
       inferPlatform: false, // Local candidates don't have platform inference
@@ -147,7 +147,7 @@ async function buildLocalCandidates(
     
     if (candidate) {
       candidates.push(candidate);
-      logger.debug(`Built local candidate: ${normalizedKey}`);
+      logger.debug(`Built local candidate: ${normalizedPath}`);
     }
   }
   
@@ -186,6 +186,11 @@ async function buildWorkspaceCandidates(
       
       const absTargetPath = join(workspaceRoot, normalizedTargetPath);
       
+      // Extract merge metadata if present
+      const mergeMetadata = typeof mapping === 'object' && mapping !== null
+        ? { merge: mapping.merge, keys: mapping.keys }
+        : undefined;
+      
       if (isDirectoryMapping) {
         // Directory mapping: enumerate all files under the directory
         logger.debug(`Enumerating directory mapping: ${registryKey} -> ${normalizedTargetPath}`);
@@ -202,7 +207,9 @@ async function buildWorkspaceCandidates(
               packageRoot,
               workspaceRoot,
               inferPlatform: true,
-              parseMarkdown: true
+              parseMarkdown: true,
+              mergeStrategy: mergeMetadata?.merge,
+              mergeKeys: mergeMetadata?.keys
             });
             
             if (candidate) {
@@ -231,7 +238,9 @@ async function buildWorkspaceCandidates(
           packageRoot,
           workspaceRoot,
           inferPlatform: true,
-          parseMarkdown: true
+          parseMarkdown: true,
+          mergeStrategy: mergeMetadata?.merge,
+          mergeKeys: mergeMetadata?.keys
         });
         
         if (candidate) {
@@ -331,7 +340,9 @@ async function buildCandidate(
       frontmatter,
       rawFrontmatter,
       markdownBody,
-      isMarkdown
+      isMarkdown,
+      mergeStrategy: options.mergeStrategy,
+      mergeKeys: options.mergeKeys
     };
     
     return candidate;

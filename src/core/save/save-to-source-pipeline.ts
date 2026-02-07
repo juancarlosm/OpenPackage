@@ -26,6 +26,7 @@ import { analyzeGroup } from './save-conflict-analyzer.js';
 import { executeResolution } from './save-resolution-executor.js';
 import { pruneExistingPlatformCandidates } from './save-platform-handler.js';
 import { writeResolution } from './save-write-coordinator.js';
+import { clearConversionCache } from './save-conversion-helper.js';
 import {
   buildSaveReport,
   createCommandResult,
@@ -77,93 +78,99 @@ export async function runSaveToSourcePipeline(
   packageName: string | undefined,
   options: SaveToSourceOptions = {}
 ): Promise<CommandResult> {
-  // Phase 1: Validate preconditions
-  logger.debug(`Validating save preconditions for ${packageName}`);
-  const validation = await validateSavePreconditions(packageName);
-  if (!validation.valid) {
-    return createErrorResult(validation.error!);
-  }
-  
-  const { cwd, packageRoot, filesMapping } = validation;
-  
-  // Phase 2: Build candidates from workspace and source
-  logger.debug(`Building candidates for ${packageName}`);
-  const candidateResult = await buildCandidates({
-    packageRoot: packageRoot!,
-    workspaceRoot: cwd!,
-    filesMapping: filesMapping!
-  });
-  
-  if (candidateResult.errors.length > 0) {
-    logger.warn(`Encountered ${candidateResult.errors.length} error(s) building candidates`);
-    candidateResult.errors.forEach(err =>
-      logger.warn(`  ${err.path}: ${err.reason}`)
-    );
-  }
-  
-  // Phase 3: Build candidate groups (organize by registry path)
-  logger.debug('Building candidate groups');
-  const allGroups = buildCandidateGroups(
-    candidateResult.localCandidates,
-    candidateResult.workspaceCandidates
-  );
-  
-  // Phase 4: Prune platform-specific candidates with existing files
-  logger.debug('Pruning existing platform-specific files');
-  await pruneExistingPlatformCandidates(packageRoot!, allGroups);
-  
-  // Phase 5: Filter to groups with workspace candidates
-  const activeGroups = filterGroupsWithWorkspace(allGroups);
-  
-  if (activeGroups.length === 0) {
-    logger.info(`No workspace changes detected for ${packageName}`);
-    return createSuccessResult(
-      packageName!,
-      `✓ Saved ${packageName}\n  No workspace changes detected`
-    );
-  }
-  
-  logger.debug(`Processing ${activeGroups.length} group(s) with workspace candidates`);
-  
-  // Phase 6: Analyze groups and execute resolutions
-  const analyses: ConflictAnalysis[] = [];
-  const allWriteResults: WriteResult[][] = [];
-  
-  for (const group of activeGroups) {
-    // Analyze the group
-    const analysis = analyzeGroup(group, options.force ?? false);
-    analyses.push(analysis);
-    
-    // Skip if no action needed
-    if (analysis.type === 'no-action-needed' || analysis.type === 'no-change-needed') {
-      logger.debug(`Skipping ${group.registryPath}: ${analysis.type}`);
-      continue;
+  try {
+    // Phase 1: Validate preconditions
+    logger.debug(`Validating save preconditions for ${packageName}`);
+    const validation = await validateSavePreconditions(packageName);
+    if (!validation.valid) {
+      return createErrorResult(validation.error!);
     }
     
-    // Execute resolution strategy (pass packageRoot for parity checking)
-    const resolution = await executeResolution(group, analysis, packageRoot!);
-    if (!resolution) {
-      logger.debug(`No resolution returned for ${group.registryPath}`);
-      continue;
+    const { cwd, packageRoot, filesMapping } = validation;
+    
+    // Phase 2: Build candidates from workspace and source
+    logger.debug(`Building candidates for ${packageName}`);
+    const candidateResult = await buildCandidates({
+      packageRoot: packageRoot!,
+      workspaceRoot: cwd!,
+      filesMapping: filesMapping!
+    });
+    
+    if (candidateResult.errors.length > 0) {
+      logger.warn(`Encountered ${candidateResult.errors.length} error(s) building candidates`);
+      candidateResult.errors.forEach(err =>
+        logger.warn(`  ${err.path}: ${err.reason}`)
+      );
     }
     
-    // Write resolved content to source
-    const writeResults = await writeResolution(
-      packageRoot!,
-      group.registryPath,
-      resolution,
-      group.local
-    );
+    // Phase 3: Build candidate groups (organize by registry path)
+    logger.debug('Building candidate groups');
+    const allGroups = buildCandidateGroups(
+      candidateResult.localCandidates,
+      candidateResult.workspaceCandidates,
+      cwd!    );
     
-    allWriteResults.push(writeResults);
+    // Phase 4: Prune platform-specific candidates with existing files
+    logger.debug('Pruning existing platform-specific files');
+    await pruneExistingPlatformCandidates(packageRoot!, allGroups);
+    
+    // Phase 5: Filter to groups with workspace candidates
+    const activeGroups = filterGroupsWithWorkspace(allGroups);
+    
+    if (activeGroups.length === 0) {
+      logger.info(`No workspace changes detected for ${packageName}`);
+      return createSuccessResult(
+        packageName!,
+        `✓ Saved ${packageName}\n  No workspace changes detected`
+      );
+    }
+    
+    logger.debug(`Processing ${activeGroups.length} group(s) with workspace candidates`);
+    
+    // Phase 6: Analyze groups and execute resolutions
+    const analyses: ConflictAnalysis[] = [];
+    const allWriteResults: WriteResult[][] = [];
+    
+    for (const group of activeGroups) {
+      // Analyze the group (conversion-aware)
+      const analysis = await analyzeGroup(group, options.force ?? false, cwd!);
+      analyses.push(analysis);
+      
+      // Skip if no action needed
+      if (analysis.type === 'no-action-needed' || analysis.type === 'no-change-needed') {
+        logger.debug(`Skipping ${group.registryPath}: ${analysis.type}`);
+        continue;
+      }
+      
+      // Execute resolution strategy (pass packageRoot and workspaceRoot)
+      const resolution = await executeResolution(group, analysis, packageRoot!, cwd!);
+      if (!resolution) {
+        logger.debug(`No resolution returned for ${group.registryPath}`);
+        continue;
+      }
+      
+      // Write resolved content to source (pass workspaceRoot for import transformations)
+      const writeResults = await writeResolution(
+        packageRoot!,
+        group.registryPath,
+        resolution,
+        group.local,
+        cwd!
+      );
+      
+      allWriteResults.push(writeResults);
+    }
+    
+    // Phase 7: Build and format report
+    logger.debug('Building save report');
+    const report = buildSaveReport(packageName!, analyses, allWriteResults);
+    
+    // Phase 8: Return result
+    return createCommandResult(report);
+  } finally {
+    // Clear conversion cache to free memory
+    clearConversionCache();
   }
-  
-  // Phase 7: Build and format report
-  logger.debug('Building save report');
-  const report = buildSaveReport(packageName!, analyses, allWriteResults);
-  
-  // Phase 8: Return result
-  return createCommandResult(report);
 }
 
 /**
