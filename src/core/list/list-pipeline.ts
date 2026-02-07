@@ -77,13 +77,19 @@ async function checkPackageStatus(
   entry: WorkspaceIndexPackage,
   includeFileList: boolean = false
 ): Promise<ListPackageReport> {
+  const totalTargets = entry.files
+    ? Object.values(entry.files).reduce((s, arr) => s + (Array.isArray(arr) ? arr.length : 0), 0)
+    : 0;
   const resolved = resolveDeclaredPath(entry.path, targetDir);
   const sourceRoot = resolved.absolute;
 
   // Check if source path exists
   const sourceExists = await exists(sourceRoot);
-  
-  if (!sourceExists) {
+
+  // When source path is gone but we have workspace file mappings, determine state from
+  // workspace targets instead of marking the package missing (e.g. index.path was a temp dir).
+  const canDeriveFromFiles = totalTargets > 0;
+  if (!sourceExists && !canDeriveFromFiles) {
     return {
       name: pkgName,
       version: entry.version,
@@ -114,7 +120,6 @@ async function checkPackageStatus(
       if (fileExists) {
         existingFiles++;
       }
-      
       if (includeFileList) {
         fileList.push({
           source: sourceKey,
