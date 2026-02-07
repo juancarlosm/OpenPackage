@@ -3,6 +3,7 @@ import { performIndexBasedInstallationPhases } from '../../operations/installati
 import { displayDependencyTree } from '../../../dependency-resolver/display.js';
 import { resolvePlatforms } from '../../platform-resolution.js';
 import { logger } from '../../../../utils/logger.js';
+import { splitPackageNameForTelemetry } from '../../../../utils/plugin-naming.js';
 
 export interface ExecutionResult {
   installedCount: number;
@@ -66,26 +67,36 @@ export async function executeInstallationPhase(
   // Record telemetry for successful installations
   if (installedAnyFiles && ctx.execution.telemetryCollector) {
     for (const pkg of ctx.resolvedPackages) {
+      // Split package name into base name and resource path
+      // This handles cases like "gh@user/repo/agents/designer" -> base: "gh@user/repo", path: "agents/designer"
+      const { baseName, resourcePath: nameResourcePath } = splitPackageNameForTelemetry(pkg.name);
+      
+      // Determine the actual resource path to send
+      // Priority: ctx.matchedPattern > nameResourcePath (extracted from package name)
+      const resourcePath = ctx.matchedPattern || nameResourcePath;
+      
       // Determine resource type
       let resourceType: string | undefined;
       if (pkg.marketplaceMetadata) {
         resourceType = 'plugin';
-      } else if (ctx.matchedPattern) {
-        // Check if this was an agent or skill based on pattern
-        if (ctx.matchedPattern.includes('agent')) {
+      } else if (resourcePath) {
+        // Check if this was an agent or skill based on resource path
+        if (resourcePath.includes('agent')) {
           resourceType = 'agent';
-        } else if (ctx.matchedPattern.includes('skill')) {
+        } else if (resourcePath.includes('skill')) {
           resourceType = 'skill';
         }
       }
       
-      // Extract resource name from package name
-      const resourceName = pkg.name.split('/').pop() || pkg.name;
+      // Extract resource name from resource path or package name
+      const resourceName = resourcePath 
+        ? resourcePath.split('/').pop()?.replace(/\.(md|json)$/, '') || pkg.name.split('/').pop() || pkg.name
+        : pkg.name.split('/').pop() || pkg.name;
       
       ctx.execution.telemetryCollector.recordInstall({
-        packageName: pkg.name,
+        packageName: baseName,  // Send base package name (e.g., "gh@user/repo")
         version: pkg.version,
-        resourcePath: ctx.matchedPattern,
+        resourcePath,           // Send resource path separately (e.g., "agents/designer")
         resourceType,
         resourceName,
         marketplaceName: pkg.marketplaceMetadata?.pluginName,
