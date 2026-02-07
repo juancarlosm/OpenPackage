@@ -68,6 +68,21 @@
         }
       }
     },
+    "flowPatternWithSchema": {
+      "type": "object",
+      "description": "Flow pattern with optional schema reference for format detection",
+      "required": ["pattern"],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "File pattern (supports glob patterns and {name} placeholders)"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Explicit path to JSON Schema file for format detection (relative to platforms.jsonc). Example: './schemas/formats/claude-agent.schema.json'"
+        }
+      }
+    },
     "flow": {
       "type": "object",
       "description": "Defines a transformation from source to target",
@@ -80,10 +95,17 @@
               "description": "Source file pattern (supports glob patterns and {name} placeholders)"
             },
             {
+              "$ref": "#/definitions/flowPatternWithSchema",
+              "description": "Pattern with optional schema reference for format detection"
+            },
+            {
               "type": "array",
               "description": "Array of source patterns with priority (first match wins)",
               "items": {
-                "type": "string"
+                "oneOf": [
+                  { "type": "string" },
+                  { "$ref": "#/definitions/flowPatternWithSchema" }
+                ]
               },
               "minItems": 1
             },
@@ -98,6 +120,10 @@
             {
               "type": "string",
               "description": "Single target path"
+            },
+            {
+              "$ref": "#/definitions/flowPatternWithSchema",
+              "description": "Pattern with optional schema reference for format detection"
             },
             {
               "type": "object",
@@ -242,7 +268,16 @@
               }
             },
             "default": {
-              "type": "string",
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Default target path if no pattern matches"
+                },
+                {
+                  "$ref": "#/definitions/flowPatternWithSchema",
+                  "description": "Default target path with schema for format detection"
+                }
+              ],
               "description": "Optional default value if no pattern matches"
             }
           }
@@ -267,8 +302,16 @@
           ]
         },
         "value": {
-          "type": "string",
-          "description": "Target path to use if pattern matches"
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Target path to use if pattern matches"
+            },
+            {
+              "$ref": "#/definitions/flowPatternWithSchema",
+              "description": "Target path with schema for format detection"
+            }
+          ]
         }
       }
     },

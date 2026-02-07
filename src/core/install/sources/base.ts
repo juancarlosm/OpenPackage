@@ -1,6 +1,8 @@
 import type { PackageYml, ExecutionContext } from '../../../types/index.js';
 import type { PackageSource } from '../unified/context.js';
 import type { InstallOptions } from '../../../types/index.js';
+import type { EnhancedPackageFormat } from '../detection-types.js';
+import type { ConversionContext } from '../conversion-context.js';
 
 /**
  * Result of loading a package from a source
@@ -40,6 +42,24 @@ export interface LoadedPackage {
     /** Base detection result (for resource model) */
     baseDetection?: any;
   };
+  
+  /**
+   * Format detection metadata (Phase 4)
+   * Set by conversion coordinator after format detection
+   */
+  formatDetection?: EnhancedPackageFormat;
+  
+  /**
+   * Whether package was pre-converted (Phase 4)
+   * True if package was converted from platform format to universal
+   */
+  preConverted?: boolean;
+  
+  /**
+   * Conversion context (Phase 4)
+   * Contains conversion metadata and statistics
+   */
+  conversionContext?: ConversionContext;
 }
 
 /**

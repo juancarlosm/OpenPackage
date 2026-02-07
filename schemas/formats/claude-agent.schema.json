@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openpackage.dev/schemas/formats/claude-agent.schema.json",
+  "title": "Claude Code Agent Frontmatter",
+  "description": "Claude Code specific agent frontmatter format. Derived from platforms.jsonc Claude import/export map transformations.",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string",
+      "x-detection-weight": 0.1
+    },
+    "tools": {
+      "type": "string",
+      "description": "Comma-separated capitalized tool names (e.g., 'Read, Write, Bash')",
+      "x-detection-weight": 0.4
+    },
+    "model": {
+      "type": "string",
+      "description": "Claude shorthand (sonnet, opus, haiku) or claude-* model ID",
+      "x-detection-weight": 0.2
+    },
+    "permissionMode": {
+      "enum": ["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"],
+      "description": "Claude-specific permission mode",
+      "x-detection-weight": 0.5,
+      "x-exclusive": true
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Claude-specific lifecycle hooks",
+      "x-detection-weight": 0.4,
+      "x-exclusive": true
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Claude-specific skills to load",
+      "x-detection-weight": 0.3,
+      "x-exclusive": true
+    },
+    "disallowedTools": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Claude-specific tool blacklist",
+      "x-detection-weight": 0.3,
+      "x-exclusive": true
+    }
+  },
+  "x-detection": {
+    "platform": "claude"
+  }
+}

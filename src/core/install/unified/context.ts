@@ -139,4 +139,14 @@ export interface InstallationContext {
     base: string;
     startIndex: number;
   }>;
+  
+  // === Format detection and conversion (Phase 4) ===
+  /** Format detection result (set during load phase) */
+  formatDetection?: import('../detection-types.js').EnhancedPackageFormat;
+  
+  /** Whether package was pre-converted to universal format */
+  wasPreConverted?: boolean;
+  
+  /** Conversion errors (non-fatal, logged but don't stop installation) */
+  conversionErrors?: Error[];
 }

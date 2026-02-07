@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openpackage.dev/schemas/formats/opencode-agent.schema.json",
+  "title": "OpenCode Agent Frontmatter",
+  "description": "OpenCode specific agent frontmatter format. Derived from platforms.jsonc OpenCode import/export map transformations.",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string",
+      "x-detection-weight": 0.1
+    },
+    "tools": {
+      "type": "object",
+      "description": "Object format with tool names as keys and boolean values (e.g., { read: true, write: true })",
+      "additionalProperties": { "type": "boolean" },
+      "x-detection-weight": 0.4
+    },
+    "model": {
+      "type": "string",
+      "description": "Provider-prefixed model ID (e.g., 'anthropic/claude-3.5-sonnet')",
+      "x-detection-weight": 0.2
+    },
+    "permissions": {
+      "type": "object",
+      "x-detection-weight": 0.2
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "OpenCode-specific temperature setting",
+      "x-detection-weight": 0.3,
+      "x-exclusive": true
+    },
+    "maxSteps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "OpenCode-specific max iterations",
+      "x-detection-weight": 0.3,
+      "x-exclusive": true
+    },
+    "disabled": {
+      "type": "boolean",
+      "description": "OpenCode-specific disable flag",
+      "x-detection-weight": 0.2,
+      "x-exclusive": true
+    },
+    "mode": {
+      "enum": ["primary", "subagent", "all"],
+      "description": "OpenCode-specific agent mode",
+      "x-detection-weight": 0.3,
+      "x-exclusive": true
+    },
+    "prompt": {
+      "type": "string",
+      "description": "OpenCode-specific external prompt path",
+      "x-detection-weight": 0.2,
+      "x-exclusive": true
+    }
+  },
+  "x-detection": {
+    "platform": "opencode"
+  }
+}

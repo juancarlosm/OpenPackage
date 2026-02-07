@@ -267,6 +267,27 @@ export function validatePlatformsConfig(config: PlatformsConfig): string[] {
 }
 
 /**
+ * Extract pattern string from flow field (handles string, array, and pattern object)
+ */
+function extractPatternString(field: any): string | null {
+  if (typeof field === 'string') {
+    return field;
+  }
+  if (typeof field === 'object' && field !== null) {
+    if ('pattern' in field) {
+      return field.pattern;
+    }
+    if ('$switch' in field) {
+      return null; // Skip switch expressions
+    }
+  }
+  if (Array.isArray(field) && field.length > 0) {
+    return extractPatternString(field[0]);
+  }
+  return null;
+}
+
+/**
  * Validate global flows configuration
  */
 function validateGlobalFlowsConfig(config: GlobalFlowsConfig): string[] {
@@ -309,6 +330,35 @@ function isSwitchExpression(value: any): boolean {
   );
 }
 
+/**
+ * Check if a value is a pattern object (with pattern and optional schema)
+ */
+function isPatternObject(value: any): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'pattern' in value &&
+    typeof value.pattern === 'string'
+  );
+}
+
+/**
+ * Validate a pattern object
+ */
+function validatePatternObject(value: any, context: string): string[] {
+  const errors: string[] = [];
+  
+  if (typeof value.pattern !== 'string' || value.pattern.trim() === '') {
+    errors.push(`${context}: pattern must be non-empty string`);
+  }
+  
+  if ('schema' in value && typeof value.schema !== 'string') {
+    errors.push(`${context}: schema must be string if provided`);
+  }
+  
+  return errors;
+}
+
 function validateFlows(flows: Flow[], context: string): string[] {
   const errors: string[] = []
   
@@ -318,18 +368,39 @@ function validateFlows(flows: Flow[], context: string): string[] {
     // Required fields
     if (!flow.from) {
       errors.push(`${context}, flows[${i}]: Missing 'from' field`)
-    } else if (typeof flow.from !== 'string' && !Array.isArray(flow.from) && !isSwitchExpression(flow.from)) {
-      errors.push(`${context}, flows[${i}]: 'from' must be string, array of strings, or $switch expression`)
-    } else if (typeof flow.from === 'string' && flow.from.trim() === '') {
-      errors.push(`${context}, flows[${i}]: 'from' cannot be empty`)
-    } else if (Array.isArray(flow.from) && (flow.from.length === 0 || flow.from.some(p => typeof p !== 'string' || p.trim() === ''))) {
-      errors.push(`${context}, flows[${i}]: 'from' array must contain non-empty strings`)
+    } else if (typeof flow.from === 'string') {
+      if (flow.from.trim() === '') {
+        errors.push(`${context}, flows[${i}]: 'from' cannot be empty`)
+      }
+    } else if (Array.isArray(flow.from)) {
+      if (flow.from.length === 0) {
+        errors.push(`${context}, flows[${i}]: 'from' array cannot be empty`)
+      }
+      flow.from.forEach((p, j) => {
+        if (typeof p === 'string') {
+          if (p.trim() === '') {
+            errors.push(`${context}, flows[${i}]: 'from' array item ${j} cannot be empty string`)
+          }
+        } else if (isPatternObject(p)) {
+          errors.push(...validatePatternObject(p, `${context}, flows[${i}].from[${j}]`))
+        } else {
+          errors.push(`${context}, flows[${i}]: 'from' array item ${j} must be string or pattern object`)
+        }
+      })
+    } else if (isSwitchExpression(flow.from)) {
+      // Switch expression validation happens elsewhere
+    } else if (isPatternObject(flow.from)) {
+      errors.push(...validatePatternObject(flow.from, `${context}, flows[${i}].from`))
+    } else {
+      errors.push(`${context}, flows[${i}]: 'from' must be string, array, pattern object, or $switch expression`)
     }
     
     if (!flow.to) {
       errors.push(`${context}, flows[${i}]: Missing 'to' field`)
-    } else if (typeof flow.to !== 'string' && typeof flow.to !== 'object') {
-      errors.push(`${context}, flows[${i}]: 'to' must be string or object`)
+    } else if (typeof flow.to === 'string') {
+      if (flow.to.trim() === '') {
+        errors.push(`${context}, flows[${i}]: 'to' cannot be empty`)
+      }
     } else if (isSwitchExpression(flow.to)) {
       // Validate switch expression structure
       const switchValidation = validateSwitchExpression(flow.to as any);
@@ -338,6 +409,17 @@ function validateFlows(flows: Flow[], context: string): string[] {
           errors.push(`${context}, flows[${i}]: ${err}`);
         });
       }
+    } else if (isPatternObject(flow.to)) {
+      errors.push(...validatePatternObject(flow.to, `${context}, flows[${i}].to`))
+    } else if (typeof flow.to === 'object') {
+      // Multi-target flows - validate each target
+      for (const [targetPath, targetFlow] of Object.entries(flow.to)) {
+        if (typeof targetPath !== 'string' || targetPath.trim() === '') {
+          errors.push(`${context}, flows[${i}].to: target path cannot be empty`)
+        }
+      }
+    } else {
+      errors.push(`${context}, flows[${i}]: 'to' must be string, pattern object, switch expression, or multi-target object`)
     }
     
     // Validate merge strategy
@@ -467,15 +549,10 @@ export function getPlatformsState(targetDir?: string | null): PlatformsState {
     // Collect all 'from' patterns from export flows
     if (def.export && def.export.length > 0) {
       for (const flow of def.export) {
-        // Skip switch expressions
-        if (typeof flow.from === 'object' && '$switch' in flow.from) {
-          continue;
-        }
-        // For array patterns, add all patterns
-        if (Array.isArray(flow.from)) {
-          flow.from.forEach((p: string) => universalPatterns.add(p));
-        } else {
-          universalPatterns.add(flow.from);
+        // Extract pattern string using helper
+        const pattern = extractPatternString(flow.from);
+        if (pattern) {
+          universalPatterns.add(pattern);
         }
       }
     }
@@ -488,15 +565,10 @@ export function getPlatformsState(targetDir?: string | null): PlatformsState {
   // Add patterns from global export flows
   if (globalExportFlows && globalExportFlows.length > 0) {
     for (const flow of globalExportFlows) {
-      // Skip switch expressions
-      if (typeof flow.from === 'object' && '$switch' in flow.from) {
-        continue;
-      }
-      // For array patterns, add all patterns
-      if (Array.isArray(flow.from)) {
-        flow.from.forEach((p: string) => universalPatterns.add(p));
-      } else {
-        universalPatterns.add(flow.from);
+      // Extract pattern string using helper
+      const pattern = extractPatternString(flow.from);
+      if (pattern) {
+        universalPatterns.add(pattern);
       }
     }
   }
@@ -783,13 +855,10 @@ function buildDirectoryPaths(
   // Build from export flows (the flows that define workspace structure)
   if (definition.export && definition.export.length > 0) {
     for (const flow of definition.export) {
-      // Skip switch expressions
-      if (typeof flow.from === 'object' && '$switch' in flow.from) {
-        continue;
-      }
-      // Extract universal subdir from 'from' pattern
-      // For array patterns, use the first pattern
-      const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
+      // Extract pattern from 'from' field
+      const fromPattern = extractPatternString(flow.from);
+      if (!fromPattern) continue;
+      
       const firstComponent = fromPattern.split('/')[0]
       
       // Skip if it's a file (contains extension) or already exists
@@ -970,13 +1039,11 @@ export function getPlatformSubdirExts(
     const extensions = new Set<string>()
     
     for (const flow of definition.export) {
-      // Skip switch expressions
-      if (typeof flow.from === 'object' && '$switch' in flow.from) {
-        continue;
-      }
+      // Extract pattern from 'from' field
+      const fromPattern = extractPatternString(flow.from);
+      if (!fromPattern) continue;
+      
       // Check if this flow matches the universal subdir
-      // For array patterns, use the first pattern
-      const fromPattern = Array.isArray(flow.from) ? flow.from[0] : flow.from;
       if (fromPattern.startsWith(`${universalSubdir}/`)) {
         // Extract extension from the 'from' pattern
         const extMatch = fromPattern.match(/\.[^./]+$/)
