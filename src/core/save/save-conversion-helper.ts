@@ -23,9 +23,41 @@ import { calculateFileHash } from '../../utils/hash-utils.js';
 import { ensureDir, writeTextFile, readTextFile, exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { minimatch } from 'minimatch';
+import { extractPackageContribution } from './save-merge-extractor.js';
 import type { SaveCandidate } from './save-types.js';
 import type { Platform } from '../platforms.js';
 import type { Flow, FlowContext } from '../../types/flows.js';
+
+let sharedTempDir: string | null = null;
+let tempDirCounter = 0;
+
+export async function initSharedTempDir(): Promise<void> {
+  if (!sharedTempDir) {
+    sharedTempDir = await mkdtemp(join(tmpdir(), 'opkg-save-'));
+  }
+}
+
+export async function cleanupSharedTempDir(): Promise<void> {
+  if (sharedTempDir) {
+    try {
+      await rm(sharedTempDir, { recursive: true, force: true });
+    } catch (error) {
+      logger.debug('Failed to cleanup shared temp directory', { tempDir: sharedTempDir, error });
+    }
+    sharedTempDir = null;
+    tempDirCounter = 0;
+  }
+}
+
+export async function allocateTempSubdir(): Promise<string> {
+  if (!sharedTempDir) {
+    const standalone = await mkdtemp(join(tmpdir(), 'opkg-save-standalone-'));
+    return standalone;
+  }
+  const subDir = join(sharedTempDir, `op-${tempDirCounter++}`);
+  await ensureDir(subDir);
+  return subDir;
+}
 
 /**
  * Conversion result with success status
@@ -120,8 +152,6 @@ export async function convertWorkspaceToUniversal(
   registryPath: string,
   workspaceRoot: string
 ): Promise<ConversionResult> {
-  let tempDir: string | null = null;
-  
   try {
     // Get platform definition and import flows
     const platformDef = getPlatformDefinition(platform, workspaceRoot);
@@ -154,7 +184,7 @@ export async function convertWorkspaceToUniversal(
     }
     
     // Create temporary directory for conversion
-    tempDir = await mkdtemp(join(tmpdir(), 'opkg-save-convert-'));
+    const tempDir = await allocateTempSubdir();
     const inputDir = join(tempDir, 'in');
     const outputDir = join(tempDir, 'out');
     await ensureDir(inputDir);
@@ -248,15 +278,6 @@ export async function convertWorkspaceToUniversal(
       success: false,
       error: error instanceof Error ? error.message : String(error)
     };
-  } finally {
-    // Cleanup temp directory
-    if (tempDir) {
-      try {
-        await rm(tempDir, { recursive: true, force: true });
-      } catch (error) {
-        logger.debug('Failed to cleanup conversion temp directory', { tempDir, error });
-      }
-    }
   }
 }
 
@@ -446,8 +467,6 @@ export async function convertSourceToWorkspace(
   workspacePath: string,
   workspaceRoot: string
 ): Promise<ConversionResult> {
-  let tempDir: string | null = null;
-  
   try {
     // Get platform definition and export flows
     const platformDef = getPlatformDefinition(platform, workspaceRoot);
@@ -480,7 +499,7 @@ export async function convertSourceToWorkspace(
     
     
     // Create temporary directory for conversion
-    tempDir = await mkdtemp(join(tmpdir(), 'opkg-save-forward-'));
+    const tempDir = await allocateTempSubdir();
     const inputDir = join(tempDir, 'in');
     const outputDir = join(tempDir, 'out');
     await ensureDir(inputDir);
@@ -563,15 +582,6 @@ export async function convertSourceToWorkspace(
       success: false,
       error: error instanceof Error ? error.message : String(error)
     };
-  } finally {
-    // Cleanup temp directory
-    if (tempDir) {
-      try {
-        await rm(tempDir, { recursive: true, force: true });
-      } catch (error) {
-        logger.debug('Failed to cleanup forward conversion temp directory', { tempDir, error });
-      }
-    }
   }
 }
 
@@ -622,6 +632,41 @@ function findMatchingExportFlow(
   }
   
   return undefined;
+}
+
+/**
+ * Compute and cache the comparable hash for a candidate.
+ * 
+ * For merged files, extracts the package contribution first.
+ * For platform-specific files, converts to universal format.
+ * The result is cached on `candidate.comparableHash` for reuse.
+ */
+export async function ensureComparableHash(
+  candidate: SaveCandidate,
+  workspaceRoot: string
+): Promise<string> {
+  if (candidate.comparableHash !== undefined) {
+    return candidate.comparableHash;
+  }
+
+  let hash = candidate.contentHash;
+
+  if (candidate.mergeStrategy && candidate.mergeKeys && candidate.mergeKeys.length > 0) {
+    const extractResult = await extractPackageContribution(candidate);
+    if (extractResult.success && extractResult.extractedHash) {
+      hash = extractResult.extractedHash;
+      if (extractResult.extractedContent) {
+        candidate.extractedContent = extractResult.extractedContent;
+      }
+    } else {
+      hash = await calculateConvertedHash(candidate, workspaceRoot);
+    }
+  } else {
+    hash = await calculateConvertedHash(candidate, workspaceRoot);
+  }
+
+  candidate.comparableHash = hash;
+  return hash;
 }
 
 /**

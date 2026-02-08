@@ -22,7 +22,7 @@ import { inferPlatformFromWorkspaceFile } from '../platforms.js';
 import { logger } from '../../utils/logger.js';
 import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
 import { getTargetPath } from '../../utils/workspace-index-helpers.js';
-import type { SaveCandidate, SaveCandidateSource, CandidateBuildError } from './save-types.js';
+import type { SaveCandidate, SaveCandidateSource, CandidateBuildError, LocalSourceRef } from './save-types.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';
 
 /**
@@ -43,8 +43,11 @@ export interface CandidateBuilderOptions {
  * Result of candidate building process
  */
 export interface CandidateBuildResult {
-  /** Candidates from package source */
+  /** Candidates from package source (empty when using lazy path via localSourceRefs) */
   localCandidates: SaveCandidate[];
+  
+  /** Lightweight refs for local source files (used for lazy materialization) */
+  localSourceRefs: LocalSourceRef[];
   
   /** Candidates from workspace */
   workspaceCandidates: SaveCandidate[];
@@ -89,69 +92,68 @@ export async function buildCandidates(
   
   errors.push(...workspaceErrors);
   
-  // Build local candidates by discovering all files in source
-  // This way we don't depend on workspace index keys matching source file names
-  logger.debug(`Building local candidates from package source (discovery mode)`);
-  const localCandidates = await buildLocalCandidatesFromSource(
+  // Build lightweight local source refs (no file reads)
+  logger.debug(`Building local source refs from package source (lazy mode)`);
+  const localSourceRefs = await buildLocalSourceRefs(
     options.packageRoot
   );
   
   logger.debug(
-    `Built ${localCandidates.length} local candidates, ${workspaceCandidates.length} workspace candidates`
+    `Built ${localSourceRefs.length} local source refs, ${workspaceCandidates.length} workspace candidates`
   );
   
   return {
-    localCandidates,
+    localCandidates: [],
+    localSourceRefs,
     workspaceCandidates,
     errors
   };
 }
 
 /**
- * Build local (source) candidates by discovering all files in source directory
- * 
- * Discovers all files in the package source, creating candidates for each.
- * This approach doesn't depend on workspace index keys matching source file names.
- * 
- * @param packageRoot - Absolute path to package root
- * @returns Array of local candidates
+ * Build lightweight local source refs by discovering all files in source directory.
+ * Only captures path metadata (registryPath, fullPath) without reading content.
  */
-async function buildLocalCandidatesFromSource(
+async function buildLocalSourceRefs(
   packageRoot: string
-): Promise<SaveCandidate[]> {
-  const candidates: SaveCandidate[] = [];
+): Promise<LocalSourceRef[]> {
+  const refs: LocalSourceRef[] = [];
   
-  // Walk all files in package source
   for await (const absPath of walkFiles(packageRoot)) {
     const relPath = relative(packageRoot, absPath);
     const normalizedPath = normalizePathForProcessing(relPath);
     
     if (!normalizedPath) continue;
     
-    // Skip .openpackage directory and openpackage.yml (metadata, not content)
     if (normalizedPath.startsWith('.openpackage/') || normalizedPath === 'openpackage.yml') {
       continue;
     }
     
-    // Skip hidden/temp files (except platform-specific like .cursor, .claude)
     if (normalizedPath.startsWith('.') && !normalizedPath.match(/^\.(cursor|claude|opencode|windsurf|roo|factory|kilo|qwen|warp|codex|pi|kilocode|agent|augment)/)) {
       continue;
     }
     
-    const candidate = await buildCandidate('local', absPath, normalizedPath, {
-      packageRoot,
-      workspaceRoot: packageRoot, // Not used for local candidates
-      inferPlatform: false, // Local candidates don't have platform inference
-      parseMarkdown: true
-    });
-    
-    if (candidate) {
-      candidates.push(candidate);
-      logger.debug(`Built local candidate: ${normalizedPath}`);
-    }
+    refs.push({ registryPath: normalizedPath, fullPath: absPath });
+    logger.debug(`Built local source ref: ${normalizedPath}`);
   }
   
-  return candidates;
+  return refs;
+}
+
+/**
+ * Materialize a full SaveCandidate from a lightweight LocalSourceRef.
+ * Reads file content, hash, stats, and frontmatter on demand.
+ */
+export async function materializeLocalCandidate(
+  ref: LocalSourceRef,
+  packageRoot: string
+): Promise<SaveCandidate | null> {
+  return buildCandidate('local', ref.fullPath, ref.registryPath, {
+    packageRoot,
+    workspaceRoot: packageRoot,
+    inferPlatform: false,
+    parseMarkdown: true
+  });
 }
 
 /**

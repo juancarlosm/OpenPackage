@@ -60,7 +60,7 @@ export async function pruneExistingPlatformCandidates(
   for (const group of groups) {
     // No local file means no platform files could exist yet
     // Skip pruning for new files
-    if (!group.local) {
+    if (!group.local && !group.localRef) {
       continue;
     }
     

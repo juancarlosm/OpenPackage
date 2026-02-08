@@ -201,10 +201,12 @@ export function createErrorResult(error: string): CommandResult {
 export function formatSaveMessage(report: SaveReport): string {
   const lines: string[] = [];
   
-  // Header
+  if (report.filesSaved === 0 && report.errors.length === 0) {
+    return `✓ Saved ${report.packageName}\n  No changes detected`;
+  }
+  
   lines.push(`✓ Saved ${report.packageName}`);
   
-  // File counts (conditionally show if non-zero)
   if (report.filesCreated > 0) {
     lines.push(`  ${report.filesCreated} file(s) created`);
   }
@@ -213,17 +215,14 @@ export function formatSaveMessage(report: SaveReport): string {
     lines.push(`  ${report.filesUpdated} file(s) updated`);
   }
   
-  // Platform-specific files (show if non-zero)
   if (report.platformSpecificFiles > 0) {
     lines.push(`  ${report.platformSpecificFiles} platform-specific file(s)`);
   }
   
-  // Interactive resolutions (show if non-zero)
   if (report.interactiveResolutions > 0) {
     lines.push(`  ${report.interactiveResolutions} interactive resolution(s)`);
   }
   
-  // Errors (show if any)
   if (report.errors.length > 0) {
     lines.push('');
     lines.push(`⚠️  ${report.errors.length} error(s) occurred:`);
@@ -232,9 +231,29 @@ export function formatSaveMessage(report: SaveReport): string {
     });
   }
   
-  // If nothing happened, show zero message
-  if (report.filesSaved === 0 && report.errors.length === 0) {
-    return `✓ Saved ${report.packageName}\n  No changes detected`;
+  const successfulWrites = report.writeResults.filter(r => r.success);
+  if (successfulWrites.length > 0) {
+    lines.push('');
+    lines.push('  Files saved:');
+    
+    const sorted = [...successfulWrites].sort((a, b) =>
+      a.operation.registryPath.localeCompare(b.operation.registryPath)
+    );
+    
+    for (const result of sorted) {
+      const { registryPath, isPlatformSpecific, platform } = result.operation;
+      const label = isPlatformSpecific && platform
+        ? `${registryPath} (${platform})`
+        : `${registryPath} (universal)`;
+      lines.push(`   ├── ${label}`);
+    }
+  }
+  
+  if (report.filesSaved > 0) {
+    lines.push('');
+    lines.push('💡 Changes saved to package source.');
+    lines.push('   To sync changes to workspace, run:');
+    lines.push(`     opkg install ${report.packageName}`);
   }
   
   return lines.join('\n');

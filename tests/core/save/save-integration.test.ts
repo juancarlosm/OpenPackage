@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync, rmSync } from 'fs';
-import { buildCandidates } from '../../../src/core/save/save-candidate-builder.js';
+import { buildCandidates, materializeLocalCandidate } from '../../../src/core/save/save-candidate-builder.js';
 import { buildCandidateGroups, filterGroupsWithWorkspace } from '../../../src/core/save/save-group-builder.js';
 import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
 
@@ -95,13 +95,13 @@ import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
     });
 
     // Verify candidates built correctly
-    expect(candidatesResult.localCandidates.length).toBeGreaterThan(0);
+    expect(candidatesResult.localSourceRefs.length).toBeGreaterThan(0);
     expect(candidatesResult.workspaceCandidates.length).toBeGreaterThan(0);
     expect(candidatesResult.errors).toHaveLength(0);
 
     // Group candidates
     const allGroups = buildCandidateGroups(
-      candidatesResult.localCandidates,
+      candidatesResult.localSourceRefs,
       candidatesResult.workspaceCandidates
     );
 
@@ -111,17 +111,17 @@ import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
     // Check specific groups
     const generalGroup = allGroups.find(g => g.registryPath === 'rules/general.md');
     expect(generalGroup).toBeDefined();
-    expect(generalGroup!.local).toBeDefined();
+    expect(generalGroup!.localRef).toBeDefined();
     expect(generalGroup!.workspace).toHaveLength(2); // cursor + claude
 
     const typescriptGroup = allGroups.find(g => g.registryPath === 'rules/typescript.md');
     expect(typescriptGroup).toBeDefined();
-    expect(typescriptGroup!.local).toBeUndefined(); // New file
+    expect(typescriptGroup!.localRef).toBeUndefined(); // New file
     expect(typescriptGroup!.workspace).toHaveLength(1);
 
     const agentsGroup = allGroups.find(g => g.registryPath === 'AGENTS.md');
     expect(agentsGroup).toBeDefined();
-    expect(agentsGroup!.local).toBeDefined();
+    expect(agentsGroup!.localRef).toBeDefined();
     expect(agentsGroup!.workspace).toHaveLength(1);
 
     // Filter to only groups with workspace candidates
@@ -150,7 +150,7 @@ import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
     });
 
     // Group
-    const groups = buildCandidateGroups(result.localCandidates, result.workspaceCandidates);
+    const groups = buildCandidateGroups(result.localSourceRefs, result.workspaceCandidates);
     const activeGroups = filterGroupsWithWorkspace(groups);
 
     // Verify
@@ -189,7 +189,7 @@ This is a test rule.`;
     });
 
     // Group
-    const groups = buildCandidateGroups(result.localCandidates, result.workspaceCandidates);
+    const groups = buildCandidateGroups(result.localSourceRefs, result.workspaceCandidates);
     const activeGroups = filterGroupsWithWorkspace(groups);
 
     // Verify
@@ -230,7 +230,7 @@ This is a test rule.`;
     });
 
     // Group
-    const groups = buildCandidateGroups(result.localCandidates, result.workspaceCandidates);
+    const groups = buildCandidateGroups(result.localSourceRefs, result.workspaceCandidates);
     const activeGroups = filterGroupsWithWorkspace(groups);
 
     // Verify
@@ -264,7 +264,7 @@ This is a test rule.`;
     });
 
     // Group
-    const groups = buildCandidateGroups(result.localCandidates, result.workspaceCandidates);
+    const groups = buildCandidateGroups(result.localSourceRefs, result.workspaceCandidates);
     const activeGroups = filterGroupsWithWorkspace(groups);
 
     // Verify - both candidates should have same hash
@@ -328,7 +328,7 @@ This is a test rule.`;
       });
 
       const allGroups = buildCandidateGroups(
-        candidateResult.localCandidates,
+        candidateResult.localSourceRefs,
         candidateResult.workspaceCandidates
       );
       const activeGroups = filterGroupsWithWorkspace(allGroups);
@@ -343,9 +343,16 @@ This is a test rule.`;
       // Both candidates should remain (no platform files exist in source)
       expect(activeGroups[0].workspace).toHaveLength(2);
 
+      // Materialize local candidates for analysis
+      for (const group of activeGroups) {
+        if (group.localRef && !group.local) {
+          group.local = await materializeLocalCandidate(group.localRef, join(testDir, 'package-source')) ?? undefined;
+        }
+      }
+
       // Phase 2: Analyze conflicts
       const { analyzeGroup } = await import('../../../src/core/save/save-conflict-analyzer.js');
-      const analysis = analyzeGroup(activeGroups[0], false);
+      const analysis = await analyzeGroup(activeGroups[0], false, join(testDir, 'workspace'));
 
       // Should be needs-resolution (multiple differing candidates)
       expect(analysis.type).toBe('needs-resolution');
@@ -400,7 +407,7 @@ This is a test rule.`;
       });
 
       const allGroups = buildCandidateGroups(
-        candidateResult.localCandidates,
+        candidateResult.localSourceRefs,
         candidateResult.workspaceCandidates
       );
       const activeGroups = filterGroupsWithWorkspace(allGroups);
@@ -458,12 +465,12 @@ This is a test rule.`;
       });
 
       const allGroups = buildCandidateGroups(
-        candidateResult.localCandidates,
+        candidateResult.localSourceRefs,
         candidateResult.workspaceCandidates
       );
       const activeGroups = filterGroupsWithWorkspace(allGroups);
 
-      const analysis = analyzeGroup(activeGroups[0], false);
+      const analysis = await analyzeGroup(activeGroups[0], false, join(testDir, 'workspace'));
 
       // Should auto-resolve (all candidates identical after dedup)
       expect(analysis.type).toBe('auto-write');

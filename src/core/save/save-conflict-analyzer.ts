@@ -1,5 +1,6 @@
 import { FILE_PATTERNS } from '../../constants/index.js';
-import { calculateConvertedHash, convertSourceToWorkspace } from './save-conversion-helper.js';
+import { calculateConvertedHash, convertSourceToWorkspace, ensureComparableHash } from './save-conversion-helper.js';
+import { extractPackageContribution, extractContentByKeys } from './save-merge-extractor.js';
 import { logger } from '../../utils/logger.js';
 import type { SaveCandidate, SaveCandidateGroup, ResolutionStrategy } from './save-types.js';
 
@@ -224,42 +225,35 @@ async function checkConvertedParity(
   local: SaveCandidate,
   workspaceRoot: string
 ): Promise<boolean> {
-  // Check if this is a merged file
+  const workspaceHash = await ensureComparableHash(workspace, workspaceRoot);
+
   if (workspace.mergeStrategy && workspace.mergeKeys && workspace.mergeKeys.length > 0) {
-    const { extractPackageContribution, extractContentByKeys } = await import('./save-merge-extractor.js');
-    const extractResult = await extractPackageContribution(workspace);
-    
-    if (extractResult.success && extractResult.extractedHash) {
-      if (workspace.platform && workspace.platform !== 'ai') {
-        const forward = await convertSourceToWorkspace(
-          local.content,
-          workspace.platform as any,
-          local.registryPath,
-          workspace.displayPath,
-          workspaceRoot
+    if (workspace.platform && workspace.platform !== 'ai') {
+      const forward = await convertSourceToWorkspace(
+        local.content,
+        workspace.platform as any,
+        local.registryPath,
+        workspace.displayPath,
+        workspaceRoot
+      );
+      if (forward.success && forward.convertedContent) {
+        const localConvertedExtract = await extractContentByKeys(
+          forward.convertedContent,
+          workspace.mergeKeys
         );
-        if (forward.success && forward.convertedContent) {
-          const localConvertedExtract = await extractContentByKeys(
-            forward.convertedContent,
-            workspace.mergeKeys
-          );
-          if (localConvertedExtract.success && localConvertedExtract.extractedHash) {
-            return extractResult.extractedHash === localConvertedExtract.extractedHash;
-          }
+        if (localConvertedExtract.success && localConvertedExtract.extractedHash) {
+          return workspaceHash === localConvertedExtract.extractedHash;
         }
       }
-      const localExtract = await extractContentByKeys(local.content, workspace.mergeKeys);
-      if (localExtract.success && localExtract.extractedHash) {
-        return extractResult.extractedHash === localExtract.extractedHash;
-      }
-      return extractResult.extractedHash === local.contentHash;
     }
-    // If extraction failed, fall through to conversion
+    const localExtract = await extractContentByKeys(local.content, workspace.mergeKeys);
+    if (localExtract.success && localExtract.extractedHash) {
+      return workspaceHash === localExtract.extractedHash;
+    }
+    return workspaceHash === local.contentHash;
   }
-  
-  // Otherwise, use conversion-based comparison
-  const convertedHash = await calculateConvertedHash(workspace, workspaceRoot);
-  return convertedHash === local.contentHash;
+
+  return workspaceHash === local.contentHash;
 }
 
 /**
@@ -293,33 +287,15 @@ async function deduplicateCandidatesWithMerge(
 ): Promise<SaveCandidate[]> {
   const seen = new Set<string>();
   const unique: SaveCandidate[] = [];
-  
+
   for (const candidate of candidates) {
-    // For merged files, try to extract package contribution first
-    let hash = candidate.contentHash;
-    let usedMergeExtraction = false;
-    
-    if (candidate.mergeStrategy && candidate.mergeKeys && candidate.mergeKeys.length > 0) {
-      const { extractPackageContribution } = await import('./save-merge-extractor.js');
-      const extractResult = await extractPackageContribution(candidate);
-      
-      if (extractResult.success && extractResult.extractedHash) {
-        hash = extractResult.extractedHash;
-        usedMergeExtraction = true;
-      } else {
-        // Fall back to conversion
-        hash = await calculateConvertedHash(candidate, workspaceRoot);
-      }
-    } else {
-      // Use converted hash for deduplication
-      hash = await calculateConvertedHash(candidate, workspaceRoot);
-    }
-    
+    const hash = await ensureComparableHash(candidate, workspaceRoot);
+
     logger.debug(
       `Dedup check for ${candidate.displayPath}: hash=${hash}, ` +
       `rawHash=${candidate.contentHash}, seen=${seen.has(hash)}`
     );
-    
+
     if (seen.has(hash)) {
       logger.debug(`  Skipping duplicate: ${candidate.displayPath}`);
       continue;
@@ -327,9 +303,8 @@ async function deduplicateCandidatesWithMerge(
     seen.add(hash);
     unique.push(candidate);
   }
-  
+
   logger.debug(`Deduplication: ${candidates.length} → ${unique.length} unique candidates`);
-  
   return unique;
 }
 
@@ -340,6 +315,7 @@ async function deduplicateCandidatesWithMerge(
  * Used by existing tests. For production code, use the merge-aware async version
  * via analyzeGroup.
  * 
+ * @deprecated For backward compatibility with tests only.
  * @param candidates - Array of candidates to deduplicate
  * @returns Array of candidates with unique raw content hashes
  */

@@ -8,6 +8,15 @@
 import type { Platform } from '../platforms.js';
 
 /**
+ * Lightweight reference to a local source file (path metadata only, no content).
+ * Used during the grouping phase to avoid reading file content eagerly.
+ */
+export interface LocalSourceRef {
+  registryPath: string;
+  fullPath: string;
+}
+
+/**
  * Source type for a save candidate
  * - 'local': File exists in package source
  * - 'workspace': File exists in workspace
@@ -65,6 +74,12 @@ export interface SaveCandidate {
   
   /** Keys contributed by this package (for merged files) */
   mergeKeys?: string[];
+  
+  /** Cached comparable hash (after conversion/extraction), computed once */
+  comparableHash?: string;
+
+  /** Cached extracted content (for merged files), computed once */
+  extractedContent?: string;
 }
 
 /**
@@ -78,8 +93,11 @@ export interface SaveCandidateGroup {
   /** The canonical registry path for this group */
   registryPath: string;
   
-  /** Optional local (source) candidate */
+  /** Optional local (source) candidate (materialized on demand) */
   local?: SaveCandidate;
+  
+  /** Lightweight local source reference (set during grouping, before materialization) */
+  localRef?: LocalSourceRef;
   
   /** Array of workspace candidates (may be empty, single, or multiple) */
   workspace: SaveCandidate[];

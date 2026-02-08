@@ -16,12 +16,11 @@
  */
 
 import { dirname, join } from 'path';
-import { tmpdir } from 'os';
-import { mkdtemp, rm } from 'fs/promises';
 import { ensureDir, exists, readTextFile, writeTextFile } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { createPlatformSpecificRegistryPath } from '../../utils/platform-specific-paths.js';
 import { extractPackageContribution } from './save-merge-extractor.js';
+import { allocateTempSubdir } from './save-conversion-helper.js';
 import { getPlatformDefinition, getGlobalImportFlows, type Platform } from '../platforms.js';
 import { createFlowExecutor } from '../flows/flow-executor.js';
 import { calculateFileHash } from '../../utils/hash-utils.js';
@@ -273,8 +272,6 @@ async function applyImportTransformation(
   workspacePath: string,
   workspaceRoot: string
 ): Promise<{ success: boolean; transformedContent?: string; reason?: string }> {
-  let tempDir: string | null = null;
-  
   try {
     // Get platform definition and import flows
     const platformDef = getPlatformDefinition(platform, workspaceRoot);
@@ -314,7 +311,7 @@ async function applyImportTransformation(
     }
     
     // Create temporary directory for transformation
-    tempDir = await mkdtemp(join(tmpdir(), 'opkg-save-transform-'));
+    const tempDir = await allocateTempSubdir();
     const inputDir = join(tempDir, 'in');
     const outputDir = join(tempDir, 'out');
     await ensureDir(inputDir);
@@ -396,15 +393,6 @@ async function applyImportTransformation(
       success: false,
       reason: error instanceof Error ? error.message : String(error)
     };
-  } finally {
-    // Cleanup temp directory
-    if (tempDir) {
-      try {
-        await rm(tempDir, { recursive: true, force: true });
-      } catch (error) {
-        logger.debug('Failed to cleanup transformation temp directory', { tempDir, error });
-      }
-    }
   }
 }
 

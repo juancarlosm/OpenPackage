@@ -10,7 +10,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { ensureDir, writeTextFile, exists, readTextFile } from '../../../src/utils/fs.js';
-import { buildCandidates } from '../../../src/core/save/save-candidate-builder.js';
+import { buildCandidates, materializeLocalCandidate } from '../../../src/core/save/save-candidate-builder.js';
 import { buildCandidateGroups } from '../../../src/core/save/save-group-builder.js';
 import { analyzeGroup } from '../../../src/core/save/save-conflict-analyzer.js';
 import type { WorkspaceIndexFileMapping } from '../../../src/types/workspace-index.js';
@@ -86,7 +86,7 @@ describe('save-merged-file-parity', () => {
       });
       
       expect(candidateResult.errors).toHaveLength(0);
-      expect(candidateResult.localCandidates).toHaveLength(1);
+      expect(candidateResult.localSourceRefs).toHaveLength(1);
       expect(candidateResult.workspaceCandidates).toHaveLength(1);
       
       // Verify merge metadata was extracted
@@ -96,7 +96,7 @@ describe('save-merged-file-parity', () => {
       
       // Build groups
       const groups = buildCandidateGroups(
-        candidateResult.localCandidates,
+        candidateResult.localSourceRefs,
         candidateResult.workspaceCandidates,
         workspaceRoot
       );
@@ -104,8 +104,13 @@ describe('save-merged-file-parity', () => {
       expect(groups).toHaveLength(1);
       const group = groups[0];
       expect(group.registryPath).toBe('mcp.json');
-      expect(group.local).toBeDefined();
+      expect(group.localRef).toBeDefined();
       expect(group.workspace).toHaveLength(1);
+      
+      // Materialize local candidate for analysis
+      if (group.localRef) {
+        group.local = await materializeLocalCandidate(group.localRef, packageRoot) ?? undefined;
+      }
       
       // Analyze group - should detect no change needed
       const analysis = await analyzeGroup(group, false, workspaceRoot);
@@ -186,12 +191,17 @@ describe('save-merged-file-parity', () => {
       
       // Build groups
       const groups = buildCandidateGroups(
-        candidateResult.localCandidates,
+        candidateResult.localSourceRefs,
         candidateResult.workspaceCandidates,
         workspaceRoot
       );
       
       const group = groups[0];
+      
+      // Materialize local candidate for analysis
+      if (group.localRef) {
+        group.local = await materializeLocalCandidate(group.localRef, packageRoot) ?? undefined;
+      }
       
       // Analyze group - should detect change
       const analysis = await analyzeGroup(group, false, workspaceRoot);
@@ -263,12 +273,18 @@ describe('save-merged-file-parity', () => {
       
       // Build groups and analyze
       const groups = buildCandidateGroups(
-        candidateResult.localCandidates,
+        candidateResult.localSourceRefs,
         candidateResult.workspaceCandidates,
         workspaceRoot
       );
       
-      const analysis = await analyzeGroup(groups[0], false, workspaceRoot);
+      // Materialize local candidate for analysis
+      const group = groups[0];
+      if (group.localRef) {
+        group.local = await materializeLocalCandidate(group.localRef, packageRoot) ?? undefined;
+      }
+      
+      const analysis = await analyzeGroup(group, false, workspaceRoot);
       
       // Should detect no change - both keys match
       expect(analysis.type).toBe('no-change-needed');

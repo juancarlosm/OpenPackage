@@ -20,13 +20,13 @@ import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { resolvePackageSource } from '../source-resolution/resolve-package-source.js';
 import { logger } from '../../utils/logger.js';
-import { buildCandidates } from './save-candidate-builder.js';
+import { buildCandidates, materializeLocalCandidate } from './save-candidate-builder.js';
 import { buildCandidateGroups, filterGroupsWithWorkspace } from './save-group-builder.js';
 import { analyzeGroup } from './save-conflict-analyzer.js';
 import { executeResolution } from './save-resolution-executor.js';
 import { pruneExistingPlatformCandidates } from './save-platform-handler.js';
 import { writeResolution } from './save-write-coordinator.js';
-import { clearConversionCache } from './save-conversion-helper.js';
+import { clearConversionCache, initSharedTempDir, cleanupSharedTempDir } from './save-conversion-helper.js';
 import {
   buildSaveReport,
   createCommandResult,
@@ -79,6 +79,8 @@ export async function runSaveToSourcePipeline(
   options: SaveToSourceOptions = {}
 ): Promise<CommandResult> {
   try {
+    await initSharedTempDir();
+    
     // Phase 1: Validate preconditions
     logger.debug(`Validating save preconditions for ${packageName}`);
     const validation = await validateSavePreconditions(packageName);
@@ -106,15 +108,12 @@ export async function runSaveToSourcePipeline(
     // Phase 3: Build candidate groups (organize by registry path)
     logger.debug('Building candidate groups');
     const allGroups = buildCandidateGroups(
-      candidateResult.localCandidates,
+      candidateResult.localSourceRefs,
       candidateResult.workspaceCandidates,
-      cwd!    );
+      cwd!
+    );
     
-    // Phase 4: Prune platform-specific candidates with existing files
-    logger.debug('Pruning existing platform-specific files');
-    await pruneExistingPlatformCandidates(packageRoot!, allGroups);
-    
-    // Phase 5: Filter to groups with workspace candidates
+    // Phase 4: Filter first (cheap), then prune only active groups
     const activeGroups = filterGroupsWithWorkspace(allGroups);
     
     if (activeGroups.length === 0) {
@@ -125,39 +124,82 @@ export async function runSaveToSourcePipeline(
       );
     }
     
-    logger.debug(`Processing ${activeGroups.length} group(s) with workspace candidates`);
+    // Prune only active groups (instead of all groups)
+    logger.debug('Pruning existing platform-specific files');
+    await pruneExistingPlatformCandidates(packageRoot!, activeGroups);
     
-    // Phase 6: Analyze groups and execute resolutions
-    const analyses: ConflictAnalysis[] = [];
+    // Re-filter after pruning (pruning may have removed all workspace candidates from some groups)
+    const finalGroups = activeGroups.filter(g => g.workspace.length > 0);
+    
+    if (finalGroups.length === 0) {
+      logger.info(`No workspace changes detected for ${packageName}`);
+      return createSuccessResult(
+        packageName!,
+        `✓ Saved ${packageName}\n  No workspace changes detected`
+      );
+    }
+    
+    // Phase 5: Materialize local candidates on demand for active groups
+    for (const group of finalGroups) {
+      if (group.localRef && !group.local) {
+        group.local = await materializeLocalCandidate(group.localRef, packageRoot!) ?? undefined;
+      }
+    }
+    
+    logger.debug(`Processing ${finalGroups.length} group(s) with workspace candidates`);
+    
+    // Phase 6: Analyze all groups first, then split into auto-resolvable vs interactive
+    const groupAnalyses = await Promise.all(
+      finalGroups.map(async group => ({
+        group,
+        analysis: await analyzeGroup(group, options.force ?? false, cwd!)
+      }))
+    );
+    
+    const analyses: ConflictAnalysis[] = groupAnalyses.map(ga => ga.analysis);
     const allWriteResults: WriteResult[][] = [];
     
-    for (const group of activeGroups) {
-      // Analyze the group (conversion-aware)
-      const analysis = await analyzeGroup(group, options.force ?? false, cwd!);
-      analyses.push(analysis);
-      
-      // Skip if no action needed
-      if (analysis.type === 'no-action-needed' || analysis.type === 'no-change-needed') {
-        logger.debug(`Skipping ${group.registryPath}: ${analysis.type}`);
+    // Partition: auto-resolvable groups can run in parallel, interactive must be serial
+    const autoResolvable: typeof groupAnalyses = [];
+    const interactive: typeof groupAnalyses = [];
+    
+    for (const ga of groupAnalyses) {
+      if (ga.analysis.type === 'no-action-needed' || ga.analysis.type === 'no-change-needed') {
+        logger.debug(`Skipping ${ga.group.registryPath}: ${ga.analysis.type}`);
         continue;
       }
-      
-      // Execute resolution strategy (pass packageRoot and workspaceRoot)
+      if (ga.analysis.recommendedStrategy === 'interactive') {
+        interactive.push(ga);
+      } else {
+        autoResolvable.push(ga);
+      }
+    }
+    
+    // Process auto-resolvable groups in parallel
+    if (autoResolvable.length > 0) {
+      logger.debug(`Processing ${autoResolvable.length} auto-resolvable group(s) in parallel`);
+      const autoResults = await Promise.all(
+        autoResolvable.map(async ({ group, analysis }) => {
+          const resolution = await executeResolution(group, analysis, packageRoot!, cwd!);
+          if (!resolution) return null;
+          return writeResolution(packageRoot!, group.registryPath, resolution, group.local, cwd!);
+        })
+      );
+      for (const result of autoResults) {
+        if (result) allWriteResults.push(result);
+      }
+    }
+    
+    // Process interactive groups serially (require user input)
+    for (const { group, analysis } of interactive) {
       const resolution = await executeResolution(group, analysis, packageRoot!, cwd!);
       if (!resolution) {
         logger.debug(`No resolution returned for ${group.registryPath}`);
         continue;
       }
-      
-      // Write resolved content to source (pass workspaceRoot for import transformations)
       const writeResults = await writeResolution(
-        packageRoot!,
-        group.registryPath,
-        resolution,
-        group.local,
-        cwd!
+        packageRoot!, group.registryPath, resolution, group.local, cwd!
       );
-      
       allWriteResults.push(writeResults);
     }
     
@@ -168,8 +210,8 @@ export async function runSaveToSourcePipeline(
     // Phase 8: Return result
     return createCommandResult(report);
   } finally {
-    // Clear conversion cache to free memory
     clearConversionCache();
+    await cleanupSharedTempDir();
   }
 }
 

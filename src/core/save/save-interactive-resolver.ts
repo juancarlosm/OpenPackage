@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { safePrompts } from '../../utils/prompts.js';
 import { sortCandidatesByMtime } from './save-conflict-analyzer.js';
-import { calculateConvertedHash } from './save-conversion-helper.js';
+import { convertSourceToWorkspace, ensureComparableHash } from './save-conversion-helper.js';
 import { logger } from '../../utils/logger.js';
 import { exists, readTextFile } from '../../utils/fs.js';
 import { calculateFileHash } from '../../utils/hash-utils.js';
@@ -126,9 +126,9 @@ export async function resolveInteractively(
     
     // If universal already selected, check if this candidate is identical (conversion-aware)
     if (universalSelected) {
-      const universalHash = await calculateConvertedHash(universalSelected, workspaceRoot);
-      const candidateHash = await calculateConvertedHash(candidate, workspaceRoot);
-      
+      const universalHash = await ensureComparableHash(universalSelected, workspaceRoot);
+      const candidateHash = await ensureComparableHash(candidate, workspaceRoot);
+
       if (candidateHash === universalHash) {
         console.log(`\n  ✓ ${candidate.displayPath}`);
         console.log(`    Identical to universal - auto-skipping\n`);
@@ -198,8 +198,6 @@ async function checkForwardParity(
 ): Promise<ParityCheck> {
   try {
     // Import conversion helper function for forward conversion
-    const { convertSourceToWorkspace } = await import('./save-conversion-helper.js');
-    
     // Try to convert source file to workspace format
     const result = await convertSourceToWorkspace(
       localCandidate.content,
@@ -255,64 +253,22 @@ async function isAtParity(
 ): Promise<ParityCheck> {
   // Check universal parity (conversion-aware and merge-aware)
   if (group.local) {
-    // First, try to extract package contribution if this is a merged file
-    let comparisonHash = candidate.contentHash;
-    let comparisonSource = 'raw content';
-    
-    if (candidate.mergeStrategy && candidate.mergeKeys && candidate.mergeKeys.length > 0) {
-      // This is a merged file - extract just the package's contribution
-      const { extractPackageContribution } = await import('./save-merge-extractor.js');
-      const extractResult = await extractPackageContribution(candidate);
-      
-      if (extractResult.success && extractResult.extractedHash) {
-        comparisonHash = extractResult.extractedHash;
-        comparisonSource = 'extracted merge contribution';
-        
-        logger.debug(
-          `Extracted package contribution from merged file: ${candidate.displayPath}`,
-          { 
-            keys: candidate.mergeKeys,
-            extractedHash: extractResult.extractedHash,
-            rawHash: candidate.contentHash
-          }
-        );
-      } else {
-        logger.debug(
-          `Could not extract merge contribution: ${extractResult.error}`,
-          { fallbackToConversion: true }
-        );
-        // Fall back to conversion-based comparison
-      }
-    }
-    
-    // If not a merged file (or extraction failed), try conversion
-    if (comparisonSource === 'raw content') {
-      const convertedHash = await calculateConvertedHash(candidate, workspaceRoot);
-      if (convertedHash !== candidate.contentHash) {
-        // Conversion occurred
-        comparisonHash = convertedHash;
-        comparisonSource = 'post-conversion';
-      }
-    }
-    
+    const comparisonHash = await ensureComparableHash(candidate, workspaceRoot);
+
     logger.debug(
       `Parity check for ${candidate.displayPath}: ` +
-      `comparisonHash=${comparisonHash} (${comparisonSource}), ` +
+      `comparisonHash=${comparisonHash}, ` +
       `localHash=${group.local.contentHash}`
     );
-    
+
     if (comparisonHash === group.local.contentHash) {
       return {
         atParity: true,
-        reason: `Already matches universal (${comparisonSource})`
+        reason: 'Already matches universal (cached comparable hash)'
       };
     }
-    
-    // Additional check: Try forward conversion (source → workspace)
-    // This handles cases where workspace file was transformed during install
-    // and we need to verify it matches what the export flow would produce
-    // Skip this check if we already extracted merge contribution
-    if (candidate.platform && candidate.platform !== 'ai' && comparisonSource !== 'extracted merge contribution') {
+
+    if (candidate.platform && candidate.platform !== 'ai' && !(candidate.mergeStrategy && candidate.mergeKeys && candidate.mergeKeys.length > 0)) {
       const forwardCheck = await checkForwardParity(
         candidate,
         group.local,

@@ -18,40 +18,41 @@
 import { getPlatformDefinition, getGlobalExportFlows } from '../platforms.js';
 import { logger } from '../../utils/logger.js';
 import { minimatch } from 'minimatch';
-import type { SaveCandidate, SaveCandidateGroup } from './save-types.js';
+import type { SaveCandidate, SaveCandidateGroup, LocalSourceRef } from './save-types.js';
 import type { Platform } from '../platforms.js';
 
 /**
- * Build candidate groups from local and workspace candidates
+ * Build candidate groups from local source refs and workspace candidates
  * 
  * Groups candidates intelligently by matching workspace candidates with their
- * corresponding source candidates. For platform-specific workspace files,
+ * corresponding source refs. For platform-specific workspace files,
  * finds the universal source file that would export to that workspace file.
  * 
  * Algorithm:
  * 1. Build initial groups by exact registry path match
  * 2. For workspace candidates without local match, find corresponding source file
  * 3. Match based on export flow patterns (source → workspace)
+ * 4. Filter out local-only groups (no workspace candidates)
  * 
- * @param localCandidates - Candidates from package source
+ * @param localRefs - Lightweight refs from package source
  * @param workspaceCandidates - Candidates from workspace
  * @param workspaceRoot - Workspace root for flow lookup
  * @returns Array of candidate groups organized by registry path
  */
 export function buildCandidateGroups(
-  localCandidates: SaveCandidate[],
+  localRefs: LocalSourceRef[],
   workspaceCandidates: SaveCandidate[],
   workspaceRoot: string = process.cwd()
 ): SaveCandidateGroup[] {
   const map = new Map<string, SaveCandidateGroup>();
   
-  logger.debug(`Building groups from ${localCandidates.length} local and ${workspaceCandidates.length} workspace candidates`);
+  logger.debug(`Building groups from ${localRefs.length} local refs and ${workspaceCandidates.length} workspace candidates`);
   
-  // Add local candidates to groups (using their actual registry paths)
-  for (const candidate of localCandidates) {
-    const group = ensureGroup(map, candidate.registryPath);
-    group.local = candidate;
-    logger.debug(`Added local candidate: ${candidate.registryPath}`);
+  // Add local refs to groups (using their actual registry paths)
+  for (const ref of localRefs) {
+    const group = ensureGroup(map, ref.registryPath);
+    group.localRef = ref;
+    logger.debug(`Added local ref: ${ref.registryPath}`);
   }
   
   // Add workspace candidates to groups
@@ -76,7 +77,7 @@ export function buildCandidateGroups(
     if (!group) {
       let sourceRegistryPath = findSourceFileForWorkspace(
         candidate,
-        localCandidates,
+        localRefs,
         workspaceRoot
       );
       
@@ -85,7 +86,7 @@ export function buildCandidateGroups(
       if (!sourceRegistryPath) {
         sourceRegistryPath = findSourceFileByFallback(
           candidate.registryPath,
-          localCandidates
+          localRefs
         );
       }
       
@@ -108,10 +109,12 @@ export function buildCandidateGroups(
     group.workspace.push(candidate);
   }
   
-  logger.debug(`Built ${map.size} candidate groups`);
+  // Filter out local-only groups (no workspace candidates) during grouping
+  const allGroups = Array.from(map.values());
+  const activeCount = allGroups.filter(g => g.workspace.length > 0).length;
+  logger.debug(`Built ${map.size} candidate groups (${activeCount} with workspace candidates)`);
   
-  // Convert map to array
-  return Array.from(map.values());
+  return allGroups;
 }
 
 /**
@@ -126,17 +129,15 @@ export function buildCandidateGroups(
  * 3. Match basename without extension (e.g., opencode.json → mcp.json)
  * 
  * @param registryPath - Workspace registry path to match
- * @param localCandidates - All source candidates
+ * @param localRefs - All source refs
  * @returns Registry path of matching source file, or null
  */
 function findSourceFileByFallback(
   registryPath: string,
-  localCandidates: SaveCandidate[]
+  localRefs: LocalSourceRef[]
 ): string | null {
-  // Strategy 1: Try matching with different extension
-  // e.g., "mcp.json" might match "mcp.jsonc"
-  const baseName = registryPath.replace(/\.[^.]+$/, ''); // Remove extension
-  const candidates = localCandidates.filter(c => {
+  const baseName = registryPath.replace(/\.[^.]+$/, '');
+  const candidates = localRefs.filter(c => {
     const sourceBaseName = c.registryPath.replace(/\.[^.]+$/, '');
     return sourceBaseName === baseName;
   });
@@ -146,14 +147,11 @@ function findSourceFileByFallback(
     return candidates[0].registryPath;
   }
   
-  // Strategy 2: If still no match, try matching just the filename portion
-  // e.g., "agents/test.md" might match "agents/test.md" even if in different subdirs
-  // (This is a weaker match, only use if we have exactly one candidate)
   const fileName = registryPath.split('/').pop() || '';
   const fileNameBase = fileName.replace(/\.[^.]+$/, '');
   
   if (fileNameBase) {
-    const fileNameCandidates = localCandidates.filter(c => {
+    const fileNameCandidates = localRefs.filter(c => {
       const sourceFileName = c.registryPath.split('/').pop() || '';
       const sourceFileNameBase = sourceFileName.replace(/\.[^.]+$/, '');
       return sourceFileNameBase === fileNameBase;
@@ -177,13 +175,13 @@ function findSourceFileByFallback(
  * (e.g., mcp.jsonc) that would produce it through export flows.
  * 
  * @param workspaceCandidate - Workspace candidate to match
- * @param localCandidates - All source candidates
+ * @param localRefs - All source refs
  * @param workspaceRoot - Workspace root for flow lookup
  * @returns Registry path of matching source file, or null
  */
 function findSourceFileForWorkspace(
   workspaceCandidate: SaveCandidate,
-  localCandidates: SaveCandidate[],
+  localRefs: LocalSourceRef[],
   workspaceRoot: string
 ): string | null {
   const platform = workspaceCandidate.platform as Platform;
@@ -240,13 +238,13 @@ function findSourceFileForWorkspace(
         
         logger.debug(`  Checking 'from' pattern: ${fromPattern}`);
         
-        // Find local candidate that matches the 'from' pattern
-        for (const localCandidate of localCandidates) {
-          const fromMatches = minimatch(localCandidate.registryPath, fromPattern, { dot: true });
+        // Find local ref that matches the 'from' pattern
+        for (const ref of localRefs) {
+          const fromMatches = minimatch(ref.registryPath, fromPattern, { dot: true });
           
           if (fromMatches) {
-            logger.debug(`  Found matching source: ${localCandidate.registryPath}`);
-            return localCandidate.registryPath;
+            logger.debug(`  Found matching source: ${ref.registryPath}`);
+            return ref.registryPath;
           }
         }
       }
