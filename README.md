@@ -9,7 +9,7 @@
   </a>
 </p>
 
-<p align="center">Universal plugins for coding agents.</p>
+<p align="center">The package manager for coding agent configs.</p>
 <p align="center">
 <a href="https://www.npmjs.com/package/opkg " target="blank">
   <img src="https://img.shields.io/npm/v/opkg?style=flat-square" alt="Npm package for OpenPackage">
@@ -33,8 +33,7 @@ OpenPackage enables simple, modular management of coding agent configs, providin
 
 ## Why OpenPackage?
 
-Modern AI coding tools are powerful and efficient when rules, commands, subagents, and skills are properly setup.  
-Unfortunately, these files remain difficult to organize and manage.  
+Modern AI coding tools are powerful and efficient when rules, commands, subagents, and skills are properly setup. Unfortunately, these files remain difficult to organize and manage.  
 
 OpenPackage provides a centralized and universal interface for installing, uninstalling, and packaging coding agent config files for simplified management and distribution.
 
@@ -54,7 +53,7 @@ OpenPackage provides a centralized and universal interface for installing, unins
 
 At its core, OpenPackage is a lightweight CLI package manager that performs installs and uninstalls of config files, with the ability to keep track of file sources and dependencies, plus packaging capabilities.
 
-It's basically a much more powerful, universal, and open source version of Claude Code Plugins.
+It's basically a much more powerful, universal, and open source version of Vercel Skills and Claude Code Plugins.
 
 ## Install OpenPackage
 
@@ -75,37 +74,42 @@ Installs all files from a specified resource into the codebase at cwd, formatted
 #### Install resources (packages, plugins, rules, commands, agents, and skills)
 
 ```bash title="Terminal"
-# Packages or Marketplaces
-opkg install gh@<user>/<repo>
+# OpenPackage local or remote packages
+opkg install <package-name>
 
-# Packages or Claude Plugins hosted on GitHub
-opkg install gh@<user>/<repo> --plugins <plugin-name>
-
-# Agents and Skills hosted on GitHub
-opkg install gh@<user>/<repo> --plugins <plugin-name> --agents <agent-name>
-opkg install gh@<user>/<repo> --plugins <plugin-name> --skills <agent-name>
-opkg install gh@<user>/<repo> --skills <agent-name>
+# Github repos
+opkg install gh@<owner>/<repo>
 
 # GitHub URLs
-opkg install https://github.com/<user>/<repo>/<path-to-resource>
+opkg install https://github.com/<owner>/<repo>/<path-to-resource>
 
 # Local path to package or Claude Plugin
 opkg install <path-to-dir>
 
+# Git URLs
+opkg install git@<host>:<repo>.git
+
 # Examples
+opkg install essentials
 opkg install gh@anthropics/claude-code --plugins code-review
+opkg install gh@wshobson/agents --plugins ui-design --agents ui-designer
+opkg install gh@wshobson/agents/plugins/ui-design/agents/ui-designer
 opkg install gh@vercel-labs/agent-skills --skills react-best-practices
 opkg install https://github.com/anthropics/claude-code/tree/main/plugins/code-review
+opkg install https://github.com/wshobson/agents/tree/main/plugins/ui-design/ui-designer.md
 opkg install https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices
 ```  
 
 #### Options
 
-Use the `--global` (or `-g`) option to install files to user scope:
-```bash title="Terminal"
-# Installs to home dir, ex: ~/.cursor/, ~/.opencode/
-opkg install github:anthropics/claude-code -g
-```  
+| Option | Description |
+| --- | --- |
+| `-g, --global`               | Install to user directory instead of project |
+| `-a, --agents <agents...>`   | Install specific agents by name |
+| `-s, --skills <skills...>`   | Install specific skills by name |
+| `--plugins <plugins...>`     | Install specific plugins by name |
+| `--platforms`                | Install to only specified platforms |
+| `--remote`                   | Install from remote source / skip cache |
 
 ### List installed resources
 ```bash title="Terminal"
@@ -114,11 +118,29 @@ opkg list <package>   # Lists installed files for specified resource
 ```  
 Use the list command to show an overview of packages and files installed.
 
+#### Options
+
+| Option | Description |
+| --- | --- |
+| `-p, --project`              | Lists only project scoped packages & resource file count |
+| `-g, --global`               | Lists only user scoped packages & resource file count |
+| `-a, --all`                  | Lists all packages recursively (includes nested) |
+| `-f, --files`                | Lists all resource files |
+| `-t, --tracked`              | Lists all packages & resources tracked by OpenPackage |
+| `-u, --untracked`            | Lists all resources not tracked by OpenPackage |
+| `--platforms`                | Lists packages & files from specified platforms |
+
 ### Uninstall packages
 ```bash title="Terminal"
 opkg uninstall <package>
 ```  
 Removes all files for a package from the codebase at cwd.
+
+#### Options
+
+| Option | Description |
+| --- | --- |
+| `-g, --global`               | Uninstall from user directory |
 
 > [!TIP]  
 > Learn more by heading over to the [official docs](https://openpackage.dev/docs).
@@ -161,7 +183,7 @@ opkg remove <package> commands/clean.md         # Removes file or dir from packa
 > [!TIP]  
 > Learn more about packages from the [packages doc](https://openpackage.dev/docs/packages) on our official docs.
 
-## Supported Platforms
+## Supported Platforms & Files
 
 OpenPackage performs installation and platform sync of files for supported AI coding platforms outlined by the table below.  
 
