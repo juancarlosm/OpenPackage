@@ -51,7 +51,7 @@ export function setupInstallCommand(program: Command): void {
       const programOpts = command.parent?.opts() || {};
       
       // Create telemetry collector
-      const telemetryCollector = createTelemetryCollector('install');
+      const telemetryCollector = await createTelemetryCollector('install');
       
       // Create execution context with telemetry
       const execContext = await createExecutionContext({

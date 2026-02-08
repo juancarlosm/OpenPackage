@@ -197,6 +197,15 @@ class ConfigManager {
     return this.openPackageDirs;
   }
 
+  /**
+   * Get telemetry disabled setting
+   * Returns undefined if not set in config
+   */
+  async getTelemetryDisabled(): Promise<boolean | undefined> {
+    const config = await this.load();
+    return config.telemetry?.disabled;
+  }
+
 }
 
 // Create and export a singleton instance

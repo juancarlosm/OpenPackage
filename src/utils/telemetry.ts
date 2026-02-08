@@ -1,6 +1,7 @@
 import { HttpClient } from './http-client.js';
 import { logger } from './logger.js';
 import { getVersion } from './package.js';
+import { configManager } from '../core/config.js';
 
 /**
  * Single install event
@@ -33,10 +34,31 @@ interface BatchTelemetryRequest {
 }
 
 /**
- * Check if telemetry is disabled via environment variable
+ * Check if telemetry is enabled
+ * Checks (in order of precedence):
+ * 1. Environment variable OPKG_TELEMETRY_DISABLED
+ * 2. Config file telemetry.disabled setting
+ * 3. Default: enabled (true)
  */
-export function isTelemetryEnabled(): boolean {
-  return process.env.OPKG_TELEMETRY_DISABLED !== 'true';
+export async function isTelemetryEnabled(): Promise<boolean> {
+  // 1. Check environment variable first (highest priority)
+  if (process.env.OPKG_TELEMETRY_DISABLED === 'true') {
+    return false;
+  }
+
+  // 2. Check config file
+  try {
+    const configDisabled = await configManager.getTelemetryDisabled();
+    if (configDisabled === true) {
+      return false;
+    }
+  } catch (error) {
+    // If config loading fails, continue with default
+    logger.debug('Failed to load telemetry config, using default', { error });
+  }
+
+  // 3. Default: enabled
+  return true;
 }
 
 /**
@@ -60,12 +82,9 @@ export class TelemetryCollector {
 
   /**
    * Record an install event
+   * Note: Does not check telemetry enabled here - check is done at collector creation
    */
   recordInstall(event: InstallEvent): void {
-    if (!isTelemetryEnabled()) {
-      return;
-    }
-
     // Basic validation
     if (!event.packageName || !event.version) {
       logger.debug('Skipping invalid telemetry event (missing package name or version)');
@@ -117,12 +136,9 @@ export class TelemetryCollector {
   /**
    * Flush all collected events to the backend
    * Fire-and-forget with timeout
+   * Note: Does not check telemetry enabled here - check is done at collector creation
    */
   async flush(httpClient: HttpClient): Promise<void> {
-    if (!isTelemetryEnabled()) {
-      return;
-    }
-
     if (this.events.length === 0) {
       logger.debug('[Telemetry] No events to flush');
       return;
@@ -198,8 +214,9 @@ async function reportBatchInstalls(
  * Create a new telemetry collector
  * Returns null if telemetry is disabled
  */
-export function createTelemetryCollector(command?: string): TelemetryCollector | null {
-  if (!isTelemetryEnabled()) {
+export async function createTelemetryCollector(command?: string): Promise<TelemetryCollector | null> {
+  const enabled = await isTelemetryEnabled();
+  if (!enabled) {
     return null;
   }
 
