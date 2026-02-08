@@ -67,12 +67,6 @@ export async function detectBase(
     : resolve(repoRoot, resourcePath);
   const repoRootResolved = resolve(repoRoot);
 
-  logger.debug('Detecting base for resource', {
-    resourcePath,
-    repoRoot,
-    absoluteResourcePath
-  });
-
   // Determine whether resourcePath points to a file or directory.
   // If it's a file, manifests must be discovered by walking up from the file's directory.
   let probeStart = absoluteResourcePath;
@@ -207,11 +201,6 @@ async function detectBaseFromPatterns(
 ): Promise<BaseDetectionResult> {
   // Extract all patterns from platforms config
   const patterns = extractAllFromPatterns(platformsConfig);
-
-  logger.debug('Pattern matching for base detection', {
-    resourcePath,
-    patternCount: patterns.length
-  });
 
   // Match resource path against patterns
   const result = findDeepestMatch(resourcePath, patterns);

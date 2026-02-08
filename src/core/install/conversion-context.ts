@@ -96,11 +96,6 @@ export function createConversionContext(
   const totalFiles = Array.from(formatGroups.values())
     .reduce((sum, files) => sum + files.length, 0);
   
-  logger.debug('Creating conversion context', {
-    groupCount: formatGroups.size,
-    totalFiles
-  });
-  
   return {
     formatGroups,
     convertedGroups: new Map(),
@@ -135,12 +130,6 @@ export function recordGroupConversion(
   context.convertedGroups.set(platformId, convertedFiles);
   context.metadata.convertedFiles += filesConverted;
   context.metadata.skippedFiles += filesSkipped;
-  
-  logger.debug(`Recorded conversion for group ${platformId}`, {
-    filesConverted,
-    filesSkipped,
-    totalConverted: context.metadata.convertedFiles
-  });
 }
 
 /**
@@ -171,14 +160,6 @@ export function recordConversionError(
 export function finalizeConversion(context: ConversionContext): void {
   context.metadata.endTime = Date.now();
   context.metadata.durationMs = context.metadata.endTime - context.metadata.startTime;
-  
-  logger.debug('Conversion finalized', {
-    totalFiles: context.metadata.totalFiles,
-    converted: context.metadata.convertedFiles,
-    skipped: context.metadata.skippedFiles,
-    failed: context.metadata.failedFiles,
-    durationMs: context.metadata.durationMs
-  });
 }
 
 /**
@@ -241,7 +222,6 @@ export function cacheImportFlows(
   flows: Flow[]
 ): void {
   context.importFlowsCache.set(platformId, flows);
-  logger.debug(`Cached ${flows.length} import flows for ${platformId}`);
 }
 
 /**

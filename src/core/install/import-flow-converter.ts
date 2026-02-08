@@ -87,13 +87,8 @@ export function convertFormatGroup(
   group: FormatGroup,
   targetDir?: string
 ): FormatGroupConversionResult {
-  logger.debug(`Converting format group for platform: ${group.platformId}`, {
-    fileCount: group.files.length
-  });
-  
   // Skip conversion for universal format (already in target format)
   if (group.platformId === 'universal') {
-    logger.debug('Group is already universal format, skipping conversion');
     return {
       platformId: group.platformId,
       convertedFiles: group.files,
@@ -185,13 +180,6 @@ export function convertFormatGroup(
   const filesConverted = fileResults.filter(r => r.success).length;
   const filesFailed = fileResults.filter(r => !r.success).length;
   
-  logger.debug(`Format group conversion complete`, {
-    platform: group.platformId,
-    processed: group.files.length,
-    converted: filesConverted,
-    failed: filesFailed
-  });
-  
   return {
     platformId: group.platformId,
     convertedFiles,
@@ -218,8 +206,6 @@ export function convertSingleFile(
   flows: Flow[],
   platformId: PlatformId
 ): FileConversionResult {
-  logger.debug(`Converting file: ${file.path}`, { platform: platformId });
-  
   // Find matching flow for this file
   const matchedFlow = findMatchingFlow(file.path, flows);
   
@@ -250,7 +236,6 @@ export function convertSingleFile(
       }
     }
 
-    logger.debug(`No matching flow for file: ${file.path}`);
     // No flow matched - return file unchanged (assume already universal)
     return {
       original: file,
@@ -303,7 +288,6 @@ function findMatchingFlow(filePath: string, flows: Flow[]): Flow | null {
     
     // Check if file path matches flow pattern
     if (matchGlob(filePath, pattern)) {
-      logger.debug(`Flow matched for ${filePath}: ${pattern}`);
       return flow;
     }
   }
@@ -394,8 +378,6 @@ function applyFlowToFile(
   let transformedFrontmatter = frontmatter;
   
   if (flow.map && flow.map.length > 0 && frontmatter) {
-    logger.debug(`Applying ${flow.map.length} map operations to frontmatter`);
-    
     // Create map context
     const mapContext = createMapContext({
       filename: basename(file.path),
@@ -520,9 +502,6 @@ export function validateUniversalFormat(file: PackageFile): boolean {
     
     // Universal format uses array
     if (!Array.isArray(tools)) {
-      logger.debug('File not in universal format: tools should be array', {
-        toolsType: typeof tools
-      });
       return false;
     }
   }
@@ -540,7 +519,6 @@ export function validateUniversalFormat(file: PackageFile): boolean {
   
   for (const field of platformExclusiveFields) {
     if (field in frontmatter) {
-      logger.debug(`File not in universal format: found platform-specific field '${field}'`);
       return false;
     }
   }

@@ -9,7 +9,6 @@ import type { FlowInstallContext, InstallationStrategy } from './types.js';
 import { ConversionInstallStrategy } from './conversion-strategy.js';
 import { FlowBasedInstallStrategy } from './flow-based-strategy.js';
 import { needsConversion } from '../format-detector.js';
-import { logger } from '../../../utils/logger.js';
 
 /**
  * Select the appropriate installation strategy based on package format and platform
@@ -31,31 +30,14 @@ export function selectInstallStrategy(
   
   // If no format provided, default to flow-based strategy
   if (!format) {
-    logger.debug('No package format provided, using flow-based strategy', {
-      package: context.packageName,
-      platform
-    });
     return new FlowBasedInstallStrategy();
   }
   
   // Check if conversion is needed
   if (needsConversion(format, platform)) {
-    logger.debug('Selected installation strategy: conversion', {
-      package: context.packageName,
-      platform,
-      formatType: format.type,
-      formatPlatform: format.platform
-    });
     return new ConversionInstallStrategy();
   }
   
   // Default: flow-based strategy
-  logger.debug('Selected installation strategy: flow-based', {
-    package: context.packageName,
-    platform,
-    formatType: format.type,
-    formatPlatform: format.platform
-  });
-  
   return new FlowBasedInstallStrategy();
 }

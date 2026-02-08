@@ -26,7 +26,6 @@ function cacheTransformedPlugin(pkg: Package, context?: any): void {
     ? { package: pkg, context }
     : { package: pkg, context: createPlatformContext('claude-plugin', 1.0) };
   transformedPluginCache.set(key, cached);
-  logger.debug('Cached transformed plugin', { name: pkg.metadata.name, version: pkg.metadata.version });
 }
 
 /**
@@ -62,20 +61,9 @@ export async function transformPluginToPackage(
   pluginDir: string,
   context?: PluginTransformContext
 ): Promise<PackageWithContext> {
-  logger.debug('Transforming Claude Code plugin to OpenPackage format', { 
-    pluginDir, 
-    context,
-    hasMarketplaceEntry: !!context?.marketplaceEntry
-  });
-  
   // Resolve plugin metadata from plugin.json or marketplace entry
   const resolved = await resolvePluginMetadata(pluginDir, context?.marketplaceEntry);
   const pluginManifest = resolved.manifest;
-  
-  logger.debug('Resolved plugin metadata', {
-    source: resolved.source,
-    pluginName: pluginManifest.name
-  });
   
   // Generate scoped name using consistent naming logic
   // Always generate the name (no override) to ensure consistency
@@ -85,13 +73,6 @@ export async function transformPluginToPackage(
     resourcePath: context?.resourcePath,
     packageName: pluginManifest.name,
     repoPath: context?.repoPath
-  });
-  
-  logger.debug('Generated plugin name', { 
-    original: pluginManifest.name, 
-    scoped: packageName,
-    hasGitContext: !!context?.gitUrl,
-    hasPath: !!context?.path
   });
   
   // Transform to OpenPackage metadata
@@ -207,7 +188,6 @@ async function extractPluginFiles(pluginDir: string): Promise<PackageFile[]> {
       });
     }
     
-    logger.debug(`Extracted ${files.length} files from plugin`, { pluginDir });
     return files;
     
   } catch (error) {

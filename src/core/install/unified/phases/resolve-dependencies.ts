@@ -104,8 +104,6 @@ async function resolveDependenciesForInstall(
  * Resolve dependencies phase
  */
 export async function resolveDependenciesPhase(ctx: InstallationContext): Promise<void> {
-  logger.debug(`Resolving dependencies for ${ctx.source.packageName}`);
-  
   try {
     // Initial dependency resolution
     const result = await resolveDependenciesForInstall(

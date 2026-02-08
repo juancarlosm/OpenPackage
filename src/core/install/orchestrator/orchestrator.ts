@@ -51,7 +51,6 @@ export class InstallOrchestrator {
    */
   registerStrategy(strategy: InstallStrategy): void {
     this.strategies.push(strategy);
-    logger.debug('Registered install strategy', { name: strategy.name });
   }
   
   /**
@@ -82,7 +81,6 @@ export class InstallOrchestrator {
     if (!strategy) {
       throw new Error(`No strategy found for input type: ${classification.type}`);
     }
-    logger.debug('Selected install strategy', { strategy: strategy.name });
     
     // Step 4: Build context (pass ExecutionContext)
     const context = await strategy.buildContext(classification, options, execContext);

@@ -7,8 +7,6 @@ import { logger } from '../../../../utils/logger.js';
  * @returns true if should proceed, false if cancelled
  */
 export async function processConflictsPhase(ctx: InstallationContext): Promise<boolean> {
-  logger.debug(`Processing conflicts for ${ctx.resolvedPackages.length} packages`);
-  
   const conflictResult = await checkAndHandleAllPackageConflicts(ctx.resolvedPackages as any, ctx.options);
   
   if (!conflictResult.shouldProceed) {

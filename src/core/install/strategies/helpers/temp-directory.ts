@@ -20,7 +20,6 @@ import { contextToJSON } from '../../../conversion-context/index.js';
  */
 export async function createTempPackageDirectory(prefix: string = 'opkg-converted-'): Promise<string> {
   const tempDir = await mkdtemp(join(tmpdir(), prefix));
-  logger.debug('Created temporary directory', { tempDir });
   return tempDir;
 }
 
@@ -39,11 +38,6 @@ export async function writeTempPackageFiles(
     await ensureDir(dirname(filePath));
     await writeTextFile(filePath, file.content);
   }
-  
-  logger.debug(
-    `Wrote ${files.length} converted files to temp directory`,
-    { tempDir }
-  );
 }
 
 /**
@@ -59,12 +53,6 @@ export async function writeConversionContext(
   const contextPath = join(tempDir, '.opkg-conversion-context.json');
   const contextJson = contextToJSON(context);
   await writeTextFile(contextPath, contextJson);
-  
-  logger.debug('Wrote conversion context to temp directory', {
-    tempDir,
-    originalPlatform: context.originalFormat.platform,
-    conversions: context.conversionHistory.length
-  });
 }
 
 /**
@@ -79,7 +67,6 @@ export async function cleanupTempDirectory(tempDir: string | null): Promise<void
   
   try {
     await rm(tempDir, { recursive: true, force: true });
-    logger.debug('Cleaned up temporary directory', { tempDir });
   } catch (error) {
     logger.warn('Failed to cleanup temp directory', {
       tempDir,

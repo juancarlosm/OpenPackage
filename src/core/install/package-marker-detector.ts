@@ -55,8 +55,6 @@ export function detectPlatformMarkers(
   files: PackageFile[],
   targetDir?: string
 ): PackageMarkers {
-  logger.debug('Detecting package-level markers', { fileCount: files.length });
-  
   const matches: MarkerMatch[] = [];
   const platforms = getPlatformDefinitions(targetDir);
   
@@ -79,8 +77,6 @@ export function detectPlatformMarkers(
           matchedPattern: pattern,
           confidence: 1.0
         });
-        
-        logger.debug(`Matched platform marker: ${platformId} (${pattern})`);
       }
     }
   }
@@ -88,13 +84,6 @@ export function detectPlatformMarkers(
   // Check for universal format markers
   const hasOpenPackageYml = filePaths.has('openpackage.yml');
   const hasPackageYml = filePaths.has('package.yml');
-  
-  if (hasOpenPackageYml || hasPackageYml) {
-    logger.debug('Found universal format marker', { 
-      hasOpenPackageYml, 
-      hasPackageYml 
-    });
-  }
   
   return {
     matches,

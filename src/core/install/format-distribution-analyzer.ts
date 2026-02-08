@@ -40,10 +40,6 @@ export interface FormatDistribution {
 export function analyzeFormatDistribution(
   fileFormats: Map<string, FileFormat>
 ): FormatDistribution {
-  logger.debug('Analyzing format distribution', { 
-    fileCount: fileFormats.size 
-  });
-  
   const counts = new Map<PlatformId | SpecialFormat, number>();
   const total = fileFormats.size;
   
@@ -72,12 +68,6 @@ export function analyzeFormatDistribution(
   }
   
   const dominantPercentage = dominant ? percentages.get(dominant) : undefined;
-  
-  logger.debug('Format distribution analysis', {
-    platforms: Array.from(counts.entries()).map(([p, c]) => `${p}: ${c}`),
-    dominant,
-    dominantPercentage: dominantPercentage?.toFixed(2)
-  });
   
   return {
     counts,

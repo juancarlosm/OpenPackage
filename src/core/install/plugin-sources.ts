@@ -126,8 +126,6 @@ function normalizeRelativePathSource(
   // Normalize path: strip leading ./ if present
   const normalizedPath = path.startsWith('./') ? path.substring(2) : path;
   
-  logger.debug('Normalized relative path source', { pluginName, path: normalizedPath });
-  
   return {
     type: 'relative-path',
     relativePath: normalizedPath,
@@ -165,14 +163,6 @@ function normalizeGitHubSource(
   // Convert to full git URL
   const gitUrl = `https://github.com/${source.repo}.git`;
   
-  logger.debug('Normalized GitHub source', { 
-    pluginName, 
-    repo: source.repo, 
-    ref: source.ref,
-    path: source.path,
-    gitUrl 
-  });
-  
   return {
     type: 'git',
     gitUrl,
@@ -205,13 +195,6 @@ function normalizeGitUrlSource(
       `Error: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  
-  logger.debug('Normalized Git URL source', { 
-    pluginName, 
-    url: source.url,
-    ref: source.ref,
-    path: source.path
-  });
   
   return {
     type: 'git',

@@ -12,8 +12,6 @@ export async function reportResultsPhase(
   ctx: InstallationContext,
   installResult: ExecutionResult
 ): Promise<CommandResult> {
-  logger.debug(`Reporting results for ${ctx.source.packageName}`);
-  
   const mainPackage = ctx.resolvedPackages.find(pkg => pkg.isRoot);
   
   // Display results (only show "dependency recorded" for dependency installs, not workspace-root)

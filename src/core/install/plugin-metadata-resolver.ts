@@ -70,8 +70,6 @@ export async function resolvePluginMetadata(
   pluginDir: string,
   marketplaceEntry?: MarketplacePluginEntry
 ): Promise<ResolvedPluginMetadata> {
-  logger.debug('Resolving plugin metadata', { pluginDir, hasMarketplaceEntry: !!marketplaceEntry });
-  
   const manifestPath = join(pluginDir, CLAUDE_PLUGIN_PATHS.PLUGIN_MANIFEST);
   const hasPluginJson = await exists(manifestPath);
   const isStrictFalse = marketplaceEntry?.strict === false;
@@ -105,9 +103,6 @@ export async function resolvePluginMetadata(
     // Case 1: strict is true or undefined - merge with marketplace entry
     if (marketplaceEntry) {
       const merged = mergePluginMetadata(pluginManifest, marketplaceEntry);
-      logger.debug('Merged plugin.json with marketplace entry', { 
-        pluginName: merged.name 
-      });
       
       return {
         manifest: merged,
@@ -124,10 +119,6 @@ export async function resolvePluginMetadata(
   
   // Case 4: No plugin.json, strict:false - use marketplace entry
   if (isStrictFalse && marketplaceEntry) {
-    logger.debug('Using marketplace entry as full plugin definition (strict:false)', {
-      pluginName: marketplaceEntry.name
-    });
-    
     const manifest = marketplaceEntryToManifest(marketplaceEntry);
     
     return {

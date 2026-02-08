@@ -32,11 +32,6 @@ import { createTempPackageDirectory, writeTempPackageFiles } from '../../strateg
  * @param ctx - Installation context
  */
 export async function convertPhase(ctx: InstallationContext): Promise<void> {
-  logger.debug('Starting convert phase', {
-    packageName: ctx.source.packageName,
-    contentRoot: ctx.source.contentRoot
-  });
-  
   // Skip if no content root (shouldn't happen after load phase)
   if (!ctx.source.contentRoot) {
     logger.warn('No content root, skipping convert phase');
@@ -45,7 +40,6 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
   
   // Skip if package is a marketplace (will be handled by marketplace flow)
   if (ctx.source.pluginMetadata?.pluginType === 'marketplace') {
-    logger.debug('Skipping conversion for marketplace package');
     return;
   }
   
@@ -60,9 +54,7 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
       logger.warn('No files found in package, skipping conversion');
       return;
     }
-    
-    logger.debug(`Loaded ${files.length} files for conversion analysis`);
-    
+
     // Coordinate conversion (detection + conversion if needed)
     const conversionResult = await coordinateConversion(
       files,
@@ -128,13 +120,6 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
           (rootPackage.pkg.metadata as any)._originalFormat = conversionResult.formatDetection.packageFormat;
         }
       }
-    } else {
-      logger.debug('No conversion needed', {
-        packageFormat: conversionResult.formatDetection.packageFormat,
-        reason: conversionResult.formatDetection.packageFormat === 'universal' 
-          ? 'already universal' 
-          : 'no conversion required'
-      });
     }
     
   } catch (error) {

@@ -48,8 +48,6 @@ export async function loadPackageFromDirectory(
   dirPath: string,
   context?: PackageLoadContext
 ): Promise<Package> {
-  logger.debug(`Loading package from directory: ${dirPath}`, { context });
-  
   // Check if this is a Claude Code plugin (with marketplace context if available)
   const pluginDetection = await detectPluginWithMarketplace(dirPath, context?.marketplaceEntry);
   
@@ -129,12 +127,6 @@ export async function loadPackageFromDirectory(
     // Only override if GitHub scoping was applied (name changed)
     if (scopedName !== originalName) {
       config.name = scopedName;
-      logger.debug('Applied GitHub scoping to OpenPackage repo', {
-        original: originalName,
-        scoped: scopedName,
-        gitUrl: context.gitUrl,
-        path: context.path
-      });
     }
   }
 
@@ -159,8 +151,6 @@ export async function loadPackageFromDirectory(
       });
     }
     
-    logger.debug(`Loaded ${files.length} files from directory: ${dirPath}`);
-    
     return {
       metadata: config,
       files
@@ -176,8 +166,6 @@ export async function loadPackageFromDirectory(
  * Extracts to a temporary location, reads files, then cleans up.
  */
 export async function loadPackageFromTarball(tarballPath: string): Promise<Package> {
-  logger.debug(`Loading package from tarball: ${tarballPath}`);
-  
   // Read tarball file
   let tarballBuffer: Buffer;
   try {

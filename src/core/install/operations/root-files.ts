@@ -66,7 +66,6 @@ export async function installOrSyncRootFiles(
   const rootFilesMap = normalizeRootFileInput(rootFiles);
   
   if (rootFilesMap.size === 0) {
-    logger.debug(`No root files to install for ${packageName}`);
     return result;
   }
   
@@ -76,8 +75,6 @@ export async function installOrSyncRootFiles(
   // Install platform-specific root files
   if (platforms.length > 0) {
     await installPlatformRootFiles(cwd, packageName, rootFilesMap, platforms, result);
-  } else {
-    logger.debug('No platforms provided, skipping platform-specific root files');
   }
   
   // Deduplicate results
@@ -145,7 +142,6 @@ async function installUniversalAgentsFile(
   const agentsContent = rootFilesMap.get(FILE_PATTERNS.AGENTS_MD);
   
   if (!agentsContent || !agentsContent.trim()) {
-    logger.debug(`No AGENTS.md content for ${packageName}`);
     return;
   }
   
@@ -162,8 +158,6 @@ async function installUniversalAgentsFile(
     } else {
       result.created.push(FILE_PATTERNS.AGENTS_MD);
     }
-    
-    logger.debug(`Installed universal root file ${FILE_PATTERNS.AGENTS_MD} for ${packageName}`);
   } catch (error) {
     logger.error(`Failed to install universal root file ${FILE_PATTERNS.AGENTS_MD}: ${error}`);
     result.skipped.push(FILE_PATTERNS.AGENTS_MD);
@@ -218,11 +212,6 @@ async function installPlatformRootFiles(
       } else {
         result.created.push(platformDef.rootFile);
       }
-      
-      logger.debug(
-        `Installed root file ${platformDef.rootFile} for ${packageName} ` +
-        `(from ${sourceFileName})`
-      );
     } catch (error) {
       logger.error(`Failed to install root file ${platformDef.rootFile}: ${error}`);
       result.skipped.push(platformDef.rootFile);
@@ -256,7 +245,6 @@ async function installSingleRootFile(
     )?.trim();
     
     if (existingSectionContent === sectionBody) {
-      logger.debug(`Root file section unchanged: ${targetPath} (pkg: ${packageName})`);
       return true; // Still counts as "updated" (touched but unchanged)
     }
   }

@@ -97,12 +97,6 @@ export class DependencyResolutionExecutor {
       logger.info('Planning installation');
       const plan = await this.planner.createPlan(graph);
 
-      if (plan.skipped.length > 0) {
-        for (const s of plan.skipped) {
-          logger.debug(`Skipped ${s.id.displayName}: ${s.reason}`);
-        }
-      }
-
       logger.info(`${plan.contexts.length} packages to install, ${plan.skipped.length} skipped`);
 
       if (this.options.dryRun) {

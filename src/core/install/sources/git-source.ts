@@ -63,11 +63,6 @@ export class GitSourceLoader implements PackageSourceLoader {
         const platformsConfig = platformsState.config;
         const pathToDetect = source.resourcePath || source.gitPath || '';
         
-        logger.debug('Detecting base for git resource', {
-          resourcePath: pathToDetect,
-          repoPath: result.repoPath
-        });
-        
         detectedBaseInfo = await detectBase(
           pathToDetect,
           result.repoPath,

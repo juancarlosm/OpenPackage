@@ -1,5 +1,6 @@
 import type { ConvenienceFilterOptions, ResourceInstallationSpec } from '../convenience-matchers.js';
 import { applyConvenienceFilters, displayFilterErrors } from '../convenience-matchers.js';
+import { logger } from '../../../utils/logger.js';
 
 /**
  * Resolve convenience resources (agents/skills) to install.
@@ -23,7 +24,7 @@ export async function resolveConvenienceResources(
       throw new Error('None of the requested resources were found');
     }
 
-    console.log(`\n⚠️  Continuing with ${filterResult.resources.length} resource(s)\n`);
+    logger.debug(`Continuing with ${filterResult.resources.length} resource(s)`);
   }
 
   return filterResult.resources;

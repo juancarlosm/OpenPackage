@@ -58,12 +58,6 @@ export abstract class BaseStrategy implements InstallationStrategy {
     // Use conversion context as single source of truth for original format
     const originalSource = context.conversionContext.originalFormat.platform || 'openpackage';
     
-    logger.debug('Building flow context', {
-      originalSource,
-      targetPlatform: context.platform,
-      conversions: context.conversionContext.conversionHistory.length
-    });
-    
     return {
       workspaceRoot: context.workspaceRoot,
       packageRoot: context.packageRoot,
@@ -92,12 +86,7 @@ export abstract class BaseStrategy implements InstallationStrategy {
    * Log strategy selection for debugging
    */
   protected logStrategySelection(context: FlowInstallContext): void {
-    logger.debug(`Selected installation strategy: ${this.name}`, {
-      package: context.packageName,
-      platform: context.platform,
-      formatType: context.packageFormat?.type,
-      formatPlatform: context.packageFormat?.platform
-    });
+    // Strategy selection logging removed for cleaner output
   }
   
   /**
@@ -170,10 +159,6 @@ export abstract class BaseStrategy implements InstallationStrategy {
         
         // Check matched pattern if specified
         if (!minimatch(relativePath, normalizedPattern)) {
-          logger.debug('Source filtered by pattern', {
-            source: relativePath,
-            pattern: normalizedPattern
-          });
           return false;
         }
         
@@ -184,12 +169,6 @@ export abstract class BaseStrategy implements InstallationStrategy {
         filteredSources.set(flow, filtered);
       }
     }
-    
-    logger.debug('Applied resource filtering', {
-      originalFlowCount: flowSources.size,
-      filteredFlowCount: filteredSources.size,
-      matchedPattern: normalizedPattern
-    });
     
     return filteredSources;
   }

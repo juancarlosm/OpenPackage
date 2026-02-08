@@ -7,8 +7,6 @@ import { logger } from '../../../../utils/logger.js';
  * Update manifest phase (openpackage.yml)
  */
 export async function updateManifestPhase(ctx: InstallationContext): Promise<void> {
-  logger.debug(`Updating manifest for ${ctx.source.packageName}`);
-  
   const mainPackage = ctx.resolvedPackages.find(pkg => pkg.isRoot);
   
   if (!mainPackage) {
@@ -68,7 +66,6 @@ function buildManifestFields(ctx: InstallationContext, mainPackage: any) {
   // This ensures reproducible installs when ambiguity was resolved
   if (ctx.baseRelative && ctx.baseSource === 'user-selection') {
     fields.base = ctx.baseRelative;
-    logger.debug('Recording user-selected base in manifest', { base: ctx.baseRelative });
   }
   
   switch (ctx.source.type) {

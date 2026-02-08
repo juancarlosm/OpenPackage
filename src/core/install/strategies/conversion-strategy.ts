@@ -181,11 +181,6 @@ export class ConversionInstallStrategy extends BaseStrategy {
       // Write conversion context (persists through temp directory)
       await writeConversionContext(conversionContext, tempPackageRoot);
       
-      logger.debug(
-        `Wrote ${convertedPackage.files.length} converted files and context to temp directory`,
-        { tempPackageRoot }
-      );
-      
       // Install from temp directory using flow-based installation
       const flowStrategy = new FlowBasedInstallStrategy();
       

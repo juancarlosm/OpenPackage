@@ -49,7 +49,6 @@ class SchemaRegistry {
       // Resolve path relative to platforms.jsonc location
       const resolvedPath = this.resolveSchemaPath(schemaPath);
       
-      logger.debug(`Loading schema from ${resolvedPath}`);
       const content = readFileSync(resolvedPath, 'utf-8');
       const schema = JSON.parse(content) as DetectionSchema;
       

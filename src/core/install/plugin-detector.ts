@@ -24,8 +24,6 @@ export interface PluginDetectionResult {
  * @returns Detection result with plugin type if found
  */
 export async function detectPluginType(dirPath: string): Promise<PluginDetectionResult> {
-  logger.debug('Detecting plugin type', { dirPath });
-  
   const pluginDir = join(dirPath, DIR_PATTERNS.CLAUDE_PLUGIN);
   
   // Check for individual plugin
@@ -117,7 +115,6 @@ export async function hasPluginContent(dirPath: string): Promise<boolean> {
       try {
         const items = await fs.readdir(subdirPath);
         if (items.length > 0) {
-          logger.debug('Found plugin content directory', { subdir, dirPath });
           return true;
         }
       } catch {
@@ -130,7 +127,6 @@ export async function hasPluginContent(dirPath: string): Promise<boolean> {
   for (const file of pluginContentFiles) {
     const filePath = join(dirPath, file);
     if (await exists(filePath)) {
-      logger.debug('Found plugin content file', { file, dirPath });
       return true;
     }
   }

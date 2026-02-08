@@ -120,15 +120,6 @@ export async function applyConvenienceFilters(
     return rel.replace(/\\/g, '/').replace(/^\.\/?/, '');
   };
 
-  logger.debug('Applying convenience filters', {
-    basePath,
-    repoRoot: repoRootResolved,
-    hasAgents: !!options.agents,
-    hasSkills: !!options.skills,
-    agentCount: options.agents?.length || 0,
-    skillCount: options.skills?.length || 0
-  });
-
   // Match agents
   if (options.agents && options.agents.length > 0) {
     const agentResults = await matchAgents(basePath, options.agents);
@@ -222,11 +213,6 @@ async function matchAgents(
     }
   }
 
-  logger.debug('Found agent files', {
-    basePath,
-    count: agentFiles.length
-  });
-
   for (const name of requestedNames) {
     const match = await findAgentByName(agentFiles, name);
     
@@ -265,12 +251,10 @@ async function findAgentByName(
       const { frontmatter } = splitFrontmatter(content);
       if (frontmatter?.name === name) {
         const version = extractVersionFromFrontmatter(frontmatter);
-        logger.debug('Agent matched by frontmatter', { name, file, version });
         return { path: file, matchedBy: 'frontmatter', version };
       }
     } catch (error) {
       // Ignore frontmatter parsing errors
-      logger.debug('Failed to parse frontmatter', { file, error });
     }
   }
 
@@ -280,7 +264,6 @@ async function findAgentByName(
   if (byFilename.length === 1) {
     const file = byFilename[0];
     const version = await extractVersionFromFile(file);
-    logger.debug('Agent matched by filename (single)', { name, file, version });
     return { path: file, matchedBy: 'filename', version };
   }
 
@@ -290,7 +273,6 @@ async function findAgentByName(
       b.split('/').length - a.split('/').length
     )[0];
     const version = await extractVersionFromFile(deepest);
-    logger.debug('Agent matched by filename (deepest)', { name, file: deepest, candidates: byFilename.length, version });
     return { path: deepest, matchedBy: 'filename', version };
   }
 
@@ -323,11 +305,6 @@ async function matchSkills(
       }
     }
   }
-
-  logger.debug('Found SKILL.md files', {
-    basePath,
-    count: skillFiles.length
-  });
 
   for (const name of requestedNames) {
     const match = await findSkillByName(skillFiles, name);
@@ -368,12 +345,10 @@ async function findSkillByName(
       const { frontmatter } = splitFrontmatter(content);
       if (frontmatter?.name === name) {
         const version = extractVersionFromFrontmatter(frontmatter);
-        logger.debug('Skill matched by frontmatter', { name, file, version });
         return { path: file, matchedBy: 'frontmatter', version };
       }
     } catch (error) {
       // Ignore frontmatter parsing errors
-      logger.debug('Failed to parse SKILL.md frontmatter', { file, error });
     }
   }
 
@@ -382,7 +357,6 @@ async function findSkillByName(
     const dirName = basename(dirname(file));
     if (dirName === name) {
       const version = await extractVersionFromFile(file);
-      logger.debug('Skill matched by dirname (immediate)', { name, file, version });
       return { path: file, matchedBy: 'dirname', version };
     }
   }
@@ -400,7 +374,6 @@ async function findSkillByName(
       b.split('/').length - a.split('/').length
     )[0];
     const version = await extractVersionFromFile(deepest);
-    logger.debug('Skill matched by dirname (nested deepest)', { name, file: deepest, candidates: matchingByNested.length, version });
     return { path: deepest, matchedBy: 'dirname', version };
   }
 
@@ -456,7 +429,6 @@ async function extractVersionFromFile(filePath: string): Promise<string | undefi
     const { frontmatter } = splitFrontmatter(content);
     return extractVersionFromFrontmatter(frontmatter);
   } catch (error) {
-    logger.debug('Failed to extract version from file', { filePath, error });
     return undefined;
   }
 }

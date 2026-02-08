@@ -85,15 +85,12 @@ const PLATFORM_ROOT_DIRS: Record<string, Platform> = {
  * Detect package format from file list
  */
 export function detectPackageFormat(files: PackageFile[]): PackageFormat {
-  logger.debug('Detecting package format', { fileCount: files.length });
-  
   // Check for claude-plugin first (highest priority)
   const hasClaudePluginManifest = files.some(f => 
     f.path === '.claude-plugin/plugin.json'
   );
   
   if (hasClaudePluginManifest) {
-    logger.debug('Detected Claude Code plugin format');
     return {
       type: 'platform-specific',
       platform: 'claude-plugin',
@@ -222,12 +219,6 @@ function determineFormat(analysis: FormatAnalysis): PackageFormat {
   
   // Strong universal signal: >70% universal files
   if (universalRatio > 0.7) {
-    logger.debug('Detected universal format', { 
-      universalRatio, 
-      universalFiles,
-      samples: analysis.samplePaths.universal
-    });
-    
     return {
       type: 'universal',
       confidence: universalRatio,
@@ -249,13 +240,6 @@ function determineFormat(analysis: FormatAnalysis): PackageFormat {
     }
     
     if (dominantPlatform) {
-      logger.debug('Detected platform-specific format', {
-        platform: dominantPlatform,
-        platformRatio,
-        platformFiles: platformSpecificFiles,
-        samples: analysis.samplePaths.platformSpecific
-      });
-      
       return {
         type: 'platform-specific',
         platform: dominantPlatform,
@@ -266,12 +250,6 @@ function determineFormat(analysis: FormatAnalysis): PackageFormat {
   }
   
   // Mixed or unclear: default to universal with low confidence
-  logger.debug('Mixed or unclear format, defaulting to universal', {
-    universalRatio,
-    platformRatio,
-    detectedPlatforms: Array.from(detectedPlatforms.entries())
-  });
-  
   return {
     type: 'universal',
     confidence: Math.max(universalRatio, 0.3),
@@ -346,10 +324,6 @@ export async function detectEnhancedPackageFormat(
   files: PackageFile[],
   targetDir?: string
 ): Promise<EnhancedPackageFormat> {
-  logger.debug('Starting enhanced package format detection', {
-    fileCount: files.length
-  });
-  
   // Import detection modules dynamically to avoid circular deps
   const { detectPlatformMarkers, getPrimaryPlatformFromMarkers, isPurePlatformSpecific } = 
     await import('./package-marker-detector.js');
@@ -367,11 +341,6 @@ export async function detectEnhancedPackageFormat(
   // Pure platform-specific package with single marker
   if (isPurePlatformSpecific(markers)) {
     const primaryPlatform = getPrimaryPlatformFromMarkers(markers)!;
-    
-    logger.debug('Fast path: Pure platform-specific package detected', {
-      platform: primaryPlatform,
-      markers: markers.matches
-    });
     
     return {
       packageFormat: primaryPlatform,
@@ -399,8 +368,6 @@ export async function detectEnhancedPackageFormat(
   }
   
   // Tier 2: Per-file detection (detailed path)
-  logger.debug('Detailed path: Performing per-file detection');
-  
   // Detect format for each file
   const fileFormats = detectFileFormats(files, targetDir);
   
@@ -413,13 +380,6 @@ export async function detectEnhancedPackageFormat(
   // Count analyzed vs skipped files
   const analyzedFiles = fileFormats.size;
   const skippedFiles = files.length - analyzedFiles;
-  
-  logger.debug('Per-file detection complete', {
-    packageFormat,
-    confidence,
-    analyzedFiles,
-    distribution: Array.from(distribution.counts.entries())
-  });
   
   return {
     packageFormat,

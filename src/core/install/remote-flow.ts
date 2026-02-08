@@ -12,7 +12,6 @@ import { packageManager } from '../package.js';
 import { getVersionInfoFromDependencyTree } from '../../utils/install-helpers.js';
 import { promptOverwriteConfirmation } from '../../utils/prompts.js';
 import { Spinner } from '../../utils/spinner.js';
-import { logger } from '../../utils/logger.js';
 import { computeMissingDownloadKeys, createDownloadKey } from './download-keys.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';
 import { recordBatchOutcome } from './remote-reporting.js';
@@ -61,7 +60,7 @@ export async function fetchMissingDependencyMetadata(
         const versionInfo = await getVersionInfoFromDependencyTree(missingName, resolvedPackages);
         requiredVersion = versionInfo.requiredVersion;
       } catch (error) {
-        logger.debug('Failed to determine required version for missing dependency', { missingName, error });
+        // Failed to determine required version, continue without it
       }
 
       const metadataResult = await fetchRemotePackageMetadata(missingName, requiredVersion, { recursive: true, profile: opts.profile, apiKey: opts.apiKey });

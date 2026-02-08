@@ -106,19 +106,12 @@ export async function coordinateConversion(
   contentRoot: string,
   options: ConversionOptions = {}
 ): Promise<PackageConversionResult> {
-  logger.debug('Starting conversion coordination', {
-    fileCount: files.length,
-    contentRoot,
-    options
-  });
-  
   const errors: Error[] = [];
   const warnings: string[] = [];
   
   try {
     // Skip conversion if requested
     if (options.skipConversion) {
-      logger.debug('Skipping conversion (skipConversion=true)');
       return {
         wasConverted: false,
         formatDetection: createSkipDetectionResult(files),
@@ -143,12 +136,6 @@ export async function coordinateConversion(
     const needsConversion = shouldPreConvert(formatDetection, options);
     
     if (!needsConversion) {
-      logger.debug('No conversion needed', {
-        reason: formatDetection.packageFormat === 'universal' 
-          ? 'already universal' 
-          : 'package format does not require conversion'
-      });
-      
       return {
         wasConverted: false,
         formatDetection,
@@ -293,10 +280,6 @@ async function preConvertPackage(
   
   for (const [platformId, groupFiles] of formatGroups.entries()) {
     try {
-      logger.debug(`Converting format group: ${platformId}`, {
-        fileCount: groupFiles.length
-      });
-      
       // Create format group object
       const formatGroup: FormatGroup = {
         platformId,
@@ -347,10 +330,6 @@ async function preConvertPackage(
   }
   
   // Merge converted groups (Phase 3)
-  logger.debug('Merging converted format groups', {
-    groupCount: convertedGroups.size
-  });
-  
   const mergedFiles = mergeFormatGroups(convertedGroups);
   
   // Finalize conversion context

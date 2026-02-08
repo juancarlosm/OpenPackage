@@ -17,14 +17,8 @@ export async function loadPackagePhase(ctx: InstallationContext): Promise<void> 
   // Skip if context already has loaded data (preprocessed by strategy)
   // NOTE: We require resolvedPackages to be populated too; otherwise later phases break.
   if (ctx.source.contentRoot && ctx.source.packageName && ctx.resolvedPackages.length > 0) {
-    logger.debug('Skipping load phase - context already preprocessed', {
-      packageName: ctx.source.packageName,
-      contentRoot: ctx.source.contentRoot
-    });
     return;
   }
-
-  logger.debug(`Loading package from ${ctx.source.type} source`);
   
   const spinner = new Spinner('Loading package from source');
   
@@ -50,22 +44,10 @@ export async function loadPackagePhase(ctx: InstallationContext): Promise<void> 
     // Priority: resourceVersion (from frontmatter) > metadata.version > parent version > undefined
     if (ctx.source.resourceVersion !== undefined) {
       // Resource has explicit version from frontmatter, use it as final version
-      const effectiveVersion = ctx.source.resourceVersion;
-      logger.debug('Using resource version from frontmatter', {
-        packageName: loaded.packageName,
-        resourceVersion: ctx.source.resourceVersion,
-        parentVersion: loaded.version
-      });
-      ctx.source.version = effectiveVersion;
+      ctx.source.version = ctx.source.resourceVersion;
     } else if (loaded.metadata?.version && loaded.metadata.version !== loaded.version) {
       // Metadata has different version than loader provided (e.g., openpackage.yml in resource dir)
-      const effectiveVersion = loaded.metadata.version;
-      logger.debug('Using metadata version for resource', {
-        packageName: loaded.packageName,
-        metadataVersion: loaded.metadata.version,
-        parentVersion: loaded.version
-      });
-      ctx.source.version = effectiveVersion;
+      ctx.source.version = loaded.metadata.version;
     }
     // Otherwise, keep loaded.version (parent package/plugin version)
     

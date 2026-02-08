@@ -46,11 +46,7 @@ export async function checkAndHandleAllPackageConflicts(
       const versionInfo = await getVersionInfoFromDependencyTree(resolved.name, resolvedPackages);
       const existingVersion = existingCheck.version || await getInstalledPackageVersion(cwd, resolved.name);
       
-      if (existingVersion) {
-        logger.debug(`Found existing package '${resolved.name}' v${existingVersion} in ${existingCheck.location}`);
-      } else {
-        logger.debug(`Found existing package '${resolved.name}' in ${existingCheck.location}`);
-      }
+
       
       if (options.dryRun) {
         // In dry run mode, proceed; per-file logic will report decisions

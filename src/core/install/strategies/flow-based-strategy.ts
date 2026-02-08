@@ -15,7 +15,6 @@ import { filterSourcesByPlatform } from './helpers/platform-filtering.js';
 import { convertToInstallResult } from './helpers/result-converter.js';
 import { discoverFlowSources } from '../../flows/flow-source-discovery.js';
 import { executeFlowsForSources } from '../../flows/flow-execution-coordinator.js';
-import { logger } from '../../../utils/logger.js';
 
 /**
  * Standard Flow-Based Installation Strategy
@@ -39,18 +38,14 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
     
     this.logStrategySelection(context);
     
-    logger.debug(`Standard flow-based installation for ${packageName}`);
-    
     // Check if platform uses flows
     if (!platformUsesFlows(platform, workspaceRoot)) {
-      logger.debug(`Platform ${platform} does not use flows, skipping flow-based installation`);
       return this.createEmptyResult();
     }
     
     // Get applicable flows
     const flows = this.getApplicableFlows(platform, workspaceRoot);
     if (flows.length === 0) {
-      logger.debug(`No flows defined for platform ${platform}`);
       return this.createEmptyResult();
     }
     

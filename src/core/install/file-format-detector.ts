@@ -34,8 +34,6 @@ export function detectFileFormat(
   file: PackageFile,
   targetDir?: string
 ): FileFormat {
-  logger.debug(`Detecting format for file: ${file.path}`);
-  
   // Parse frontmatter if not already parsed
   let frontmatter = file.frontmatter;
   if (!frontmatter && file.content) {
@@ -45,7 +43,6 @@ export function detectFileFormat(
   
   // No frontmatter - return unknown
   if (!frontmatter || Object.keys(frontmatter).length === 0) {
-    logger.debug(`No frontmatter found in ${file.path}`);
     return {
       platform: 'unknown',
       confidence: 0,
@@ -94,7 +91,6 @@ export function detectFileFormat(
   
   // No matches - default to universal
   if (matches.length === 0) {
-    logger.debug(`No schema matches for ${file.path}, defaulting to universal`);
     return {
       platform: 'universal',
       confidence: 0.3,
@@ -109,8 +105,6 @@ export function detectFileFormat(
   const bestMatch = matches.reduce((best, current) => 
     current.score > best.score ? current : best
   );
-  
-  logger.debug(`Best match for ${file.path}: ${bestMatch.platform} (score: ${bestMatch.score.toFixed(2)})`);
   
   return {
     platform: bestMatch.platform,
@@ -174,7 +168,6 @@ export function scoreAgainstSchema(
       // Bonus for exclusive fields
       if (property['x-exclusive']) {
         score += 0.1;
-        logger.debug(`Exclusive field bonus for ${fieldName}`);
       }
     }
   }
@@ -277,7 +270,6 @@ function getPathBoost(filePath: string, flow: Flow): number {
   
   // Check if file path matches pattern
   if (matchGlob(filePath, pattern)) {
-    logger.debug(`Path boost applied for ${filePath} matching ${pattern}`);
     return 0.2;
   }
   

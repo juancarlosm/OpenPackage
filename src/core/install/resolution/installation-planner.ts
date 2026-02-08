@@ -17,7 +17,6 @@ import type {
 import { getInstalledPackageVersion } from '../../openpackage.js';
 import { join, relative } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
-import { logger } from '../../../utils/logger.js';
 
 /**
  * Map resolution source type to ResolvedPackage source.
@@ -189,10 +188,6 @@ export class InstallationPlanner {
           // but we are installing a specific resource (e.g. "skills/react-best-practices"),
           // we must narrow the pattern to ensure only the requested resource is installed.
           if (!ctx.matchedPattern || (ctx.matchedPattern.includes('**') && specificPattern.length > ctx.matchedPattern.replace('/**', '').length)) {
-            logger.debug('Narrowing matchedPattern for resource scoping', {
-              original: ctx.matchedPattern,
-              narrowed: specificPattern
-            });
             ctx.matchedPattern = specificPattern;
           }
         }

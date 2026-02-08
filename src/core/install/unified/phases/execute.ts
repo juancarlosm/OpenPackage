@@ -23,8 +23,6 @@ export interface ExecutionResult {
 export async function executeInstallationPhase(
   ctx: InstallationContext
 ): Promise<ExecutionResult> {
-  logger.debug(`Executing installation for ${ctx.resolvedPackages.length} packages`);
-  
   // Display dependency tree
   displayDependencyTree(ctx.resolvedPackages, true);
   
@@ -36,10 +34,8 @@ export async function executeInstallationPhase(
       ctx.options.platforms,
       { interactive: canPrompt }
     );
-  } else {
-    logger.debug('Platforms already resolved', { platforms: ctx.platforms });
   }
-  
+
   // Get conflict result from context
   const conflictResult = (ctx as any).conflictResult;
   

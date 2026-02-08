@@ -36,27 +36,15 @@ export interface ValidationResult {
 export function mergeFormatGroups(
   groups: Map<PlatformId | SpecialFormat, PackageFile[]>
 ): PackageFile[] {
-  logger.debug('Merging format groups', {
-    groupCount: groups.size,
-    totalFiles: Array.from(groups.values()).reduce((sum, files) => sum + files.length, 0)
-  });
-  
   // Collect all files from all groups
   const allFiles: PackageFile[] = [];
   
   for (const [platformId, files] of groups) {
-    logger.debug(`Adding ${files.length} files from ${platformId} group`);
     allFiles.push(...files);
   }
   
   // Deduplicate paths with priority-based resolution
   const deduplicated = deduplicatePaths(allFiles);
-  
-  logger.debug('Format groups merged', {
-    originalCount: allFiles.length,
-    finalCount: deduplicated.length,
-    duplicatesRemoved: allFiles.length - deduplicated.length
-  });
   
   return deduplicated;
 }
@@ -87,10 +75,7 @@ export function deduplicatePaths(files: PackageFile[]): PackageFile[] {
     const priority = determinePriority(file, existing);
     
     if (priority === 'new') {
-      logger.debug(`Replacing ${file.path} with higher priority version`);
       pathMap.set(file.path, file);
-    } else {
-      logger.debug(`Keeping existing ${file.path} (higher priority)`);
     }
   }
   

@@ -2,7 +2,6 @@ import type { InputClassification } from '../orchestrator/types.js';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import { parseResourceArg, type ResourceSpec } from '../../../utils/resource-arg-parser.js';
 import { classifyPackageInput } from '../../../utils/package-input.js';
-import { logger } from '../../../utils/logger.js';
 
 /**
  * Classify package input for routing to appropriate install strategy.
@@ -51,7 +50,6 @@ export async function classifyInput(
       if (hasConvenienceFilters) {
         throw error; // With convenience options, resource parsing is required
       }
-      logger.debug('Resource parsing failed, falling back to legacy classification', { error });
     }
   }
 

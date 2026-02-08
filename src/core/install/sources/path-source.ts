@@ -55,11 +55,6 @@ export class PathSourceLoader implements PackageSourceLoader {
         // NEW: If a resource path was specified, detect base
         const platformsState = getPlatformsState(execContext.targetDir);
         const platformsConfig = platformsState.config;
-        
-        logger.debug('Detecting base for path resource', {
-          resourcePath: source.resourcePath,
-          resolvedPath
-        });
 
         // For resource-centric installs, prefer detecting base from the actual resource path
         // when the resource exists under the provided localPath.

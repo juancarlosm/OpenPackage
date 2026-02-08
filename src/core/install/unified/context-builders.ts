@@ -129,7 +129,6 @@ export async function buildWorkspaceRootInstallContext(
   
   // Check if workspace manifest exists
   if (!(await exists(packageYmlPath))) {
-    logger.debug('No workspace manifest found, skipping workspace root context');
     return null;
   }
   
@@ -253,14 +252,12 @@ async function buildBulkInstallContexts(
         base: dep?.base ?? null
       });
       if (seen.has(dedupeKey)) {
-        logger.debug('Skipping duplicate manifest dependency', { name: dep?.name, path: dep?.path, url: dep?.url ?? dep?.git });
         continue;
       }
       seen.add(dedupeKey);
 
       // Skip if this package matches the workspace package name
       if (workspacePackageName && dep.name === workspacePackageName) {
-        logger.debug(`Skipping workspace package '${dep.name}' from bulk install`);
         continue;
       }
       
@@ -343,7 +340,6 @@ async function buildBulkInstallContexts(
       if (dep.base) {
         context.baseRelative = dep.base;
         context.baseSource = 'manifest';
-        logger.debug(`Using base from manifest for ${dep.name}`, { base: dep.base });
       }
       
       dependencyContexts.push(context);

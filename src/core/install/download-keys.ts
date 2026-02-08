@@ -1,7 +1,6 @@
 import type { PullPackageDownload } from '../../types/api.js';
 import { hasPackageVersion } from '../directory.js';
 import { parseDownloadIdentifier } from '../remote-pull.js';
-import { logger } from '../../utils/logger.js';
 
 /**
  * Create a unique key for a download based on name and version
@@ -32,7 +31,7 @@ export async function computeMissingDownloadKeys(downloads: PullPackageDownload[
         missingKeys.add(createDownloadKey(name, version));
       }
     } catch (error) {
-      logger.debug('Skipping download due to invalid name', { download: download.name, error });
+      // Skip download due to invalid name
     }
   }
 

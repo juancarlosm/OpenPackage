@@ -60,8 +60,6 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
 
   for (const resolved of packages) {
     try {
-      logger.debug(`Installing ${resolved.name}@${resolved.version} using index-based installer`);
-
       const installResult: IndexInstallResult = await installPackageByIndex(
         cwd,
         resolved.name,
