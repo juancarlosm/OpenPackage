@@ -13,6 +13,7 @@ import { resolveRemoteList, type RemoteListResult } from '../core/list/remote-li
 
 interface ListOptions {
   global?: boolean;
+  project?: boolean;
   all?: boolean;
   files?: boolean;
   tracked?: boolean;
@@ -104,42 +105,58 @@ function printTreeNode(
 }
 
 function printUntrackedSummary(result: UntrackedScanResult): void {
+  printUntrackedSummaryWithLabel(result, undefined);
+}
+
+function printUntrackedSummaryWithLabel(result: UntrackedScanResult, scopeLabel?: string): void {
   if (result.totalFiles === 0) return;
 
-  const platformCounts: string[] = [];
-  const sortedPlatforms = Array.from(result.platformGroups.keys()).sort();
-  for (const platform of sortedPlatforms) {
-    const files = result.platformGroups.get(platform)!;
-    platformCounts.push(`${platform}${dim(` (${files.length})`)}`);
-  }
+  const label = scopeLabel ? `${scopeLabel} Untracked:` : 'Untracked:';
+  console.log(label);
 
-  console.log(`Untracked:`);
-  console.log(`  ${platformCounts.join('\n  ')}`);
+  const sortedPlatforms = Array.from(result.platformGroups.keys()).sort();
+  
+  for (let i = 0; i < sortedPlatforms.length; i++) {
+    const platform = sortedPlatforms[i];
+    const files = result.platformGroups.get(platform)!;
+    const isLast = i === sortedPlatforms.length - 1;
+    const connector = isLast ? '└── ' : '├── ';
+    console.log(`${connector}${platform}${dim(` (${files.length})`)}`);
+  }
 }
 
 function printUntrackedExpanded(result: UntrackedScanResult): void {
+  printUntrackedExpandedWithLabel(result, 'Untracked:');
+}
+
+function printUntrackedExpandedWithLabel(result: UntrackedScanResult, label: string): void {
   if (result.totalFiles === 0) {
     console.log('No untracked files detected.');
     console.log(dim('All files matching platform patterns are tracked in the index.'));
     return;
   }
 
-  console.log(`Untracked:`);
+  console.log(label);
 
   const sortedPlatforms = Array.from(result.platformGroups.keys()).sort();
 
-  for (const platform of sortedPlatforms) {
+  for (let i = 0; i < sortedPlatforms.length; i++) {
+    const platform = sortedPlatforms[i];
     const files = result.platformGroups.get(platform)!;
-    console.log(`${platform}${dim(` (${files.length})`)}`);
+    const isLastPlatform = i === sortedPlatforms.length - 1;
+    const platformConnector = isLastPlatform ? '└─┬ ' : '├─┬ ';
+    const platformPrefix = isLastPlatform ? '  ' : '│ ';
+    
+    console.log(`${platformConnector}${platform}${dim(` (${files.length})`)}`);
 
     // Sort files alphabetically by workspace path
     const sortedFiles = [...files].sort((a, b) => a.workspacePath.localeCompare(b.workspacePath));
 
-    for (let i = 0; i < sortedFiles.length; i++) {
-      const file = sortedFiles[i];
-      const isLast = i === sortedFiles.length - 1;
-      const prefix = isLast ? '└── ' : '├── ';
-      console.log(`${prefix}${dim(file.workspacePath)}`);
+    for (let j = 0; j < sortedFiles.length; j++) {
+      const file = sortedFiles[j];
+      const isLastFile = j === sortedFiles.length - 1;
+      const fileConnector = isLastFile ? '└── ' : '├── ';
+      console.log(`${platformPrefix}${fileConnector}${dim(file.workspacePath)}`);
     }
   }
 }
@@ -150,10 +167,12 @@ function printDefaultView(
   headerPath: string,
   tree: ListTreeNode[],
   data: ListPipelineResult,
-  showFiles: boolean
+  showFiles: boolean,
+  scopeLabel?: string
 ): void {
   const version = headerVersion && headerVersion !== '0.0.0' ? `@${headerVersion}` : '';
-  console.log(`${headerName}${version} ${headerPath}`);
+  const label = scopeLabel ? `${scopeLabel} ` : '';
+  console.log(`${label}${headerName}${version} ${headerPath}`);
 
   if (tree.length === 0) {
     console.log(dim('  No packages installed.'));
@@ -167,11 +186,10 @@ function printDefaultView(
 
   if (data.untrackedFiles && data.untrackedFiles.totalFiles > 0) {
     if (showFiles) {
-      console.log();
-      printUntrackedExpanded(data.untrackedFiles);
+      const untrackedLabel = scopeLabel ? `${scopeLabel} Untracked:` : 'Untracked:';
+      printUntrackedExpandedWithLabel(data.untrackedFiles, untrackedLabel);
     } else {
-      console.log();
-      printUntrackedSummary(data.untrackedFiles);
+      printUntrackedSummaryWithLabel(data.untrackedFiles, scopeLabel);
     }
   }
 }
@@ -182,10 +200,12 @@ function printTrackedView(
   headerPath: string,
   tree: ListTreeNode[],
   data: ListPipelineResult,
-  showFiles: boolean
+  showFiles: boolean,
+  scopeLabel?: string
 ): void {
   const version = headerVersion && headerVersion !== '0.0.0' ? `@${headerVersion}` : '';
-  console.log(`${headerName}${version} ${headerPath}`);
+  const label = scopeLabel ? `${scopeLabel} ` : '';
+  console.log(`${label}${headerName}${version} ${headerPath}`);
 
   if (tree.length === 0) {
     console.log(dim('  No packages installed.'));
@@ -260,32 +280,22 @@ function printRemotePackageDetail(
   }
 }
 
-async function listCommand(
+interface ScopeResult {
+  headerName: string;
+  headerVersion: string | undefined;
+  headerPath: string;
+  tree: ListTreeNode[];
+  data: ListPipelineResult;
+}
+
+/**
+ * Run list pipeline for a specific scope (project or global)
+ */
+async function runScopeList(
   packageName: string | undefined,
-  options: ListOptions,
-  command: Command
-): Promise<CommandResult> {
-  const programOpts = command.parent?.opts() || {};
-
-  const execContext = await createExecutionContext({
-    global: options.global,
-    cwd: programOpts.cwd
-  });
-
-  const displayDir = getDisplayTargetDir(execContext);
-
-  if (options.tracked && options.untracked) {
-    throw new ValidationError('Cannot use --tracked and --untracked together.');
-  }
-
-  if (packageName && options.untracked) {
-    throw new ValidationError('Cannot use --untracked with a specific package.');
-  }
-
-  if (options.all && options.untracked) {
-    throw new ValidationError('Cannot use --all with --untracked.');
-  }
-
+  execContext: ExecutionContext,
+  options: ListOptions
+): Promise<ScopeResult | null> {
   const skipLocal = options.remote && !!packageName;
 
   let result: CommandResult<ListPipelineResult> | undefined;
@@ -307,45 +317,191 @@ async function listCommand(
     data = result.data!;
   }
 
-  if (packageName && (skipLocal || packages.length === 0)) {
-    const remoteResult = await resolveRemoteListForPackage(packageName, execContext, options);
-    if (remoteResult) {
-      printRemotePackageDetail(remoteResult, !!options.files);
-      return { success: true };
-    }
-    throw new ValidationError(`Package '${packageName}' not found locally or remotely`);
+  // If we didn't find anything in this scope, return null
+  if (!data || (packages.length === 0 && !packageName)) {
+    return null;
   }
 
-  if (packageName && data?.targetPackage) {
-    printPackageDetail(data.targetPackage, tree, data, !!options.files);
-    return { success: true };
-  }
-
-  if (options.untracked) {
-    printUntrackedView(data!, !!options.files);
-    return { success: true };
-  }
-
-  let headerName: string;
-  let headerVersion: string | undefined;
-  let headerPath: string;
-
+  const displayDir = getDisplayTargetDir(execContext);
   const manifestPath = getLocalPackageYmlPath(execContext.targetDir);
-  headerName = 'Unnamed';
-  headerPath = displayDir;
+  
+  let headerName = 'Unnamed';
+  let headerVersion: string | undefined;
+  const headerPath = displayDir;
 
   try {
     const manifest = await parsePackageYml(manifestPath);
     headerName = manifest.name || 'Unnamed';
     headerVersion = manifest.version;
   } catch (error) {
-    logger.warn(`Failed to read workspace manifest: ${error}`);
+    logger.debug(`Failed to read workspace manifest: ${error}`);
   }
 
-  if (options.tracked) {
-    printTrackedView(headerName, headerVersion, headerPath, tree, data!, !!options.files);
-  } else {
-    printDefaultView(headerName, headerVersion, headerPath, tree, data!, !!options.files);
+  return {
+    headerName,
+    headerVersion,
+    headerPath,
+    tree,
+    data
+  };
+}
+
+async function listCommand(
+  packageName: string | undefined,
+  options: ListOptions,
+  command: Command
+): Promise<CommandResult> {
+  const programOpts = command.parent?.opts() || {};
+
+  // Validate option combinations
+  if (options.tracked && options.untracked) {
+    throw new ValidationError('Cannot use --tracked and --untracked together.');
+  }
+
+  if (packageName && options.untracked) {
+    throw new ValidationError('Cannot use --untracked with a specific package.');
+  }
+
+  if (options.all && options.untracked) {
+    throw new ValidationError('Cannot use --all with --untracked.');
+  }
+
+  if (options.global && options.project) {
+    throw new ValidationError('Cannot use --global and --project together.');
+  }
+
+  // Determine which scopes to display
+  const showBothScopes = !options.global && !options.project;
+  const showGlobal = options.global || showBothScopes;
+  const showProject = options.project || showBothScopes;
+
+  // Handle package detail view (single package lookup)
+  if (packageName) {
+    // For package detail, use the originally specified scope (or default to project)
+    const execContext = await createExecutionContext({
+      global: options.global,
+      cwd: programOpts.cwd
+    });
+
+    const displayDir = getDisplayTargetDir(execContext);
+    const skipLocal = options.remote && !!packageName;
+
+    let result: CommandResult<ListPipelineResult> | undefined;
+    let packages: ListPackageReport[] = [];
+    let tree: ListTreeNode[] = [];
+    let data: ListPipelineResult | undefined;
+
+    if (!skipLocal) {
+      result = await runListPipeline(packageName, execContext, {
+        includeFiles: options.files || !!packageName,
+        all: options.all,
+        tracked: options.tracked,
+        untracked: options.untracked,
+        platforms: options.platforms
+      });
+
+      packages = result.data?.packages ?? [];
+      tree = result.data?.tree ?? [];
+      data = result.data!;
+    }
+
+    if (skipLocal || packages.length === 0) {
+      const remoteResult = await resolveRemoteListForPackage(packageName, execContext, options);
+      if (remoteResult) {
+        printRemotePackageDetail(remoteResult, !!options.files);
+        return { success: true };
+      }
+      throw new ValidationError(`Package '${packageName}' not found locally or remotely`);
+    }
+
+    if (data?.targetPackage) {
+      printPackageDetail(data.targetPackage, tree, data, !!options.files);
+      return { success: true };
+    }
+
+    return { success: true };
+  }
+
+  // Handle list views (no specific package)
+  const results: { scope: 'project' | 'global'; result: ScopeResult }[] = [];
+
+  // Collect project scope
+  if (showProject) {
+    const projectContext = await createExecutionContext({
+      global: false,
+      cwd: programOpts.cwd
+    });
+
+    try {
+      const projectResult = await runScopeList(packageName, projectContext, options);
+      if (projectResult) {
+        results.push({ scope: 'project', result: projectResult });
+      }
+    } catch (error) {
+      logger.debug(`Failed to list project scope: ${error}`);
+    }
+  }
+
+  // Collect global scope
+  if (showGlobal) {
+    const globalContext = await createExecutionContext({
+      global: true,
+      cwd: programOpts.cwd
+    });
+
+    try {
+      const globalResult = await runScopeList(packageName, globalContext, options);
+      if (globalResult) {
+        results.push({ scope: 'global', result: globalResult });
+      }
+    } catch (error) {
+      logger.debug(`Failed to list global scope: ${error}`);
+    }
+  }
+
+  // Display results
+  if (results.length === 0) {
+    if (options.untracked) {
+      console.log('No untracked files detected.');
+      console.log(dim('All files matching platform patterns are tracked in the index.'));
+    } else {
+      console.log(dim('No packages found in any scope.'));
+    }
+    return { success: true };
+  }
+
+  for (let i = 0; i < results.length; i++) {
+    const { scope, result } = results[i];
+    const scopeLabel = showBothScopes ? `[${scope === 'project' ? 'Project' : 'Global'}]` : undefined;
+
+    if (options.untracked) {
+      if (scopeLabel) {
+        const label = `${scopeLabel} Untracked:`;
+        printUntrackedExpandedWithLabel(result.data.untrackedFiles!, label);
+      } else {
+        printUntrackedView(result.data, !!options.files);
+      }
+    } else if (options.tracked) {
+      printTrackedView(
+        result.headerName,
+        result.headerVersion,
+        result.headerPath,
+        result.tree,
+        result.data,
+        !!options.files,
+        scopeLabel
+      );
+    } else {
+      printDefaultView(
+        result.headerName,
+        result.headerVersion,
+        result.headerPath,
+        result.tree,
+        result.data,
+        !!options.files,
+        scopeLabel
+      );
+    }
   }
 
   return { success: true };
@@ -377,7 +533,8 @@ export function setupListCommand(program: Command): void {
     .alias('ls')
     .description('Show installed packages, file status, and untracked files')
     .argument('[package]', 'show details for a specific package')
-    .option('-g, --global', 'list packages in home directory (~/) instead of current workspace')
+    .option('-p, --project', 'list packages in current workspace only')
+    .option('-g, --global', 'list packages in home directory (~/) only')
     .option('-a, --all', 'show full dependency tree including transitive dependencies')
     .option('-f, --files', 'show individual files for each package')
     .option('-t, --tracked', 'show only tracked file information (skip untracked scan)')
