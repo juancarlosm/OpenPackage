@@ -532,7 +532,7 @@ export function setupListCommand(program: Command): void {
     .command('list')
     .alias('ls')
     .description('Show installed packages, file status, and untracked files')
-    .argument('[package]', 'show details for a specific package')
+    .argument('[resource-spec]', 'show details for a specific resource')
     .option('-p, --project', 'list packages in current workspace only')
     .option('-g, --global', 'list packages in home directory (~/) only')
     .option('-a, --all', 'show full dependency tree including transitive dependencies')

@@ -21,19 +21,18 @@ export function setupInstallCommand(program: Command): void {
     .alias('i')
     .description('Install packages to workspace')
     .argument(
-      '[package-name]',
-      'name of the package to install (optional - installs workspace-level files and all packages from openpackage.yml if not specified). ' +
-      'Supports package@version syntax.'
+      '[resource-spec]',
+      'resource to install (package[@version], gh@owner/repo, https://github.com/owner/repo, /path/to/local, or git@host:repo.git)'
     )
     .option('-g, --global', 'install to home directory (~/) instead of current workspace')
     .option('-a, --agents <names...>', 'install specific agents by name (matches frontmatter name or filename)')
     .option('-s, --skills <names...>', 'install specific skills by name (matches SKILL.md frontmatter name or directory name)')
     .option('--plugins <names...>', 'install specific plugins from marketplace (bypasses interactive selection)')
-    .option('--platforms <platforms...>', 'prepare specific platforms (e.g., cursor claudecode opencode)')
+    .option('--platforms <platforms...>', 'install to specific platforms (e.g., cursor claudecode opencode)')
     .option('--dry-run', 'preview changes without applying them')
     .option('--force', 'overwrite existing files')
     .option('--conflicts <strategy>', 'conflict handling strategy: keep-both, overwrite, skip, or ask')
-    .option('--dev', 'add package to dev-dependencies instead of dependencies')
+    .option('--dev', 'add resource to dev-dependencies (instead of dependencies)')
     .option('--remote', 'pull and install from remote registry, ignoring local versions')
     .option('--local', 'resolve and install using only local registry versions, skipping remote metadata and pulls')
     .option('--profile <profile>', 'profile to use for authentication')
