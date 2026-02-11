@@ -13,8 +13,9 @@
 import { join, basename, dirname, relative, resolve } from 'path';
 import { walkFiles } from '../../utils/file-walker.js';
 import { exists, readTextFile } from '../../utils/fs.js';
-import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
 import { logger } from '../../utils/logger.js';
+import { extractMarkdownResourceMetadata } from '../resources/markdown-metadata.js';
+import { defaultNameFromPath, defaultNameFromSkillDir, preferFrontmatterName } from '../resources/resource-naming.js';
 import type { 
   DiscoveredResource, 
   ResourceDiscoveryResult,
@@ -95,13 +96,14 @@ async function discoverAgents(
       continue;
     }
     
-    const metadata = await extractMarkdownMetadata(file);
+    const content = await readTextFile(file);
+    const metadata = extractMarkdownResourceMetadata(content);
     const resourcePath = normalizeResourcePath(file, repoRoot);
     
     resources.push({
       resourceType: 'agent',
       resourcePath,
-      displayName: metadata.name || basename(file, '.md'),
+      displayName: preferFrontmatterName(metadata.name, defaultNameFromPath(file)),
       description: metadata.description,
       version: metadata.version,
       filePath: file,
@@ -133,13 +135,14 @@ async function discoverSkills(
     }
     
     const skillDir = dirname(file);
-    const metadata = await extractMarkdownMetadata(file);
+    const content = await readTextFile(file);
+    const metadata = extractMarkdownResourceMetadata(content);
     const resourcePath = normalizeResourcePath(skillDir, repoRoot);
     
     resources.push({
       resourceType: 'skill',
       resourcePath,
-      displayName: metadata.name || basename(skillDir),
+      displayName: preferFrontmatterName(metadata.name, defaultNameFromSkillDir(skillDir)),
       description: metadata.description,
       version: metadata.version,
       filePath: skillDir,
@@ -170,13 +173,14 @@ async function discoverCommands(
       continue;
     }
     
-    const metadata = await extractMarkdownMetadata(file);
+    const content = await readTextFile(file);
+    const metadata = extractMarkdownResourceMetadata(content);
     const resourcePath = normalizeResourcePath(file, repoRoot);
     
     resources.push({
       resourceType: 'command',
       resourcePath,
-      displayName: metadata.name || basename(file, '.md'),
+      displayName: preferFrontmatterName(metadata.name, defaultNameFromPath(file)),
       description: metadata.description,
       version: metadata.version,
       filePath: file,
@@ -207,13 +211,14 @@ async function discoverRules(
       continue;
     }
     
-    const metadata = await extractMarkdownMetadata(file);
+    const content = await readTextFile(file);
+    const metadata = extractMarkdownResourceMetadata(content);
     const resourcePath = normalizeResourcePath(file, repoRoot);
     
     resources.push({
       resourceType: 'rule',
       resourcePath,
-      displayName: metadata.name || basename(file, '.md'),
+      displayName: preferFrontmatterName(metadata.name, defaultNameFromPath(file)),
       description: metadata.description,
       version: metadata.version,
       filePath: file,
@@ -287,53 +292,6 @@ async function discoverMCP(
   }
   
   return resources;
-}
-
-/**
- * Extract metadata from markdown frontmatter
- */
-async function extractMarkdownMetadata(
-  filePath: string
-): Promise<{
-  name?: string;
-  description?: string;
-  version?: string;
-}> {
-  try {
-    const content = await readTextFile(filePath);
-    const { frontmatter } = splitFrontmatter(content);
-    
-    if (!frontmatter) {
-      return {};
-    }
-    
-    return {
-      name: frontmatter.name,
-      description: frontmatter.description,
-      version: extractVersionFromFrontmatter(frontmatter)
-    };
-  } catch (error) {
-    logger.debug('Failed to extract metadata', { filePath, error });
-    return {};
-  }
-}
-
-/**
- * Extract version from frontmatter (supports both top-level and nested)
- */
-function extractVersionFromFrontmatter(frontmatter: any): string | undefined {
-  if (!frontmatter || typeof frontmatter !== 'object') {
-    return undefined;
-  }
-  
-  const version = frontmatter.version ?? frontmatter.metadata?.version;
-  
-  if (typeof version === 'string') {
-    const trimmed = version.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }
-  
-  return undefined;
 }
 
 /**

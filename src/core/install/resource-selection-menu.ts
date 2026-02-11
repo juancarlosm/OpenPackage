@@ -7,6 +7,7 @@
 import { logger } from '../../utils/logger.js';
 import { UserCancellationError } from '../../utils/errors.js';
 import { smartMultiselect } from '../../utils/smart-multiselect.js';
+import { getInstallableTypes, toLabelPlural } from '../resources/resource-registry.js';
 import type { 
   ResourceDiscoveryResult, 
   DiscoveredResource,
@@ -98,14 +99,10 @@ function buildMenuChoices(
   const categoryMap = new Map<number, number[]>(); // Maps category index to resource indices
   
   // Resource type display order and labels
-  const typeOrder: Array<{ type: ResourceType; label: string }> = [
-    { type: 'agent', label: 'Agents' },
-    { type: 'skill', label: 'Skills' },
-    { type: 'command', label: 'Commands' },
-    { type: 'rule', label: 'Rules' },
-    { type: 'hook', label: 'Hooks' },
-    { type: 'mcp', label: 'MCP Servers' }
-  ];
+  const typeOrder = getInstallableTypes().map(def => ({
+    type: def.id as ResourceType,
+    label: def.labelPlural,
+  }));
   
   let globalIndex = 0;
   let categoryIndex = -1;
@@ -247,14 +244,5 @@ export function displaySelectionSummary(selected: SelectedResource[]): void {
  * Get display label for resource type
  */
 function getTypeLabel(type: ResourceType): string {
-  const labels: Record<ResourceType, string> = {
-    agent: 'Agents',
-    skill: 'Skills',
-    command: 'Commands',
-    rule: 'Rules',
-    hook: 'Hooks',
-    mcp: 'MCP Servers'
-  };
-  
-  return labels[type] || type;
+  return toLabelPlural(type);
 }

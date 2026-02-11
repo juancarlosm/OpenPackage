@@ -13,6 +13,7 @@ import { resolveRemoteList, type RemoteListResult } from '../core/list/remote-li
 import { detectEntityType, getEntityDisplayName } from '../utils/entity-detector.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
 import { resolveDeclaredPath } from '../utils/path-resolution.js';
+import { RESOURCE_TYPE_ORDER_PLURAL, normalizeType, toPluralKey } from '../core/resources/resource-registry.js';
 
 type FileStatus = 'tracked' | 'untracked' | 'missing';
 type ResourceStatus = 'tracked' | 'partial' | 'untracked' | 'mixed';
@@ -388,22 +389,7 @@ function deriveResourceNameFromUntrackedFile(file: UntrackedFile): string {
 }
 
 function normalizeCategory(category: string): string {
-  const categoryMap: Record<string, string> = {
-    'rules': 'rules',
-    'rule': 'rules',
-    'agents': 'agents',
-    'agent': 'agents',
-    'commands': 'commands',
-    'command': 'commands',
-    'skills': 'skills',
-    'skill': 'skills',
-    'hooks': 'hooks',
-    'hook': 'hooks',
-    'mcp': 'mcps',
-    'mcps': 'mcps',
-  };
-
-  return categoryMap[category.toLowerCase()] || 'other';
+  return toPluralKey(normalizeType(category));
 }
 
 function calculateResourceStatus(files: EnhancedFileMapping[]): ResourceStatus {
@@ -496,10 +482,9 @@ function mergeTrackedAndUntrackedResources(
     }
   }
 
-  const typeOrder = ['rules', 'agents', 'commands', 'skills', 'hooks', 'mcps', 'other'];
   const groups: EnhancedResourceGroup[] = [];
 
-  for (const type of typeOrder) {
+  for (const type of RESOURCE_TYPE_ORDER_PLURAL) {
     const resourcesMap = typeMap.get(type);
     if (resourcesMap && resourcesMap.size > 0) {
       const resources = Array.from(resourcesMap.values())
@@ -509,7 +494,7 @@ function mergeTrackedAndUntrackedResources(
   }
 
   for (const [type, resourcesMap] of typeMap) {
-    if (typeOrder.includes(type)) continue;
+    if (RESOURCE_TYPE_ORDER_PLURAL.includes(type)) continue;
     const resources = Array.from(resourcesMap.values())
       .sort((a, b) => a.name.localeCompare(b.name));
     groups.push({ resourceType: type, resources });
@@ -547,10 +532,9 @@ function mergeResourcesAcrossScopes(
     }
   }
 
-  const typeOrder = ['rules', 'agents', 'commands', 'skills', 'hooks', 'mcps', 'other'];
   const groups: EnhancedResourceGroup[] = [];
 
-  for (const type of typeOrder) {
+  for (const type of RESOURCE_TYPE_ORDER_PLURAL) {
     const resourcesMap = typeMap.get(type);
     if (resourcesMap && resourcesMap.size > 0) {
       const resources = Array.from(resourcesMap.values())
@@ -560,7 +544,7 @@ function mergeResourcesAcrossScopes(
   }
 
   for (const [type, resourcesMap] of typeMap) {
-    if (typeOrder.includes(type)) continue;
+    if (RESOURCE_TYPE_ORDER_PLURAL.includes(type)) continue;
     const resources = Array.from(resourcesMap.values())
       .sort((a, b) => a.name.localeCompare(b.name));
     groups.push({ resourceType: type, resources });

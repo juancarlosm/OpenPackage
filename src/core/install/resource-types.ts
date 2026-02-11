@@ -2,10 +2,12 @@
  * Resource type definitions for resource discovery and selection
  */
 
+import { type InstallableResourceTypeId } from '../resources/resource-registry.js';
+
 /**
  * Type of resource that can be discovered and installed
  */
-export type ResourceType = 'agent' | 'skill' | 'command' | 'rule' | 'hook' | 'mcp';
+export type ResourceType = InstallableResourceTypeId;
 
 /**
  * Discovered resource metadata

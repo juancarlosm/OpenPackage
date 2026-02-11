@@ -15,6 +15,7 @@ import { scanUntrackedFiles, type UntrackedScanResult } from './untracked-files-
 import { getWorkspaceIndexPath } from '../../utils/workspace-index-yml.js';
 import { isPlatformId, getAllPlatforms, getPlatformDefinition } from '../platforms.js';
 import { normalizePlatforms } from '../../utils/platform-mapper.js';
+import { DIR_TO_TYPE, RESOURCE_TYPE_ORDER, toPluralKey, type ResourceTypeId } from '../resources/resource-registry.js';
 
 export type PackageSyncState = 'synced' | 'partial' | 'missing';
 
@@ -92,16 +93,6 @@ export interface ListPipelineResult {
   untrackedFiles?: UntrackedScanResult;
 }
 
-/**
- * Known resource type directories (singular form used for display)
- */
-const RESOURCE_TYPE_DIRS: Record<string, string> = {
-  'agents': 'agent',
-  'skills': 'skill',
-  'commands': 'command',
-  'rules': 'rule',
-  'hooks': 'hook',
-};
 
 /**
  * Extract the root directory prefix from a `to` pattern string.
@@ -119,7 +110,7 @@ function extractRootPrefixFromToPattern(pattern: string): string | null {
   if (nonGlobParts.length < 2) return nonGlobParts.length === 1 ? nonGlobParts[0] : null;
   // For paths like ".config/opencode/agents/foo.md", the root prefix is everything
   // up to but not including known resource type dirs or the filename.
-  const resourceDirs = new Set(Object.keys(RESOURCE_TYPE_DIRS));
+  const resourceDirs = new Set(Object.keys(DIR_TO_TYPE));
   const prefixParts = [];
   for (const part of nonGlobParts) {
     if (resourceDirs.has(part)) break;
@@ -240,7 +231,7 @@ export function classifySourceKey(sourceKey: string): { resourceType: string; re
   }
 
   const firstDir = parts[0];
-  const singularType = RESOURCE_TYPE_DIRS[firstDir];
+  const singularType = DIR_TO_TYPE[firstDir];
 
   if (!singularType) {
     // Not a known resource type directory - classify as 'other'
@@ -299,7 +290,7 @@ export function groupFilesIntoResources(fileList: ListFileMapping[]): ListResour
   }
 
   // Build final groups, sorted by type then by resource name
-  const typeOrder = ['rule', 'agent', 'command', 'skill', 'hook', 'mcp', 'other'];
+  const typeOrder = RESOURCE_TYPE_ORDER;
   const groups: ListResourceGroup[] = [];
 
   for (const type of typeOrder) {
@@ -315,13 +306,13 @@ export function groupFilesIntoResources(fileList: ListFileMapping[]): ListResour
     }
 
     // Use plural form for group label
-    const pluralLabel = type === 'other' ? 'other' : `${type}s`;
+    const pluralLabel = toPluralKey(type as ResourceTypeId);
     groups.push({ resourceType: pluralLabel, resources });
   }
 
   // Handle any types not in typeOrder
   for (const [type, resources] of typeGroupMap) {
-    if (typeOrder.includes(type)) continue;
+    if ((typeOrder as readonly string[]).includes(type)) continue;
     resources.sort((a, b) => a.name.localeCompare(b.name));
     for (const resource of resources) {
       resource.files.sort((a, b) => a.target.localeCompare(b.target));
