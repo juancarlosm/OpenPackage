@@ -24,6 +24,47 @@ export async function createTempPackageDirectory(prefix: string = 'opkg-converte
 }
 
 /**
+ * Create a conversion cache directory within git cache location.
+ * This stores converted files alongside the original git cache for reuse.
+ * 
+ * @param gitCachePath - Path to git cache directory
+ * @returns Absolute path to conversion cache directory
+ */
+export async function createConversionCacheDirectory(
+  gitCachePath: string
+): Promise<string> {
+  const conversionDir = join(gitCachePath, '.opkg-converted');
+  await ensureDir(conversionDir);
+  return conversionDir;
+}
+
+/**
+ * Check if a conversion cache exists for a git cache path
+ * 
+ * @param gitCachePath - Path to git cache directory
+ * @returns True if conversion cache exists
+ */
+export async function hasConversionCache(gitCachePath: string): Promise<boolean> {
+  const conversionDir = join(gitCachePath, '.opkg-converted');
+  try {
+    const stat = await import('fs/promises').then(fs => fs.stat(conversionDir));
+    return stat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the conversion cache directory path (doesn't create it)
+ * 
+ * @param gitCachePath - Path to git cache directory
+ * @returns Path to conversion cache directory
+ */
+export function getConversionCacheDirectory(gitCachePath: string): string {
+  return join(gitCachePath, '.opkg-converted');
+}
+
+/**
  * Write package files to temporary directory
  * 
  * @param files - Array of files to write

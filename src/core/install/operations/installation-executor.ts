@@ -60,6 +60,9 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
 
   for (const resolved of packages) {
     try {
+      // Extract originalContentRoot if it was stored during conversion
+      const originalContentRoot = (resolved as any).originalContentRoot;
+      
       const installResult: IndexInstallResult = await installPackageByIndex(
         cwd,
         resolved.name,
@@ -70,7 +73,8 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
         resolved.pkg._format,
         resolved.marketplaceMetadata,
         matchedPattern,
-        resolved.resourceVersion
+        resolved.resourceVersion,
+        originalContentRoot  // Pass original path for index writing
       );
 
       totalInstalled += installResult.installed;

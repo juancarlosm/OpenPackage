@@ -89,7 +89,8 @@ export async function installPackageByIndexWithFlows(
     pluginName: string;
   },
   matchedPattern?: string,  // Phase 4: Pattern from base detection
-  resourceVersion?: string  // Resource-specific version (for agents/skills)
+  resourceVersion?: string,  // Resource-specific version (for agents/skills)
+  originalContentRoot?: string  // Original source path before conversion (for index)
 ): Promise<IndexInstallResult> {
   logger.debug(`Installing ${packageName}@${version} with flows for platforms: ${platforms.join(', ')}`);
 
@@ -277,11 +278,15 @@ export async function installPackageByIndexWithFlows(
     const dirGlobPrefix = isDirGlob
       ? matchedPattern!.replace(/\\/g, '/').replace(/\/\*\*$/, '')
       : undefined;
+    
+    // Use originalContentRoot if provided (for converted packages), otherwise use resolvedContentRoot
+    const basePathForIndex = originalContentRoot || resolvedContentRoot;
+    
     const indexSourcePath = (matchedPattern && !isGlob)
-      ? join(resolvedContentRoot, matchedPattern)
+      ? join(basePathForIndex, matchedPattern)
       : (dirGlobPrefix && dirGlobPrefix.length > 0)
-        ? join(resolvedContentRoot, dirGlobPrefix)
-        : resolvedContentRoot;
+        ? join(basePathForIndex, dirGlobPrefix)
+        : basePathForIndex;
 
     await updateWorkspaceIndexForFlows(
       cwd,

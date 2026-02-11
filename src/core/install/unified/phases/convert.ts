@@ -18,7 +18,13 @@ import type { PackageFile as DetectionPackageFile } from '../../detection-types.
 import { minimatch } from 'minimatch';
 import { getPlatformDefinitions, matchesUniversalPattern } from '../../../platforms.js';
 import { getPatternFromFlow } from '../../schema-registry.js';
-import { createTempPackageDirectory, writeTempPackageFiles } from '../../strategies/helpers/temp-directory.js';
+import { 
+  createTempPackageDirectory, 
+  writeTempPackageFiles,
+  createConversionCacheDirectory,
+  hasConversionCache,
+  getConversionCacheDirectory
+} from '../../strategies/helpers/temp-directory.js';
 
 /**
  * Convert phase - detect format and pre-convert if needed
@@ -90,19 +96,57 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
         detectionMethod: conversionResult.formatDetection.detectionMethod
       });
 
-      // IMPORTANT: Downstream installation reads from `contentRoot` on disk (not in-memory pkg.files).
-      // Write converted files to a temp directory and update contentRoot so installers use the converted output.
-      const tempRoot = await createTempPackageDirectory('opkg-preconverted-');
-      await writeTempPackageFiles(conversionResult.files, tempRoot);
+      // Store original contentRoot before any modifications
+      const originalContentRoot = ctx.source.contentRoot;
+      
+      // Determine conversion strategy based on source location
+      const isGitCache = originalContentRoot.includes('/.openpackage/cache/git/') || 
+                         originalContentRoot.includes('.openpackage/cache/git/');
+      
+      let conversionRoot: string;
+      let shouldCleanup = false;
+      
+      if (isGitCache) {
+        // Git cache: Store converted files in .opkg-converted subdirectory
+        // Extract the git cache root (without any subdirectory)
+        const gitCacheMatch = originalContentRoot.match(/(.+\.openpackage\/cache\/git\/[^\/]+\/[^\/]+)/);
+        const gitCacheRoot = gitCacheMatch ? gitCacheMatch[1] : originalContentRoot;
+        
+        // Check if conversion cache already exists
+        if (await hasConversionCache(gitCacheRoot)) {
+          // Conversion cache exists, use it directly
+          conversionRoot = getConversionCacheDirectory(gitCacheRoot);
+          logger.info('Using existing conversion cache', { conversionRoot });
+        } else {
+          // Create new conversion cache
+          conversionRoot = await createConversionCacheDirectory(gitCacheRoot);
+          await writeTempPackageFiles(conversionResult.files, conversionRoot);
+          logger.info('Created conversion cache in git cache directory', { conversionRoot });
+        }
+        shouldCleanup = false; // Don't cleanup, keep in cache
+      } else {
+        // Local path or other source: Use temporary directory
+        conversionRoot = await createTempPackageDirectory('opkg-preconverted-');
+        await writeTempPackageFiles(conversionResult.files, conversionRoot);
+        shouldCleanup = true; // Cleanup temp directory after install
+        logger.info('Created temporary conversion directory', { conversionRoot });
+      }
 
-      // Track temp dir for cleanup in the pipeline
-      (ctx as any)._tempConversionRoot = tempRoot;
+      // Track temp dir for cleanup in the pipeline (only for non-git-cache)
+      if (shouldCleanup) {
+        (ctx as any)._tempConversionRoot = conversionRoot;
+      }
+      
+      // Store original content root for index writing
+      (ctx as any)._originalContentRoot = originalContentRoot;
 
       // Update content roots so installation uses converted files
-      ctx.source.contentRoot = tempRoot;
+      ctx.source.contentRoot = conversionRoot;
       const rootPkg = ctx.resolvedPackages.find((p: any) => p.isRoot);
       if (rootPkg) {
-        rootPkg.contentRoot = tempRoot;
+        rootPkg.contentRoot = conversionRoot;
+        // Store original for index writing
+        (rootPkg as any).originalContentRoot = originalContentRoot;
       }
       
       // Store converted files in package metadata for downstream use
