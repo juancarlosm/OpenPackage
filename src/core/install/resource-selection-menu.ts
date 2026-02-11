@@ -7,7 +7,8 @@
 import { logger } from '../../utils/logger.js';
 import { UserCancellationError } from '../../utils/errors.js';
 import { smartMultiselect } from '../../utils/smart-multiselect.js';
-import { getInstallableTypes, toLabelPlural } from '../resources/resource-registry.js';
+import { getInstallableTypes, toLabelPlural, RESOURCE_TYPE_ORDER } from '../resources/resource-registry.js';
+import type { ResourceCatalog, ResourceEntry } from '../resources/resource-catalog.js';
 import type { 
   ResourceDiscoveryResult, 
   DiscoveredResource,
@@ -245,4 +246,153 @@ export function displaySelectionSummary(selected: SelectedResource[]): void {
  */
 function getTypeLabel(type: ResourceType): string {
   return toLabelPlural(type);
+}
+
+export async function promptCatalogSelection(
+  catalog: ResourceCatalog,
+  header: { name: string; version?: string; action: string }
+): Promise<ResourceEntry[]> {
+  logger.debug('Prompting catalog selection', {
+    action: header.action,
+    total: catalog.total
+  });
+  
+  const versionSuffix = header.version ? ` (v${header.version})` : '';
+  console.log(`✓ Package: ${header.name}${versionSuffix}`);
+  console.log(`  ${catalog.total} resource${catalog.total === 1 ? '' : 's'} available\n`);
+  
+  if (catalog.total === 0) {
+    console.log(`⚠️  No resources found`);
+    return [];
+  }
+  
+  const { choices, categoryMap, indexToEntry } = buildCatalogMenuChoices(catalog);
+  
+  if (choices.length === 0) {
+    console.log(`⚠️  No selectable resources found`);
+    return [];
+  }
+  
+  try {
+    const selectedIndices = await smartMultiselect(
+      `Select resources to ${header.action}:`,
+      choices,
+      categoryMap,
+      {
+        hint: '- Space: select/deselect • Enter: confirm • Categories expand to all items',
+        min: 1
+      }
+    );
+    
+    if (!selectedIndices || selectedIndices.length === 0) {
+      logger.info('User cancelled resource selection or selected nothing');
+      return [];
+    }
+    
+    const resourceIndices = selectedIndices.filter(idx => idx >= 0);
+    const selected = resourceIndices
+      .filter(idx => indexToEntry.has(idx))
+      .map(idx => indexToEntry.get(idx)!);
+    
+    logger.info('User selected resources', {
+      count: selected.length,
+      types: Array.from(new Set(selected.map(r => r.resourceType)))
+    });
+    
+    return selected;
+  } catch (error) {
+    if (error instanceof UserCancellationError) {
+      logger.info('User cancelled resource selection');
+      return [];
+    }
+    throw error;
+  }
+}
+
+function buildCatalogMenuChoices(
+  catalog: ResourceCatalog
+): { choices: any[]; categoryMap: Map<number, number[]>; indexToEntry: Map<number, ResourceEntry> } {
+  const choices: any[] = [];
+  const categoryMap = new Map<number, number[]>();
+  const indexToEntry = new Map<number, ResourceEntry>();
+  
+  const typeOrder = RESOURCE_TYPE_ORDER;
+  
+  let globalIndex = 0;
+  let categoryIndex = -1;
+  
+  for (const typeId of typeOrder) {
+    const entries = catalog.byType.get(typeId);
+    if (!entries || entries.length === 0) continue;
+    
+    const label = toLabelPlural(typeId);
+    const currentCategoryIndex = categoryIndex;
+    const categoryResourceIndices: number[] = [];
+    
+    const boldLabel = `\x1b[1m${label} (${entries.length}):\x1b[0m`;
+    choices.push({
+      title: boldLabel,
+      value: currentCategoryIndex,
+      description: 'Select/deselect all items in this category'
+    });
+    
+    for (const entry of entries) {
+      const versionSuffix = entry.version ? ` (v${entry.version})` : '';
+      const pathHint = getCatalogPathHint(entry);
+      
+      const fullDescription = entry.description
+        ? `${entry.description} - ${pathHint}`
+        : pathHint;
+      const truncatedDescription = fullDescription.length > 160
+        ? fullDescription.substring(0, 157) + '...'
+        : fullDescription;
+      
+      categoryResourceIndices.push(globalIndex);
+      indexToEntry.set(globalIndex, entry);
+      
+      choices.push({
+        title: `  ${entry.name}${versionSuffix}`,
+        value: globalIndex++,
+        description: truncatedDescription
+      });
+    }
+    
+    categoryMap.set(currentCategoryIndex, categoryResourceIndices);
+    categoryIndex--;
+  }
+  
+  return { choices, categoryMap, indexToEntry };
+}
+
+function getCatalogPathHint(entry: ResourceEntry): string {
+  if (entry.origin === 'installed') {
+    if (entry.files.length === 1 && entry.files[0].target) {
+      return entry.files[0].target;
+    }
+    return `(${entry.files.length} file${entry.files.length === 1 ? '' : 's'})`;
+  }
+  
+  if (entry.resourcePath) {
+    return entry.installKind === 'directory' ? `${entry.resourcePath}/` : entry.resourcePath;
+  }
+  
+  return '';
+}
+
+export function displayCatalogSelectionSummary(selected: ResourceEntry[], action: string): void {
+  if (selected.length === 0) return;
+  
+  const byType = new Map<string, number>();
+  for (const entry of selected) {
+    byType.set(entry.resourceType, (byType.get(entry.resourceType) || 0) + 1);
+  }
+  
+  console.log(`\n✓ Selected ${selected.length} resource${selected.length === 1 ? '' : 's'} to ${action}:`);
+  
+  for (const [type, count] of byType.entries()) {
+    const label = toLabelPlural(type as any);
+    console.log(`  • ${count} ${label.toLowerCase()}`);
+  }
+  
+  console.log('');
 }

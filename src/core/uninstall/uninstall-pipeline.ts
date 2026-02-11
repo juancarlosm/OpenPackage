@@ -5,7 +5,7 @@ import type { CommandResult, UninstallOptions, ExecutionContext } from '../../ty
 import { ValidationError } from '../../utils/errors.js';
 import { getLocalOpenPackageDir, getLocalPackageYmlPath } from '../../utils/paths.js';
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../utils/workspace-index-yml.js';
-import { removeWorkspaceIndexEntry } from '../../utils/workspace-index-ownership.js';
+import { removeWorkspaceIndexEntry, removeWorkspaceIndexFileKeys } from '../../utils/workspace-index-ownership.js';
 import { processRootFileRemovals } from '../../utils/root-file-uninstaller.js';
 import { exists, remove, walkFiles } from '../../utils/fs.js';
 import { isDirKey } from '../../utils/package-index-yml.js';
@@ -242,6 +242,85 @@ export async function runUninstallPipeline(
     data: {
       removedFiles: deleted,
       rootFilesUpdated: [...rootResult.updated, ...updated]
+    }
+  };
+}
+
+export async function runSelectiveUninstallPipeline(
+  packageName: string,
+  sourceKeysToRemove: Set<string>,
+  options: UninstallOptions = {},
+  execContext: ExecutionContext
+): Promise<CommandResult<UninstallPipelineResult>> {
+  const targetDir = execContext.targetDir;
+  const openpkgDir = getLocalOpenPackageDir(targetDir);
+  const manifestPath = getLocalPackageYmlPath(targetDir);
+
+  if (!(await exists(openpkgDir)) || !(await exists(manifestPath))) {
+    throw new ValidationError(
+      `No .openpackage/openpackage.yml found in ${targetDir}.`
+    );
+  }
+
+  const { index, path: indexPath } = await readWorkspaceIndex(targetDir);
+  const pkgEntry = index.packages?.[packageName];
+
+  if (!pkgEntry) {
+    return { success: false, error: `Package '${packageName}' not found in workspace index.` };
+  }
+
+  const filteredFiles: Record<string, (string | WorkspaceIndexFileMapping)[]> = {};
+  for (const key of sourceKeysToRemove) {
+    if (pkgEntry.files[key]) {
+      filteredFiles[key] = pkgEntry.files[key];
+    }
+  }
+
+  const rootNames = getPlatformRootFileNames(getAllPlatforms(undefined, targetDir), targetDir);
+
+  if (options.dryRun) {
+    const plannedRemovals = await processFileMappings(
+      filteredFiles,
+      targetDir,
+      packageName,
+      rootNames,
+      { dryRun: true }
+    );
+    console.log(`(dry-run) Would remove ${plannedRemovals.removed.length} files for ${packageName}`);
+    for (const filePath of plannedRemovals.removed) {
+      console.log(` - ${filePath}`);
+    }
+    return {
+      success: true,
+      data: {
+        removedFiles: plannedRemovals.removed,
+        rootFilesUpdated: []
+      }
+    };
+  }
+
+  const { removed: deleted, updated } = await processFileMappings(
+    filteredFiles,
+    targetDir,
+    packageName,
+    rootNames,
+    { dryRun: false }
+  );
+
+  removeWorkspaceIndexFileKeys(index, packageName, sourceKeysToRemove);
+  await writeWorkspaceIndex({ path: indexPath, index });
+
+  const preservedDirs = buildPreservedDirectoriesSet(targetDir);
+  const deletedAbsolutePaths = deleted.map(relativePath => path.join(targetDir, relativePath));
+  await cleanupEmptyParents(targetDir, deletedAbsolutePaths, preservedDirs);
+
+  logger.info(`Selectively uninstalled from ${packageName}: removed ${deleted.length} files, updated ${updated.length} merged files`);
+
+  return {
+    success: true,
+    data: {
+      removedFiles: deleted,
+      rootFilesUpdated: updated
     }
   };
 }

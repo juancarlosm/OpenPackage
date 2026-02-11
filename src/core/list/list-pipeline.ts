@@ -16,6 +16,8 @@ import { getWorkspaceIndexPath } from '../../utils/workspace-index-yml.js';
 import { isPlatformId, getAllPlatforms, getPlatformDefinition } from '../platforms.js';
 import { normalizePlatforms } from '../../utils/platform-mapper.js';
 import { DIR_TO_TYPE, RESOURCE_TYPE_ORDER, toPluralKey, type ResourceTypeId } from '../resources/resource-registry.js';
+import { classifySourceKey } from '../resources/source-key-classifier.js';
+export { classifySourceKey } from '../resources/source-key-classifier.js';
 
 export type PackageSyncState = 'synced' | 'partial' | 'missing';
 
@@ -212,47 +214,6 @@ function extractPlatformFromPath(targetPath: string, targetDir: string): string 
 
   // No platform detected - this is a universal file
   return null;
-}
-
-/**
- * Classify a source key from the workspace index into a resource type and name.
- *
- * Source keys follow the pattern: `<type-dir>/<name>.md` or `<type-dir>/<name>/...`
- * For skills, multiple source keys share a `skills/<name>/` prefix and are grouped.
- * For MCP, source keys are `mcp.json` or `mcp.jsonc`.
- */
-export function classifySourceKey(sourceKey: string): { resourceType: string; resourceName: string } {
-  const normalized = sourceKey.replace(/\\/g, '/').replace(/\/$/, '');
-  const parts = normalized.split('/');
-
-  // Check for MCP files at root level
-  if (parts.length === 1 && (sourceKey === 'mcp.json' || sourceKey === 'mcp.jsonc')) {
-    return { resourceType: 'mcp', resourceName: 'MCP Server Configuration' };
-  }
-
-  const firstDir = parts[0];
-  const singularType = DIR_TO_TYPE[firstDir];
-
-  if (!singularType) {
-    // Not a known resource type directory - classify as 'other'
-    const name = parts[parts.length - 1].replace(/\.[^.]+$/, '') || sourceKey;
-    return { resourceType: 'other', resourceName: name };
-  }
-
-  if (singularType === 'skill') {
-    // Skills: the resource name is the directory after 'skills/'
-    // e.g., skills/my-skill/SKILL.md -> name is 'my-skill'
-    // e.g., skills/my-skill/helper.py -> name is 'my-skill'
-    const skillName = parts.length > 1 ? parts[1] : 'unnamed';
-    return { resourceType: 'skill', resourceName: skillName };
-  }
-
-  // File-based resources (agents, commands, rules, hooks)
-  // e.g., rules/my-rule.md -> name is 'my-rule'
-  // e.g., agents/sub/deep.md -> name is 'deep'
-  const fileName = parts[parts.length - 1];
-  const name = fileName.replace(/\.[^.]+$/, '') || fileName;
-  return { resourceType: singularType, resourceName: name };
 }
 
 /**

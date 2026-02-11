@@ -47,6 +47,23 @@ export function removeWorkspaceIndexEntry(index: WorkspaceIndex, packageName: st
   }
 }
 
+export function removeWorkspaceIndexFileKeys(
+  index: WorkspaceIndex,
+  packageName: string,
+  sourceKeysToRemove: Set<string>
+): void {
+  const pkg = index.packages?.[packageName];
+  if (!pkg) return;
+
+  for (const key of sourceKeysToRemove) {
+    delete pkg.files[key];
+  }
+
+  if (Object.keys(pkg.files).length === 0) {
+    delete index.packages[packageName];
+  }
+}
+
 /**
  * Build ownership maps from the unified workspace index.
  *
