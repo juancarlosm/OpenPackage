@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { withErrorHandling } from '../utils/errors.js';
 import { createPackage } from '../core/package-creation.js';
 import { parseScope, validateScopeWithPackageName, type PackageScope } from '../utils/scope-resolution.js';
-import { promptPackageScope, promptCustomPath } from '../utils/prompts.js';
+import { promptPackageName } from '../utils/prompts.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -12,7 +12,6 @@ interface NewCommandOptions {
   scope?: string;
   path?: string;
   force?: boolean;
-  nonInteractive?: boolean;
 }
 
 /**
@@ -20,23 +19,23 @@ interface NewCommandOptions {
  * 
  * This command creates a new package with scope support:
  * - root: Create openpackage.yml in current directory
- * - local: Create in .openpackage/packages/<name>/ (default)
- * - global: Create in ~/.openpackage/packages/<name>/
+ * - local: Create in .openpackage/packages/<name>/
+ * - global: Create in ~/.openpackage/packages/<name>/ (default)
  * - custom: Create at a user-specified path
+ * 
+ * Creates a minimal package with only the name field set.
+ * Use 'opkg set' to configure additional metadata (description, keywords, etc.)
  */
 export function setupNewCommand(program: Command): void {
   program
     .command('new')
-    .argument('[package-name]', 'package name (optional - will prompt if not provided in interactive mode)')
-    .description('Create a new package with manifest')
-    .option('--scope <scope>', 'package scope: root, local, or global')
+    .argument('[package-name]', 'package name (will prompt if not provided)')
+    .description('Create a new package with minimal manifest (use "opkg set" to configure metadata)')
+    .option('--scope <scope>', 'package scope: root, local, or global (default: global)')
     .option('--path <path>', 'custom path for package directory (overrides scope)')
     .option('-f, --force', 'overwrite existing package without confirmation')
-    .option('--non-interactive', 'skip interactive prompts, use defaults')
     .action(withErrorHandling(async (packageName?: string, options?: NewCommandOptions) => {
       const cwd = process.cwd();
-
-      const isInteractive = !options?.nonInteractive;
 
       // Parse and validate scope or custom path
       let scope: PackageScope | undefined;
@@ -57,38 +56,20 @@ export function setupNewCommand(program: Command): void {
         } catch (error) {
           throw new Error(error instanceof Error ? error.message : String(error));
         }
-      } else if (isInteractive) {
-        // Interactive mode without --scope or --path: prompt user to choose
-        const scopeOrCustom = await promptPackageScope();
-        
-        if (scopeOrCustom === 'custom') {
-          // User selected custom path - prompt for it
-          customPath = await promptCustomPath(packageName);
-        } else {
-          // User selected a predefined scope
-          scope = scopeOrCustom as PackageScope;
-        }
-        
-        console.log(); // Add blank line after prompt for better formatting
       } else {
-        // Non-interactive mode without --scope or --path: error
-        throw new Error(
-          'Either --scope or --path is required in non-interactive mode.\n\n' +
-          'Usage with scope:\n' +
-          '  opkg new [package-name] --scope <root|local|global> --non-interactive\n\n' +
-          'Usage with custom path:\n' +
-          '  opkg new [package-name] --path <directory> --non-interactive\n\n' +
-          'Available scopes:\n' +
-          '  root   - Create in current directory\n' +
-          '  local  - Create in .openpackage/packages/\n' +
-          '  global - Create in ~/.openpackage/packages/'
-        );
+        // No scope or path provided: default to global
+        scope = 'global';
+      }
+
+      // Prompt for package name if not provided
+      if (!packageName) {
+        packageName = await promptPackageName();
       }
 
       // Validate scope and package name combination (skip for custom paths)
       if (scope && !customPath) {
         try {
-          validateScopeWithPackageName(scope, packageName, isInteractive);
+          validateScopeWithPackageName(scope, packageName, false);
         } catch (error) {
           throw new Error(error instanceof Error ? error.message : String(error));
         }
@@ -99,17 +80,17 @@ export function setupNewCommand(program: Command): void {
         customPath,
         packageName,
         force: options?.force,
-        interactive: isInteractive
+        interactive: false
       });
 
-      // Create the package
+      // Create the package (non-interactive mode)
       const result = await createPackage({
         cwd,
         scope,
         customPath,
         packageName,
         force: options?.force || false,
-        interactive: !options?.nonInteractive
+        interactive: false
       });
 
       if (!result.success) {

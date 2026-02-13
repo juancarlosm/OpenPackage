@@ -169,6 +169,49 @@ export async function promptCustomPath(packageName?: string): Promise<string> {
 }
 
 /**
+ * Prompt user to enter a package name
+ * @param defaultName - Default package name to suggest
+ * @param existsChecker - Optional async function to check if package name already exists
+ */
+export async function promptPackageName(
+  defaultName?: string,
+  existsChecker?: (name: string) => Promise<boolean>
+): Promise<string> {
+  const cwd = process.cwd();
+  const suggestedName = defaultName || basename(cwd);
+
+  const response = await safePrompts({
+    type: 'text',
+    name: 'name',
+    message: 'Package name:',
+    initial: suggestedName,
+    validate: async (value: string) => {
+      if (!value) return 'Name is required';
+      try {
+        validatePackageName(value);
+      } catch (error) {
+        // Strip "Validation error: " prefix to avoid duplication in prompts UI
+        const message = (error as Error).message;
+        return message.replace(/^Validation error:\s*/, '');
+      }
+      
+      // Check if package already exists (if checker provided)
+      if (existsChecker) {
+        const normalized = normalizePackageName(value);
+        const alreadyExists = await existsChecker(normalized);
+        if (alreadyExists) {
+          return `Package '${normalized}' already exists. Please choose a different name.`;
+        }
+      }
+      
+      return true;
+    }
+  });
+
+  return normalizePackageName(response.name);
+}
+
+/**
  * Package details prompt for interactive package creation
  * @param defaultName - Default package name to suggest
  * @param existsChecker - Optional async function to check if package name already exists
