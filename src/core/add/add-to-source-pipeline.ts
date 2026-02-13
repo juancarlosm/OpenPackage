@@ -6,7 +6,7 @@ import { resolveMutableSource } from '../source-resolution/resolve-mutable-sourc
 import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
 import { collectSourceEntries } from './source-collector.js';
 import { copyFilesWithConflictResolution } from './add-conflict-handler.js';
-import type { AddPackageContext } from './add-context.js';
+import type { PackageContext } from '../package-context.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 import { exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
@@ -22,6 +22,7 @@ export interface AddToSourceResult {
   filesAdded: number;
   sourcePath: string;
   sourceType: 'workspace' | 'global';
+  isWorkspaceRoot: boolean;
   addedFilePaths: string[];
 }
 
@@ -41,10 +42,11 @@ export async function runAddToSourcePipeline(
   }
 
   // Build package context (workspace root or mutable package source)
-  let packageContext: AddPackageContext;
+  let packageContext: Pick<PackageContext, 'name' | 'version' | 'config' | 'packageYmlPath' | 'packageRootDir' | 'packageFilesDir'>;
   let sourceType: 'workspace' | 'global';
+  const isWorkspaceRoot = resolvedPackageName === null;
   
-  if (resolvedPackageName === null) {
+  if (isWorkspaceRoot) {
     // No package name: add to workspace root (.openpackage/)
     const result = await buildWorkspaceRootContext(cwd);
     if (!result.success) {
@@ -102,6 +104,7 @@ export async function runAddToSourcePipeline(
       filesAdded: changed.length,
       sourcePath: packageContext.packageRootDir,
       sourceType,
+      isWorkspaceRoot,
       addedFilePaths
     }
   };
@@ -145,9 +148,11 @@ async function resolveAddArguments(
  * Build context for workspace root package at .openpackage/
  * Creates the workspace manifest if it doesn't exist.
  */
+type AddContext = Pick<PackageContext, 'name' | 'version' | 'config' | 'packageYmlPath' | 'packageRootDir' | 'packageFilesDir'>;
+
 async function buildWorkspaceRootContext(
   cwd: string
-): Promise<{ success: true; context: AddPackageContext } | { success: false; error: string }> {
+): Promise<{ success: true; context: AddContext } | { success: false; error: string }> {
   // Ensure .openpackage/ structure exists
   await ensureLocalOpenPackageStructure(cwd);
 
@@ -189,7 +194,7 @@ async function buildWorkspaceRootContext(
  */
 async function buildPackageContextFromSource(
   source: Awaited<ReturnType<typeof resolveMutableSource>>
-): Promise<AddPackageContext> {
+): Promise<AddContext> {
   const packageYmlPath = join(source.absolutePath, FILE_PATTERNS.OPENPACKAGE_YML);
   const config = await parsePackageYml(packageYmlPath);
 

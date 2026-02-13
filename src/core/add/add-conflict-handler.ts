@@ -6,7 +6,7 @@ import { safePrompts } from '../../utils/prompts.js';
 import { UserCancellationError } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import type { SourceEntry } from './source-collector.js';
-import type { AddPackageContext } from './add-context.js';
+import type { PackageContext } from '../package-context.js';
 import { applyMapPipeline, createMapContext, splitMapPipeline } from '../flows/map-pipeline/index.js';
 import { defaultTransformRegistry } from '../flows/flow-transforms.js';
 import { parseMarkdownDocument, serializeMarkdownDocument } from '../flows/markdown.js';
@@ -17,7 +17,7 @@ type ConflictDecision = 'keep-existing' | 'overwrite';
  * Resolve the target path for a registry path.
  * Registry paths are package-root-relative (universal subdirs already at root)
  */
-function resolveTargetPath(packageContext: AddPackageContext, registryPath: string): string {
+function resolveTargetPath(packageContext: Pick<PackageContext, 'packageRootDir'>, registryPath: string): string {
   return join(packageContext.packageRootDir, registryPath);
 }
 
@@ -66,7 +66,7 @@ function transformMarkdownWithFlowMap(
 }
 
 export async function copyFilesWithConflictResolution(
-  packageContext: AddPackageContext,
+  packageContext: Pick<PackageContext, 'name' | 'packageRootDir'>,
   entries: SourceEntry[]
 ): Promise<PackageFile[]> {
   const changedFiles: PackageFile[] = [];
