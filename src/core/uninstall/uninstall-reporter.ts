@@ -28,3 +28,30 @@ export function reportUninstallResult(result: UninstallResult): void {
     }
   }
 }
+
+export interface ResourceUninstallResult {
+  resourceName: string;
+  resourceType: string;
+  packageName?: string;
+  removedFiles: string[];
+  rootFilesUpdated: string[];
+}
+
+/**
+ * Report resource-level uninstall results to console
+ */
+export function reportResourceUninstallResult(result: ResourceUninstallResult): void {
+  const fromPkg = result.packageName ? ` from ${result.packageName}` : '';
+  console.log(`✓ Removed ${result.resourceType} "${result.resourceName}"${fromPkg} (${result.removedFiles.length} file${result.removedFiles.length === 1 ? '' : 's'})`);
+  
+  const sortedFiles = [...result.removedFiles].sort((a, b) => a.localeCompare(b));
+  for (const file of sortedFiles) {
+    console.log(`  - ${formatPathForDisplay(file)}`);
+  }
+  
+  if (result.rootFilesUpdated.length > 0) {
+    for (const file of result.rootFilesUpdated) {
+      console.log(`  - ${formatPathForDisplay(file)} (updated)`);
+    }
+  }
+}
