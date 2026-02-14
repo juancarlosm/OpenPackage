@@ -7,6 +7,7 @@ import { runUninstallPipeline } from '../core/uninstall/uninstall-pipeline.js';
 import { reportUninstallResult } from '../core/uninstall/uninstall-reporter.js';
 import { createExecutionContext } from '../core/execution-context.js';
 import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
+import { isRootPackage } from '../utils/paths.js';
 
 interface UninstallCommandOptions extends UninstallOptions {
   list?: boolean;
@@ -51,7 +52,16 @@ async function handleListUninstall(
 ) {
   const targetDir = execContext.targetDir;
   const { index } = await readWorkspaceIndex(targetDir);
-  const packageNames = Object.keys(index.packages || {}).sort();
+  const allPackageNames = Object.keys(index.packages || {}).sort();
+
+  // Filter out the workspace package itself
+  const packageNames: string[] = [];
+  for (const pkgName of allPackageNames) {
+    if (await isRootPackage(targetDir, pkgName)) {
+      continue;
+    }
+    packageNames.push(pkgName);
+  }
 
   if (packageNames.length === 0) {
     console.log('No installed packages found.');
