@@ -1,12 +1,12 @@
 # Scope Management (Deferred Aspects)
 
-Package scopes distinguish local vs. shared mutable sources. Supports workspace and global scopes via paths; transitions are manual. Automated commands (`elevate`, `localize`) deferred to future release.
+Package scopes distinguish project vs. shared mutable sources. Supports workspace and global scopes via paths; transitions are manual. Automated commands (`elevate`, `localize`) deferred to future release.
 
 ## Scopes Overview
 
 | Scope | Location | Shared? | Use Case |
 |-------|----------|---------|----------|
-| **Workspace (Local)** | `./.openpackage/packages/<name>/` | No | Project-specific development |
+| **Workspace (Project)** | `./.openpackage/packages/<name>/` | No | Project-specific development |
 | **Global** | `~/.openpackage/packages/<name>/` | Yes | Cross-project utilities/rules |
 | **Registry** | `~/.openpackage/registry/<name>/<ver>/` | N/A | Immutable snapshots (scope-agnostic) |
 
@@ -14,13 +14,13 @@ Registry is scope-neutral (immutable). See [Package Sources](package-sources.md)
 
 ## Current Workflows
 
-### Creating Local Package (Workspace-Scoped)
+### Creating Project Package (Workspace-Scoped)
 ```bash
 # Interactive (prompts for scope)
 opkg new my-rules
 
 # Explicit
-opkg new my-rules --scope local
+opkg new my-rules --scope project
 # Creates: .openpackage/packages/my-rules/openpackage.yml
 # Automatically added to workspace manifest with path reference
 ```

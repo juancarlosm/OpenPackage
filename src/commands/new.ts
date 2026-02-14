@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { withErrorHandling } from '../utils/errors.js';
 import { createPackage } from '../core/package-creation.js';
-import { parseScope, validateScopeWithPackageName, type PackageScope } from '../utils/scope-resolution.js';
+import { parseScope, type PackageScope } from '../utils/scope-resolution.js';
 import { promptPackageName } from '../utils/prompts.js';
 import { logger } from '../utils/logger.js';
 
@@ -19,7 +19,7 @@ interface NewCommandOptions {
  * 
  * This command creates a new package with scope support:
  * - root: Create openpackage.yml in current directory
- * - local: Create in .openpackage/packages/<name>/
+ * - project: Create in .openpackage/packages/<name>/
  * - global: Create in ~/.openpackage/packages/<name>/ (default)
  * - custom: Create at a user-specified path
  * 
@@ -31,7 +31,7 @@ export function setupNewCommand(program: Command): void {
     .command('new')
     .argument('[package-name]', 'package name (will prompt if not provided)')
     .description('Create a new package with minimal manifest (use "opkg set" to configure metadata)')
-    .option('--scope <scope>', 'package scope: root, local, or global (default: global)')
+    .option('--scope <scope>', 'package scope: root, project, or global (default: global)')
     .option('--path <path>', 'custom path for package directory (overrides scope)')
     .option('-f, --force', 'overwrite existing package without confirmation')
     .action(withErrorHandling(async (packageName?: string, options?: NewCommandOptions) => {
@@ -66,31 +66,20 @@ export function setupNewCommand(program: Command): void {
         packageName = await promptPackageName();
       }
 
-      // Validate scope and package name combination (skip for custom paths)
-      if (scope && !customPath) {
-        try {
-          validateScopeWithPackageName(scope, packageName, false);
-        } catch (error) {
-          throw new Error(error instanceof Error ? error.message : String(error));
-        }
-      }
-
       logger.debug('Creating new package', {
         scope,
         customPath,
         packageName,
-        force: options?.force,
-        interactive: false
+        force: options?.force
       });
 
-      // Create the package (non-interactive mode)
+      // Create the package
       const result = await createPackage({
         cwd,
         scope,
         customPath,
         packageName,
-        force: options?.force || false,
-        interactive: false
+        force: options?.force || false
       });
 
       if (!result.success) {
@@ -105,7 +94,7 @@ export function setupNewCommand(program: Command): void {
         console.log(`\n💡 Next steps:`);
         console.log(`   1. Add files to your package at: ${customPath}`);
         console.log(`   2. Install to workspace: opkg install ${customPath}`);
-      } else if (scope === 'local') {
+      } else if (scope === 'project') {
         console.log(`\n💡 Next steps:`);
         console.log(`   1. Add files to your package: cd .openpackage/packages/${actualPackageName}/`);
         console.log(`   2. Install to this workspace: opkg install ${actualPackageName}`);

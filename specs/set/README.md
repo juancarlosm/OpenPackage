@@ -420,7 +420,7 @@ opkg push my-package
 
 ```bash
 # Create package, then add metadata later
-opkg new my-package --scope local --non-interactive
+opkg new my-package --scope project --non-interactive
 opkg set my-package --ver 1.0.0 --description "Initial version"
 ```
 

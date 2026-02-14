@@ -13,10 +13,8 @@ import {
   formatCustomPathForDisplay
 } from '../utils/custom-path-resolution.js';
 import { parsePackageYml, writePackageYml } from '../utils/package-yml.js';
-import { promptPackageDetails, promptPackageDetailsForNamed } from '../utils/prompts.js';
 import { logger } from '../utils/logger.js';
 import { displayPackageConfig } from '../utils/formatters.js';
-import { UserCancellationError } from '../utils/errors.js';
 import { exists, ensureDir } from '../utils/fs.js';
 import { normalizePackageName, validatePackageName } from '../utils/package-name.js';
 import type { PackageContext } from './package-context.js';
@@ -28,20 +26,17 @@ export interface CreatePackageOptions {
   /** Current working directory */
   cwd: string;
 
-  /** Package scope (root, local, or global) - optional when customPath is provided */
+  /** Package scope (root, project, or global) - optional when customPath is provided */
   scope?: PackageScope;
 
   /** Custom directory path for package - overrides scope-based resolution */
   customPath?: string;
 
-  /** Package name (optional for root scope, required for local/global) */
+  /** Package name (optional for root scope, required for project/global) */
   packageName?: string;
 
   /** Force overwrite existing package */
   force?: boolean;
-
-  /** Enable interactive prompts for package details */
-  interactive?: boolean;
 }
 
 /**
@@ -67,7 +62,6 @@ export interface CreatePackageResult {
  * This is the core package creation logic that handles:
  * - Validation of package name and scope
  * - Conflict detection with existing packages
- * - Interactive prompts for package metadata
  * - Directory structure creation
  * - openpackage.yml writing
  * 
@@ -82,8 +76,7 @@ export async function createPackage(
     scope,
     customPath,
     packageName,
-    force = false,
-    interactive = true
+    force = false
   } = options;
 
   try {
@@ -98,20 +91,18 @@ export async function createPackage(
     // Step 1: Determine initial package name
     let normalizedName: string;
     let displayName: string;
-    let nameFromPrompt = false;
 
     if (!packageName) {
-      // No name provided - will prompt or use default
-      if (!interactive && scope && scope !== 'root' && !customPath) {
+      // No name provided - package name is required for non-root scopes
+      if (scope && scope !== 'root' && !customPath) {
         return {
           success: false,
-          error: `Package name is required for ${scope} scope in non-interactive mode.\nUsage: opkg new <package-name> --scope ${scope} --non-interactive`
+          error: `Package name is required for ${scope} scope.\nUsage: opkg new <package-name> --scope ${scope}`
         };
       }
-      // Use cwd basename as default (will be prompted for in interactive mode)
+      // Use cwd basename as default for root scope
       displayName = basename(cwd);
       normalizedName = normalizePackageName(displayName);
-      nameFromPrompt = interactive; // Will prompt for name if interactive
     } else {
       // Package name provided
       validatePackageName(packageName);
@@ -189,44 +180,12 @@ export async function createPackage(
       logger.info(`Overwriting existing package at ${displayPath} (--force enabled)`);
     }
 
-    // Step 4: Prompt for package details or use defaults (before creating any directories)
-    let packageConfig: PackageYml;
+    // Step 4: Create package config (minimal manifest)
+    const packageConfig: PackageYml = {
+      name: normalizedName
+    };
 
-    if (interactive && nameFromPrompt) {
-      // Create a checker function that validates package doesn't already exist
-      const existsChecker = async (name: string): Promise<boolean> => {
-        if (isCustomPath) {
-          // For custom paths, we can't pre-validate by name since path is fixed
-          // Validation already happened in Step 2
-          return false;
-        }
-        
-        const testPackageDir = getScopePackageDir(cwd, scope!, scope === 'root' ? undefined : name);
-        const testPackageYmlPath = getScopePackageYmlPath(cwd, scope!, scope === 'root' ? undefined : name);
-        return await exists(testPackageYmlPath);
-      };
-
-      // Prompt for full details including name (with existence validation)
-      packageConfig = await promptPackageDetails(displayName, force ? undefined : existsChecker);
-      normalizedName = normalizePackageName(packageConfig.name);
-      
-      // Update paths with the actual name from prompt (might be different from default)
-      // But only for scope-based paths, not custom paths
-      if (!isCustomPath && scope) {
-        packageDir = getScopePackageDir(cwd, scope, scope === 'root' ? undefined : normalizedName);
-        packageYmlPath = getScopePackageYmlPath(cwd, scope, scope === 'root' ? undefined : normalizedName);
-      }
-    } else if (interactive) {
-      // Prompt for details with pre-set name
-      packageConfig = await promptPackageDetailsForNamed(normalizedName);
-    } else {
-      // Non-interactive: use minimal config
-      packageConfig = {
-        name: normalizedName
-      };
-    }
-
-    // Step 5: Ensure directory structure (only after all prompts are confirmed)
+    // Step 5: Ensure directory structure
     await ensureDir(packageDir);
     logger.debug(`Created package directory: ${packageDir}`);
 
@@ -245,8 +204,8 @@ export async function createPackage(
       console.log(`\n📍 Scope: ${getScopeDescription(scope)}`);
       if (scope === 'global') {
         console.log(`💡 This package can be used across all workspaces`);
-      } else if (scope === 'local') {
-        console.log(`💡 This package is local to the current workspace`);
+      } else if (scope === 'project') {
+        console.log(`💡 This package is project-scoped to the current workspace`);
       }
     }
 
@@ -268,10 +227,6 @@ export async function createPackage(
     };
 
   } catch (error) {
-    if (error instanceof UserCancellationError) {
-      throw error;
-    }
-
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to create package`, { error: errorMessage, scope, packageName });
 

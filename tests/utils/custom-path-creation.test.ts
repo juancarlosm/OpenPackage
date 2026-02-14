@@ -116,7 +116,6 @@ describe('Custom Path Creation', () => {
         customPath,
         packageName: 'test-package',
         force: false,
-        interactive: false
       });
       
       assert.strictEqual(result.success, true);
@@ -138,7 +137,6 @@ describe('Custom Path Creation', () => {
         customPath,
         packageName: 'absolute-test',
         force: false,
-        interactive: false
       });
       
       assert.strictEqual(result.success, true);
@@ -160,7 +158,6 @@ describe('Custom Path Creation', () => {
         customPath,
         packageName: 'existing-pkg',
         force: false,
-        interactive: false
       });
       
       // Try to create again without force
@@ -169,7 +166,6 @@ describe('Custom Path Creation', () => {
         customPath,
         packageName: 'existing-pkg',
         force: false,
-        interactive: false
       });
       
       assert.strictEqual(result.success, false);
@@ -185,7 +181,6 @@ describe('Custom Path Creation', () => {
         customPath,
         packageName: 'force-test',
         force: false,
-        interactive: false
       });
       
       // Create again with force
@@ -194,7 +189,6 @@ describe('Custom Path Creation', () => {
         customPath,
         packageName: 'force-test-updated',
         force: true,
-        interactive: false
       });
       
       assert.strictEqual(result.success, true);

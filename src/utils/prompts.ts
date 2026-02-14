@@ -6,7 +6,6 @@ import { getPlatformDefinitions } from '../core/platforms.js';
 import type { PlatformDefinition } from '../core/platforms.js';
 import { normalizePackageName, validatePackageName } from './package-name.js';
 import { readTextFile } from './fs.js';
-import type { PackageScope } from './scope-resolution.js';
 import { formatPathForDisplay } from './formatters.js';
 
 /**
@@ -117,69 +116,6 @@ export async function promptCreatePackage(): Promise<boolean> {
     'No openpackage.yml found. Would you like to create a new package?',
     true
   );
-}
-
-/**
- * Prompt user to select package scope or custom path
- */
-export async function promptPackageScope(): Promise<PackageScope | 'custom'> {
-  const response = await safePrompts({
-    type: 'select',
-    name: 'scope',
-    message: 'Where should this package be created?',
-    choices: [
-      {
-        title: 'Root (current directory)',
-        description: 'Create openpackage.yml here - for standalone/distributable packages',
-        value: 'root'
-      },
-      {
-        title: 'Local (workspace-scoped)',
-        description: 'Create in .openpackage/packages/ - for project-specific packages',
-        value: 'local'
-      },
-      {
-        title: 'Global (cross-workspace)',
-        description: 'Create in ~/.openpackage/packages/ - shared across all workspaces on this machine',
-        value: 'global'
-      },
-      {
-        title: 'Custom (specify path)',
-        description: 'Create at a custom location you specify',
-        value: 'custom'
-      }
-    ],
-    initial: 1, // Default to Local
-    hint: 'Use arrow keys to navigate, Enter to select'
-  });
-
-  return response.scope as PackageScope | 'custom';
-}
-
-/**
- * Prompt user to enter a custom path for package creation
- * 
- * @param packageName - Optional package name to suggest default path
- * @returns Custom path entered by user
- */
-export async function promptCustomPath(packageName?: string): Promise<string> {
-  const defaultPath = packageName ? `./${packageName}` : './';
-  
-  const response = await safePrompts({
-    type: 'text',
-    name: 'path',
-    message: 'Enter the directory path for the package:',
-    initial: defaultPath,
-    validate: (value: string) => {
-      if (!value || value.trim() === '') {
-        return 'Path is required';
-      }
-      // Basic validation - detailed validation happens in core logic
-      return true;
-    }
-  });
-
-  return response.path;
 }
 
 /**

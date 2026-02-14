@@ -10,14 +10,14 @@ opkg new [package-name] [options]
 
 Creates a new package with an `openpackage.yml` manifest in one of three predefined scopes or at a custom path:
 - **root**: Current directory as package
-- **local**: Workspace-scoped package (default)
+- **project**: Workspace-scoped package (default)
 - **global**: User-scoped package shared across workspaces
 - **custom**: User-specified directory path
 
 ## Command Signature
 
 ### Arguments
-- `[package-name]` (optional for root scope, required for local/global)
+- `[package-name]` (optional for root scope, required for project/global)
   - Package name following OpenPackage naming conventions
   - Supports scoped packages (`@org/package-name`)
   - Supports hierarchical packages (`@org/package-name/subpackage`)
@@ -25,34 +25,12 @@ Creates a new package with an `openpackage.yml` manifest in one of three predefi
   - No consecutive or trailing slashes allowed
 
 ### Options
-- `--scope <scope>` - Package scope: `root`, `local`, or `global` (prompts if not specified in interactive mode)
+- `--scope <scope>` - Package scope: `root`, `project`, or `global` (defaults to `global` if not specified)
 - `--path <path>` - Custom directory path for package (overrides `--scope`)
-- `-f, --force` - Overwrite existing package without prompting
-- `--non-interactive` - Skip interactive prompts, use defaults
+- `-f, --force` - Overwrite existing package without confirmation
 - `-h, --help` - Display help for command
 
-**Note:** Either `--scope` or `--path` is required in non-interactive mode. If both are provided, `--path` takes precedence and a warning is issued.
-
-### Scope Selection
-
-When running interactively **without** the `--scope` or `--path` flag, you'll be prompted to choose:
-
-```bash
-$ opkg new my-package
-? Where should this package be created? › 
-❯ Root (current directory) - Create openpackage.yml here - for standalone/distributable packages
-  Local (workspace-scoped) - Create in .openpackage/packages/ - for project-specific packages
-  Global (cross-workspace) - Create in ~/.openpackage/packages/ - shared across all workspaces on this machine
-  Custom (specify path) - Create at a custom location you specify
-```
-
-If you select **Custom**, you'll be prompted to enter a directory path:
-
-```bash
-? Enter the directory path for the package: › ./my-custom-location
-```
-
-This ensures you make an explicit choice about where your package lives. For CI/CD and automation, use the `--scope` or `--path` flag to skip the prompt.
+**Note:** If both `--scope` and `--path` are provided, `--path` takes precedence and a warning is issued.
 
 ## Scopes
 
@@ -62,7 +40,7 @@ This ensures you make an explicit choice about where your package lives. For CI/
 
 ```bash
 opkg new my-package --scope root
-opkg new --scope root  # Interactive: prompts for name
+opkg new --scope root  # Defaults to global scope
 ```
 
 **Use Cases:**
@@ -87,13 +65,13 @@ my-package/
 └── README.md
 ```
 
-### Local Scope
+### Project Scope
 
 **Location:** `.openpackage/packages/<package-name>/`
 
 ```bash
-opkg new my-package              # Interactive: prompts for scope
-opkg new my-package --scope local  # Explicit
+opkg new my-package              # Defaults to global scope
+opkg new my-package --scope project  # Explicit project scope
 ```
 
 **Use Cases:**
@@ -258,7 +236,7 @@ $ opkg new
 
 **Non-Interactive Example:**
 ```bash
-$ opkg new my-package --path ./custom-location --non-interactive
+$ opkg new my-package --path ./custom-location
 ✓ custom-location/openpackage.yml created
   - Name: my-package
 
@@ -278,42 +256,28 @@ $ opkg new test --path /usr/my-package
 Error: Cannot create package in system directory: /usr/my-package
 
 # Both flags provided (warning)
-$ opkg new test --scope local --path ./custom
+$ opkg new test --scope project --path ./custom
 # Uses custom path, logs warning about --scope being ignored
 ```
 
 ## Behavior Details
 
-### Interactive Mode (Default)
+### Package Creation
 
-When `--non-interactive` is not specified, prompts user for:
-- Package name (if not provided and scope allows)
-- Description
-- Keywords (space-separated)
-- Private flag
-
-**Example Session:**
-```bash
-$ opkg new my-package
-? Package name: › my-package
-? Description: › My awesome package
-? Keywords (space-separated): › tools utils
-? Private package? › No
-✓ .openpackage/packages/my-package/openpackage.yml created
-```
-
-### Non-Interactive Mode
-
-When `--non-interactive` is specified:
-- Uses provided package name or cwd basename
-- Skips all prompts
-- Creates minimal manifest with name only
+The `opkg new` command creates a minimal package manifest with only the name field set:
+- Package name is required (except for root scope where cwd basename is used)
+- Creates minimal `openpackage.yml` with name only
+- Use `opkg set` to configure additional metadata (description, keywords, etc.)
 
 **Example:**
 ```bash
-$ opkg new my-package --non-interactive
+$ opkg new my-package --scope project
 ✓ .openpackage/packages/my-package/openpackage.yml created
   - Name: my-package
+
+💡 Next steps:
+   1. Add files to your package: cd .openpackage/packages/my-package/
+   2. Install to this workspace: opkg install my-package
 ```
 
 ### Conflict Handling
@@ -352,7 +316,7 @@ The `opkg new` command **creates** packages but does **not** automatically add t
 
 To use a package after creation, explicitly install it:
 ```bash
-opkg new my-package --scope local
+opkg new my-package --scope project
 opkg install my-package  # Adds to workspace manifest and installs files
 ```
 
@@ -360,35 +324,18 @@ This separation keeps package creation (scaffolding) distinct from package usage
 
 ### Error Handling
 
-#### Missing Scope or Path (Non-Interactive)
-```bash
-$ opkg new my-package --non-interactive
-Error: Either --scope or --path is required in non-interactive mode.
-
-Usage with scope:
-  opkg new [package-name] --scope <root|local|global> --non-interactive
-
-Usage with custom path:
-  opkg new [package-name] --path <directory> --non-interactive
-
-Available scopes:
-  root   - Create in current directory
-  local  - Create in .openpackage/packages/
-  global - Create in ~/.openpackage/packages/
-```
-
 #### Missing Package Name
 ```bash
-$ opkg new --scope local --non-interactive
-Error: Package name is required for local scope in non-interactive mode.
-Usage: opkg new <package-name> --scope local --non-interactive
+$ opkg new --scope project
+Error: Package name is required for project scope.
+Usage: opkg new <package-name> --scope project
 ```
 
 #### Invalid Scope
 ```bash
 $ opkg new my-package --scope invalid
 Error: Invalid scope: 'invalid'
-Valid scopes: root, local, global
+Valid scopes: root, project, global
 ```
 
 #### Invalid Package Name
@@ -457,7 +404,7 @@ Error: <error-message>
 $ opkg new my-tools
 ? Where should this package be created? › 
 ❯ Root (current directory) - Create openpackage.yml here - for standalone/distributable packages
-  Local (workspace-scoped) - Create in .openpackage/packages/ - for project-specific packages
+  Project (workspace-scoped) - Create in .openpackage/packages/ - for project-specific packages
   Global (cross-workspace) - Create in ~/.openpackage/packages/ - shared across all workspaces on this machine
 
 # User selects "Root"
@@ -480,13 +427,12 @@ $ opkg new my-tools
 
 ### Create Local Package (Explicit Scope)
 ```bash
-$ opkg new my-tools --scope local
-# Skips scope prompt, goes directly to package details
+$ opkg new my-tools --scope project
 ✓ .openpackage/packages/my-tools/openpackage.yml created
   - Name: my-tools
 
-📍 Scope: Workspace-local (.openpackage/packages/)
-💡 This package is local to the current workspace
+📍 Scope: Project-scoped (.openpackage/packages/)
+💡 This package is project-scoped to the current workspace
 
 💡 Next steps:
    1. Add files to your package: cd .openpackage/packages/my-tools/
@@ -523,28 +469,12 @@ $ opkg new my-package --scope root
 
 ### Create with Force Overwrite
 ```bash
-$ opkg new existing-package --scope local --force --non-interactive
+$ opkg new existing-package --scope project --force
 ✓ .openpackage/packages/existing-package/openpackage.yml created
   - Name: existing-package
 
-📍 Scope: Workspace-local (.openpackage/packages/)
-💡 This package is local to the current workspace
-```
-
-### Non-Interactive Mode Requires Scope
-```bash
-$ opkg new my-package --non-interactive
-Error: The --scope flag is required in non-interactive mode.
-Usage: opkg new [package-name] --scope <root|local|global> --non-interactive
-
-Available scopes:
-  root   - Create in current directory
-  local  - Create in .openpackage/packages/
-  global - Create in ~/.openpackage/packages/
-
-$ opkg new my-package --scope local --non-interactive
-✓ .openpackage/packages/my-package/openpackage.yml created
-  - Name: my-package
+📍 Scope: Project-scoped (.openpackage/packages/)
+💡 This package is project-scoped to the current workspace
 ```
 
 ### Create Scoped Package
@@ -553,35 +483,27 @@ $ opkg new @myorg/utils
 ✓ .openpackage/packages/@myorg/utils/openpackage.yml created
   - Name: @myorg/utils
 
-📍 Scope: Workspace-local (.openpackage/packages/)
-💡 This package is local to the current workspace
+📍 Scope: Project-scoped (.openpackage/packages/)
+💡 This package is project-scoped to the current workspace
 ```
 
-### Create Package at Custom Path (Interactive)
+### Create Package at Custom Path
 ```bash
-$ opkg new my-package
-? Where should this package be created? › Custom (specify path)
-? Enter the directory path for the package: › ./custom-location
-? Package name: › my-package
-? Description: › Custom location package
-? Keywords (space-separated): › 
-? Private package? › No
-
+$ opkg new my-package --path ./custom-location
 ✓ custom-location/openpackage.yml created
   - Name: my-package
-  - Description: Custom location package
 
 📍 Location: Custom path (./custom-location)
 💡 This package is at a custom location you specified
 
 💡 Next steps:
    1. Add files to your package at: ./custom-location
-   2. Install to workspace with path: opkg install --path ./custom-location
+   2. Install to workspace: opkg install ./custom-location
 ```
 
 ### Create Package at Custom Path (Relative)
 ```bash
-$ opkg new my-package --path ./custom-location --non-interactive
+$ opkg new my-package --path ./custom-location
 ✓ custom-location/openpackage.yml created
   - Name: my-package
 
@@ -595,7 +517,7 @@ $ opkg new my-package --path ./custom-location --non-interactive
 
 ### Create Package at Custom Path (Absolute)
 ```bash
-$ opkg new my-package --path /opt/packages/my-package --non-interactive
+$ opkg new my-package --path /opt/packages/my-package
 ✓ /opt/packages/my-package/openpackage.yml created
   - Name: my-package
 
@@ -609,7 +531,7 @@ $ opkg new my-package --path /opt/packages/my-package --non-interactive
 
 ### Create Package at Custom Path (Tilde)
 ```bash
-$ opkg new my-package --path ~/projects/my-package --non-interactive
+$ opkg new my-package --path ~/projects/my-package
 ✓ /Users/user/projects/my-package/openpackage.yml created
   - Name: my-package
 
@@ -624,7 +546,7 @@ $ opkg new my-package --path ~/projects/my-package --non-interactive
 ### Custom Path with Monorepo Structure
 ```bash
 # Create package in monorepo packages directory
-$ opkg new shared-components --path ../packages/shared-components --non-interactive
+$ opkg new shared-components --path ../packages/shared-components
 ✓ ../packages/shared-components/openpackage.yml created
   - Name: shared-components
 

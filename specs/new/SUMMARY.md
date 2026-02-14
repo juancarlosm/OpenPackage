@@ -3,11 +3,11 @@
 ## Quick Reference
 
 ```bash
-# Interactive - prompts for scope selection
+# Create package (defaults to global scope)
 opkg new my-package
 
-# Create local package (explicit)
-opkg new my-package --scope local
+# Create project package (explicit)
+opkg new my-package --scope project
 
 # Create global package
 opkg new shared-utils --scope global
@@ -16,10 +16,7 @@ opkg new shared-utils --scope global
 opkg new my-package --scope root
 
 # Force overwrite
-opkg new my-package --scope local --force
-
-# Non-interactive (requires --scope)
-opkg new my-package --scope local --non-interactive
+opkg new my-package --scope project --force
 ```
 
 ## What is `opkg new`?
@@ -30,12 +27,11 @@ The `opkg new` command creates new OpenPackage packages with explicit scope supp
 
 ### Three Scopes
 
-1. **Local (Default)** - Workspace-scoped packages
+1. **Project** - Workspace-scoped packages
    - Location: `./.openpackage/packages/<name>/`
-   - Auto-added to workspace manifest
    - Best for project-specific packages
 
-2. **Global** - Cross-workspace packages
+2. **Global (Default)** - Cross-workspace packages
    - Location: `~/.openpackage/packages/<name>/`
    - Shared across all projects
    - Best for personal utilities
@@ -47,27 +43,26 @@ The `opkg new` command creates new OpenPackage packages with explicit scope supp
 
 ### Smart Behavior
 
-- **Scope Selection**: Interactive prompt in interactive mode; requires `--scope` flag in non-interactive mode
-- **Interactive**: Prompts for scope and metadata by default
-- **Workspace Integration**: Automatic for local scope
+- **Default Scope**: Defaults to `global` if not specified
+- **Minimal Creation**: Creates minimal manifest with name only (use `opkg set` for metadata)
 - **Conflict Detection**: Won't overwrite without `--force`
 
-### Auto-Creation
+### Package Creation
 
-For local packages:
-- Workspace manifest auto-created if missing
-- Package auto-added to workspace dependencies
-- Ready to use immediately with other commands
+For project packages:
+- Package is created in `.openpackage/packages/<name>/`
+- Not automatically added to workspace (use `opkg install` to add)
+- Separation between creation and usage
 
 ## When to Use Each Scope
 
 | Situation | Scope | Command |
 |-----------|-------|---------|
-| Project-specific rules | `local` | `opkg new my-rules` |
+| Project-specific rules | `project` | `opkg new my-rules` |
 | Personal utilities | `global` | `opkg new utils --scope global` |
 | Distributable package | `root` | `opkg new pkg --scope root` |
 | Team shared package | `root` | `opkg new team-pkg --scope root` (separate repo) |
-| Temporary/experimental | `local` | `opkg new experiment` |
+| Temporary/experimental | `project` | `opkg new experiment` |
 
 ## Common Workflows
 
@@ -145,7 +140,7 @@ opkg install my-pkg
 ### With Install
 
 ```bash
-# Create local package
+# Create project package
 opkg new my-pkg
 
 # Workspace manifest updated automatically
@@ -166,8 +161,8 @@ opkg list my-pkg  # Check sync state
 
 Specifies package scope:
 - `root` - Current directory
-- `local` - Workspace packages (default)
-- `global` - Global packages
+- `project` - Workspace packages
+- `global` - Global packages (default)
 
 **Example:**
 ```bash
@@ -183,27 +178,18 @@ Overwrites existing package without confirmation.
 opkg new existing-pkg --force
 ```
 
-### `--non-interactive`
-
-Skips interactive prompts, uses defaults.
-
-**Example:**
-```bash
-opkg new my-pkg --non-interactive
-```
-
 ## Error Handling
 
 ### Missing Package Name
 ```
-Error: Package name is required for local scope.
-Usage: opkg new <package-name> --scope local
+Error: Package name is required for project scope.
+Usage: opkg new <package-name> --scope project
 ```
 
 ### Invalid Scope
 ```
 Error: Invalid scope: 'invalid'
-Valid scopes: root, local, global
+Valid scopes: root, project, global
 ```
 
 ### Invalid Package Name
@@ -223,11 +209,10 @@ Package names must be lowercase...
 
 ### Do's
 
-✅ Use local scope for project-specific packages
+✅ Use project scope for project-specific packages
 ✅ Use global scope for personal utilities
 ✅ Use root scope for distributable packages
 ✅ Run `opkg new` early in development
-✅ Use `--non-interactive` in scripts/CI
 
 ### Don'ts
 
@@ -243,23 +228,23 @@ If you previously used `opkg init`:
 ```bash
 # Old way
 opkg init              # Workspace + root package
-opkg init my-package   # Local package
+opkg init my-package   # Project package
 
 # New way
 opkg new --scope root  # Just root package
-opkg new my-package    # Local package (workspace auto-created)
+opkg new my-package    # Defaults to global (use --scope project for workspace)
 ```
 
 See [MIGRATION-INIT-TO-NEW.md](../../MIGRATION-INIT-TO-NEW.md) for complete migration guide.
 
 ## File Structure Examples
 
-### Local Package
+### Project Package
 
 ```
 project/
 ├── .openpackage/
-│   ├── openpackage.yml          # Workspace (auto-created)
+│   ├── openpackage.yml          # Workspace (must be created separately)
 │   └── packages/
 │       └── my-package/
 │           └── openpackage.yml  # Package

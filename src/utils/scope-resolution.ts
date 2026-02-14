@@ -6,17 +6,17 @@ import { normalizePackageName, SCOPED_PACKAGE_REGEX } from './package-name.js';
 /**
  * Package scope types
  * - root: Current directory (cwd) as a package
- * - local: Workspace-scoped package in .openpackage/packages/
+ * - project: Workspace-scoped package in .openpackage/packages/
  * - global: User-scoped package in ~/.openpackage/packages/
  */
-export type PackageScope = 'root' | 'local' | 'global';
+export type PackageScope = 'root' | 'project' | 'global';
 
 /**
  * Get the package directory for a given scope
  * 
  * @param cwd - Current working directory
  * @param scope - Package scope
- * @param packageName - Package name (required for local/global, ignored for root)
+ * @param packageName - Package name (required for project/global, ignored for root)
  * @param customPath - Optional custom path (overrides scope-based resolution)
  * @returns Absolute path to package directory
  */
@@ -44,8 +44,8 @@ export function getScopePackageDir(
 
   const normalizedName = normalizePackageName(packageName);
 
-  if (scope === 'local') {
-    // Local scope: .openpackage/packages/<name>/
+  if (scope === 'project') {
+    // Project scope: .openpackage/packages/<name>/
     return getScopedPackagePath(
       join(cwd, DIR_PATTERNS.OPENPACKAGE, OPENPACKAGE_DIRS.PACKAGES),
       normalizedName
@@ -69,7 +69,7 @@ export function getScopePackageDir(
  * 
  * @param cwd - Current working directory
  * @param scope - Package scope
- * @param packageName - Package name (required for local/global, ignored for root)
+ * @param packageName - Package name (required for project/global, ignored for root)
  * @param customPath - Optional custom path (overrides scope-based resolution)
  * @returns Absolute path to openpackage.yml
  */
@@ -84,43 +84,6 @@ export function getScopePackageYmlPath(
 }
 
 /**
- * Validate that package name is provided when required by scope
- * Returns true if package name is required but missing (needs prompt in interactive mode)
- * Throws error only in non-interactive mode when name is required but missing
- * 
- * @param scope - Package scope
- * @param packageName - Package name (optional)
- * @param interactive - Whether running in interactive mode
- * @returns true if name is required but missing (prompt needed)
- */
-export function validateScopeWithPackageName(
-  scope: PackageScope,
-  packageName: string | undefined,
-  interactive: boolean = true
-): boolean {
-  // Package name is optional - will prompt in interactive mode or use defaults
-  if (packageName) {
-    return false; // Has name, no prompt needed
-  }
-
-  // In interactive mode, always allow prompting for name
-  if (interactive) {
-    return true; // Will prompt for name
-  }
-
-  // In non-interactive mode without name, only root scope can use cwd basename
-  if (scope === 'root') {
-    return false; // Will use cwd basename
-  }
-
-  // Non-interactive mode requires name for local/global scopes
-  throw new Error(
-    `Package name is required for ${scope} scope in non-interactive mode.\n` +
-    `Usage: opkg new <package-name> --scope ${scope} --non-interactive`
-  );
-}
-
-/**
  * Get a human-readable description of the scope
  * 
  * @param scope - Package scope
@@ -130,8 +93,8 @@ export function getScopeDescription(scope: PackageScope): string {
   switch (scope) {
     case 'root':
       return 'Current directory (root package)';
-    case 'local':
-      return 'Workspace-local (.openpackage/packages/)';
+    case 'project':
+      return 'Project-scoped (.openpackage/packages/)';
     case 'global':
       return 'Global shared (~/.openpackage/packages/)';
     default:
@@ -162,13 +125,13 @@ export function getScopeDisplayPath(
   }
 
   if (!packageName) {
-    return scope === 'local'
+    return scope === 'project'
       ? './.openpackage/packages/<package-name>/'
       : '~/.openpackage/packages/<package-name>/';
   }
 
   const normalizedName = normalizePackageName(packageName);
-  return scope === 'local'
+  return scope === 'project'
     ? `./.openpackage/packages/${normalizedName}/`
     : `~/.openpackage/packages/${normalizedName}/`;
 }
@@ -186,8 +149,8 @@ export function parseScope(scopeValue: string): PackageScope {
     return 'root';
   }
 
-  if (normalized === 'local' || normalized === 'l') {
-    return 'local';
+  if (normalized === 'project' || normalized === 'p') {
+    return 'project';
   }
 
   if (normalized === 'global' || normalized === 'g') {
@@ -196,7 +159,7 @@ export function parseScope(scopeValue: string): PackageScope {
 
   throw new Error(
     `Invalid scope: '${scopeValue}'\n` +
-    `Valid scopes: root, local, global`
+    `Valid scopes: root, project, global`
   );
 }
 
