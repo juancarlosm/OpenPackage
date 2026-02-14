@@ -1,23 +1,30 @@
 import path from 'path';
-import semver from 'semver';
-
-import type { CommandResult, PackOptions, PackageYml } from '../../types/index.js';
-import { FILE_PATTERNS } from '../../constants/index.js';
-import { ensureRegistryDirectories, getPackageVersionPath } from '../directory.js';
-import { readPackageFilesForRegistry, writePackageFilesToDirectory } from '../../utils/package-copy.js';
+import { assertValidVersion } from '../../utils/validation/version.js';
+import { validateAndReadPackageFiles } from '../../utils/validation/package-files.js';
+import { writePackageToRegistry } from '../registry-writer.js';
+import { logger } from '../../utils/logger.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 import { exists, remove, countFilesInDirectory } from '../../utils/fs.js';
-import { logger } from '../../utils/logger.js';
 import { resolvePackageByName } from '../../utils/package-name-resolution.js';
 import { classifyPackageInput } from '../../utils/package-input.js';
 import { ValidationError } from '../../utils/errors.js';
-import { promptPackOverwrite } from '../../utils/prompts.js';
+import { writePackageFilesToDirectory } from '../../utils/package-copy.js';
 import { formatPathForDisplay } from '../../utils/formatters.js';
-import { 
-  createPackResultInfo, 
-  displayPackSuccess, 
-  displayPackDryRun 
-} from './pack-output.js';
+import { formatVersionLabel } from '../../utils/package-versioning.js';
+import { createPublishResultInfo, displayPublishSuccess } from './publish-output.js';
+import { FILE_PATTERNS } from '../../constants/index.js';
+import { promptPackOverwrite } from '../../utils/prompts.js';
+import type { PublishOptions, PublishResult } from './publish-types.js';
+import type { PackageYml } from '../../types/index.js';
+
+export interface LocalPublishData {
+  packageName: string;
+  version: string;
+  sourcePath: string;
+  destination: string;
+  fileCount: number;
+  overwritten: boolean;
+}
 
 interface ResolvedSource {
   name: string;
@@ -30,7 +37,7 @@ async function resolveSource(
   cwd: string,
   packageInput?: string
 ): Promise<ResolvedSource> {
-  // No package input provided - pack CWD as package
+  // No package input provided - publish from CWD
   if (!packageInput) {
     const manifestPath = path.join(cwd, FILE_PATTERNS.OPENPACKAGE_YML);
     if (!(await exists(manifestPath))) {
@@ -56,16 +63,16 @@ async function resolveSource(
     packageRoot = classification.resolvedPath!;
     logger.info('Resolved package input as directory path', { path: packageRoot });
   } else if (classification.type === 'tarball') {
-    // Tarball input is not supported for pack
+    // Tarball input is not supported for publish
     throw new ValidationError(
-      `Pack command does not support tarball inputs.\n` +
-      `To pack from a tarball, first extract it to a directory.`
+      `Publish command does not support tarball inputs.\n` +
+      `To publish from a tarball, first extract it to a directory.`
     );
   } else if (classification.type === 'git') {
-    // Git input is not supported for pack
+    // Git input is not supported for publish
     throw new ValidationError(
-      `Pack command does not support git inputs.\n` +
-      `To pack from a git repository, first clone it to a directory.`
+      `Publish command does not support git inputs.\n` +
+      `To publish from a git repository, first clone it to a directory.`
     );
   } else {
     // Registry type or package name - use name resolution
@@ -93,7 +100,7 @@ async function resolveSource(
     // Log resolution info for debugging/transparency
     if (resolution.resolutionInfo) {
       const { selected, reason } = resolution.resolutionInfo;
-      logger.info('Resolved package for packing', {
+      logger.info('Resolved package for publishing', {
         packageInput,
         selectedSource: selected.type,
         version: selected.version,
@@ -125,29 +132,22 @@ async function resolveSource(
   };
 }
 
-export interface PackPipelineResult {
-  destination: string;
-  files: number;
-}
-
 /**
- * Handle overwrite confirmation for pack operation
+ * Handle overwrite confirmation for publish operation with custom output
  * Returns true if operation should proceed, false if cancelled
  * Throws error if confirmation is needed but environment is non-interactive
  */
-async function handlePackOverwrite(
+async function handlePublishOverwrite(
   packageName: string,
   version: string,
   destination: string,
   existingFileCount: number,
-  force: boolean,
-  isCustomOutput: boolean
+  force: boolean
 ): Promise<boolean> {
   // Force mode - auto-approve with logging
   if (force) {
-    const locationType = isCustomOutput ? 'output directory' : 'registry';
     logger.info(
-      `Force mode: Overwriting existing ${locationType}`,
+      `Force mode: Overwriting existing output directory`,
       { packageName, version, destination, existingFileCount }
     );
     console.log(
@@ -162,119 +162,174 @@ async function handlePackOverwrite(
   
   if (!canPrompt) {
     // Non-interactive environment - fail with clear error message
-    const locationType = isCustomOutput ? 'output directory' : 'registry';
     const displayPath = formatPathForDisplay(destination, process.cwd());
     throw new Error(
-      `Pack destination already exists (${locationType}: ${displayPath}).\n` +
-      `Use --force to overwrite, or specify a different version in openpackage.yml.`
+      `Publish destination already exists (output directory: ${displayPath}).\n` +
+      `Use --force to overwrite, or specify a different output path.`
     );
   }
 
-  // Interactive mode - prompt user
+  // Interactive mode - prompt user (use pack prompt with custom output flag)
   return await promptPackOverwrite(
     packageName,
     version,
     destination,
     existingFileCount,
-    isCustomOutput
+    true // isCustomOutput
   );
 }
 
-export async function runPackPipeline(
+
+/**
+ * Publish package from CWD or specified source to local registry or custom output
+ * This is the default publish behavior
+ */
+export async function runLocalPublishPipeline(
   packageInput: string | undefined,
-  options: PackOptions = {}
-): Promise<CommandResult<PackPipelineResult>> {
+  options: PublishOptions
+): Promise<PublishResult<LocalPublishData>> {
   const cwd = process.cwd();
-
+  
   try {
+    // Resolve package source (CWD, path, or package name)
     const source = await resolveSource(cwd, packageInput);
-
-    if (!source.version || !semver.valid(source.version)) {
+    
+    const packageName = source.name;
+    const version = source.version;
+    
+    // Validate version (stricter rules for publish - no prerelease)
+    assertValidVersion(version, {
+      rejectPrerelease: true,
+      context: 'publish'
+    });
+    
+    const targetDescription = options.output 
+      ? `custom output (${options.output})`
+      : 'local registry';
+    
+    logger.info(`Publishing package '${packageName}' to ${targetDescription}`, {
+      source: source.packageRoot,
+      version
+    });
+    
+    // Read and validate package files
+    const files = await validateAndReadPackageFiles(source.packageRoot, {
+      context: 'publish'
+    });
+    
+    const isCustomOutput = !!options.output;
+    
+    // For registry output, use shared registry writer
+    if (!isCustomOutput) {
+      // Write to local registry (handles overwrite logic)
+      const result = await writePackageToRegistry(
+        packageName,
+        version,
+        files,
+        {
+          force: options.force,
+          context: 'publish'
+        }
+      );
+      
+      // Create result info for output display
+      const resultInfo = createPublishResultInfo(
+        packageName,
+        version,
+        source.packageRoot,
+        result.destination,
+        result.fileCount,
+        source.manifest,
+        false, // isCustomOutput
+        result.overwritten,
+        result.overwritten ? result.fileCount : 0
+      );
+      
+      // Display success with rich formatting
+      displayPublishSuccess(resultInfo, cwd);
+      
       return {
-        success: false,
-        error: `openpackage.yml must contain a valid semver version to pack (found "${source.version || 'undefined'}").`
+        success: true,
+        data: {
+          packageName,
+          version,
+          sourcePath: source.packageRoot,
+          destination: result.destination,
+          fileCount: result.fileCount,
+          overwritten: result.overwritten
+        }
       };
     }
-
-    const files = await readPackageFilesForRegistry(source.packageRoot);
-    if (files.length === 0) {
-      return { success: false, error: 'No package files found to pack.' };
-    }
-
-    const destination = options.output
-      ? path.resolve(cwd, options.output)
-      : getPackageVersionPath(source.name, source.version);
-
-    const isCustomOutput = !!options.output;
-
-    // Check if destination exists and count existing files
+    
+    // Custom output path - handle separately
+    const destination = path.resolve(cwd, options.output!);
     const destinationExists = await exists(destination);
     const existingFileCount = destinationExists 
       ? await countFilesInDirectory(destination)
       : 0;
-
-    // Create result info for output display
-    const resultInfo = createPackResultInfo(
-      source.name,
-      source.version,
-      source.packageRoot,
-      destination,
-      files.length,
-      source.manifest,
-      isCustomOutput,
-      destinationExists,
-      existingFileCount
-    );
-
-    if (options.dryRun) {
-      displayPackDryRun(resultInfo, cwd);
-      return {
-        success: true,
-        data: { destination, files: files.length }
-      };
-    }
-
-    // Handle overwrite confirmation (unless dry-run or force)
+    
+    // Handle overwrite confirmation (unless force)
     if (destinationExists) {
-      const shouldOverwrite = await handlePackOverwrite(
-        source.name,
-        source.version,
+      const shouldOverwrite = await handlePublishOverwrite(
+        packageName,
+        version,
         destination,
         existingFileCount,
-        options.force ?? false,
-        isCustomOutput
+        options.force ?? false
       );
       
       if (!shouldOverwrite) {
         return {
           success: false,
-          error: 'Pack operation cancelled by user'
+          error: 'Publish operation cancelled by user'
         };
       }
     }
-
-    if (!options.output) {
-      await ensureRegistryDirectories();
-    }
-
+    
     // Remove existing destination if present
     if (destinationExists) {
       await remove(destination);
     }
-
+    
+    // Write package files to custom output directory
     await writePackageFilesToDirectory(destination, files);
-
-    logger.info(`Packed ${source.name}@${source.version} to ${destination}`);
-
-    // Display success output
-    displayPackSuccess(resultInfo, cwd);
-
+    
+    logger.info(`Published ${packageName}@${version} to ${destination}`);
+    
+    // Create result info for output display
+    const resultInfo = createPublishResultInfo(
+      packageName,
+      version,
+      source.packageRoot,
+      destination,
+      files.length,
+      source.manifest,
+      true, // isCustomOutput
+      destinationExists,
+      existingFileCount
+    );
+    
+    // Display success with rich formatting
+    displayPublishSuccess(resultInfo, cwd);
+    
     return {
       success: true,
-      data: { destination, files: files.length }
+      data: {
+        packageName,
+        version,
+        sourcePath: source.packageRoot,
+        destination,
+        fileCount: files.length,
+        overwritten: destinationExists
+      }
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { success: false, error: message };
+    logger.error('Local publish failed', { error: message, cwd });
+    
+    return {
+      success: false,
+      error: message
+    };
   }
 }

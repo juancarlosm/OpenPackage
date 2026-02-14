@@ -3,6 +3,9 @@ import type { CommandResult } from '../../types/index.js';
 export interface PublishOptions {
   profile?: string;
   apiKey?: string;
+  remote?: boolean;  // Flag for remote publishing
+  force?: boolean;   // Force overwrite without prompting
+  output?: string;   // Custom output directory (local only)
 }
 
 export interface PublishData {
@@ -15,4 +18,4 @@ export interface PublishData {
   message?: string;
 }
 
-export type PublishResult = CommandResult<PublishData>;
+export type PublishResult<T = PublishData> = CommandResult<T>;
