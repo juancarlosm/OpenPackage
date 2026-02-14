@@ -147,15 +147,24 @@ export async function runLocalPublishPipeline(
     const packageName = source.name;
     const version = source.version;
     
-    // Validate version (stricter rules for publish - no prerelease)
-    assertValidVersion(version, {
-      rejectPrerelease: true,
-      context: 'publish'
-    });
+    // For local publish, allow unversioned packages (default to 0.0.0)
+    let publishVersion = version;
+    
+    if (!version || version.trim() === '') {
+      publishVersion = '0.0.0';
+      console.log(`✓ No version specified, using 0.0.0 for local publish`);
+      logger.info('Auto-assigned version 0.0.0 for unversioned package', { packageName });
+    } else {
+      // Validate provided version (reject prereleases)
+      assertValidVersion(version, {
+        rejectPrerelease: true,
+        context: 'local publish'
+      });
+    }
     
     logger.info(`Publishing package '${packageName}' to local registry`, {
       source: source.packageRoot,
-      version
+      version: publishVersion
     });
     
     // Read and validate package files
@@ -166,7 +175,7 @@ export async function runLocalPublishPipeline(
     // Write to local registry (handles overwrite logic)
     const result = await writePackageToRegistry(
       packageName,
-      version,
+      publishVersion,
       files,
       {
         force: options.force,
@@ -177,7 +186,7 @@ export async function runLocalPublishPipeline(
     // Create result info for output display
     const resultInfo = createPublishResultInfo(
       packageName,
-      version,
+      publishVersion,
       source.packageRoot,
       result.destination,
       result.fileCount,
@@ -194,7 +203,7 @@ export async function runLocalPublishPipeline(
       success: true,
       data: {
         packageName,
-        version,
+        version: publishVersion,
         sourcePath: source.packageRoot,
         destination: result.destination,
         fileCount: result.fileCount,

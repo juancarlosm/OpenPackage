@@ -54,15 +54,12 @@ export async function writePackageToRegistry(
     const unversioned = isUnversionedPackage(version);
     
     if (unversioned) {
-      // Unversioned packages: auto-overwrite with log message
-      logger.info(
+      // Unversioned packages: silent auto-overwrite with subtle message
+      logger.debug(
         `Updating unversioned package ${packageName}@${version}`,
         { destination, existingFileCount }
       );
-      console.log(
-        `⚠️  Updating ${packageName}@${version} ` +
-        `(${existingFileCount} existing file${existingFileCount !== 1 ? 's' : ''})`
-      );
+      console.log(`✓ Updated ${packageName}@${version}`);
     } else if (force) {
       // Force mode: auto-approve with logging
       logger.info(
