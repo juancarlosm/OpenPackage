@@ -87,54 +87,9 @@ export async function runRemoveFromSourcePipeline(
     });
   }
 
-  // Try resolving as resource name if path doesn't exist directly
-  const directPath = resolvePath(packageRootDir, resolvedPath);
-  if (!(await exists(directPath))) {
-    try {
-      const { buildSourceResources } = await import('../resources/resource-builder.js');
-      const sourceData = await buildSourceResources(packageRootDir, 'project');
-
-      const nameLower = resolvedPath.toLowerCase();
-      const matchingResources = sourceData.resources.filter(
-        r => r.resourceName.toLowerCase() === nameLower
-      );
-
-      if (matchingResources.length === 1) {
-        logger.info('Resolved resource name to path for remove', {
-          name: resolvedPath,
-          resolvedPath: matchingResources[0].targetFiles[0],
-          resourceType: matchingResources[0].resourceType,
-        });
-        resolvedPath = matchingResources[0].targetFiles[0];
-      } else if (matchingResources.length > 1) {
-        const { disambiguate } = await import('../resources/disambiguation-prompt.js');
-
-        const selected = await disambiguate(
-          resolvedPath,
-          matchingResources,
-          (r) => ({
-            title: `${r.resourceName} (${r.resourceType})`,
-            description: r.targetFiles.join(', '),
-            value: r,
-          }),
-          {
-            notFoundMessage: `"${resolvedPath}" not found in package source.`,
-            promptMessage: 'Select which resource to remove:',
-            multi: false,
-          }
-        );
-
-        if (selected.length === 0) {
-          return { success: false, error: 'Remove cancelled.' };
-        }
-        resolvedPath = selected[0].targetFiles[0];
-      }
-    } catch (error) {
-      logger.debug('Resource name resolution skipped for remove', {
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
+  // [DISABLED] Resource name resolution - only file/directory paths accepted
+  // To re-enable: restore the buildSourceResources block that resolved names like "my-agent"
+  // to actual file paths within the package when the direct path didn't exist
 
   // Collect files to remove
   let entries: RemovalEntry[];

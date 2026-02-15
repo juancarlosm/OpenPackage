@@ -131,7 +131,7 @@ export function setupAddCommand(program: Command): void {
   program
     .command('add')
     .argument('[resource-spec]',
-      'resource to add (package[@version], gh@owner/repo, https://github.com/owner/repo, /path/to/local, or installed resource name). If omitted, shows interactive file selector.')
+      'resource to add (package[@version], gh@owner/repo, https://github.com/owner/repo, or /path/to/file). If omitted, shows interactive file selector.')
     .description('Add a dependency to openpackage.yml or copy files to a package')
     .option('--to <package-name>', 'target package (for dependency: which manifest; for copy: which package source)')
     .option('--dev', 'add to dev-dependencies instead of dependencies')
@@ -149,7 +149,6 @@ export function setupAddCommand(program: Command): void {
               '<resource-spec> argument is required in non-interactive mode.\n' +
               'Usage: opkg add <resource-spec> [options]\n\n' +
               'Examples:\n' +
-              '  opkg add cursor-rules                    # Add from workspace resources\n' +
               '  opkg add ./path/to/file.txt              # Add local file\n' +
               '  opkg add gh@owner/repo                   # Add from GitHub\n' +
               '  opkg add package@version                 # Add package dependency'

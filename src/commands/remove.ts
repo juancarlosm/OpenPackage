@@ -12,7 +12,7 @@ export function setupRemoveCommand(program: Command): void {
   program
     .command('remove')
     .alias('rm')
-    .argument('[path]', 'file, directory, or resource name to remove. If omitted, shows interactive file selector.')
+    .argument('[path]', 'file or directory to remove. If omitted, shows interactive file selector.')
     .description('Remove files from a mutable package source or workspace package')
     .option('--from <package-name>', 'source package name (defaults to workspace package)')
     .option('--force', 'Skip confirmation prompts')
@@ -31,7 +31,6 @@ export function setupRemoveCommand(program: Command): void {
               'Examples:\n' +
               '  opkg remove file.txt                        # Remove from workspace package\n' +
               '  opkg remove file.txt --from package-name    # Remove from specific package\n' +
-              '  opkg remove resource-name                   # Remove by resource name\n' +
               '  opkg remove                                 # Interactive mode (TTY only)'
             );
           }
