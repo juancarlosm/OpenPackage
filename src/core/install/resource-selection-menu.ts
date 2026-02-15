@@ -6,6 +6,7 @@
 
 import { logger } from '../../utils/logger.js';
 import { UserCancellationError } from '../../utils/errors.js';
+import { clackGroupMultiselect } from '../../utils/clack-multiselect.js';
 import { smartMultiselect } from '../../utils/smart-multiselect.js';
 import { getInstallableTypes, toLabelPlural, RESOURCE_TYPE_ORDER } from '../resources/resource-registry.js';
 import type { ResourceCatalog, ResourceEntry } from '../resources/resource-catalog.js';
@@ -45,35 +46,38 @@ export async function promptResourceSelection(
     return [];
   }
   
-  // Build choices grouped by resource type
-  const { choices, categoryMap } = buildMenuChoices(discovery);
+  // Build grouped options by resource type
+  const groupedOptions = buildGroupedOptions(discovery);
   
-  if (choices.length === 0) {
+  if (Object.keys(groupedOptions).length === 0) {
     console.log('⚠️  No installable resources found');
     return [];
   }
   
   try {
-    const selectedIndices = await smartMultiselect(
+    const selectedResources = await clackGroupMultiselect<DiscoveredResource>(
       'Select resources to install:',
-      choices,
-      categoryMap,
+      groupedOptions,
       {
-        hint: '- Space: select/deselect • Enter: confirm • Categories expand to all items',
-        min: 1
+        selectableGroups: true,
+        groupSpacing: 0
       }
     );
     
-    if (!selectedIndices || selectedIndices.length === 0) {
+    if (!selectedResources || selectedResources.length === 0) {
       logger.info('User cancelled resource selection or selected nothing');
       return [];
     }
     
-    // Filter out category indices (negative values) before mapping
-    const resourceIndices = selectedIndices.filter(idx => idx >= 0);
-    
-    // Map selected indices to resources
-    const selected = mapIndicesToResources(resourceIndices, discovery);
+    // Map selected DiscoveredResource objects to SelectedResource objects
+    const selected: SelectedResource[] = selectedResources.map(resource => ({
+      resourceType: resource.resourceType,
+      resourcePath: resource.resourcePath,
+      displayName: resource.displayName,
+      filePath: resource.filePath,
+      installKind: resource.installKind,
+      version: resource.version
+    }));
     
     logger.info('User selected resources', {
       count: selected.length,
@@ -91,22 +95,18 @@ export async function promptResourceSelection(
 }
 
 /**
- * Build menu choices grouped by resource type
+ * Build grouped options for resource selection
  */
-function buildMenuChoices(
+function buildGroupedOptions(
   discovery: ResourceDiscoveryResult
-): { choices: any[]; categoryMap: Map<number, number[]> } {
-  const choices: any[] = [];
-  const categoryMap = new Map<number, number[]>(); // Maps category index to resource indices
+): Record<string, Array<{ value: DiscoveredResource; label: string; hint: string }>> {
+  const groupedOptions: Record<string, Array<{ value: DiscoveredResource; label: string; hint: string }>> = {};
   
   // Resource type display order and labels
   const typeOrder = getInstallableTypes().map(def => ({
     type: def.id as ResourceType,
     label: def.labelPlural,
   }));
-  
-  let globalIndex = 0;
-  let categoryIndex = -1;
   
   for (const { type, label } of typeOrder) {
     const resources = discovery.byType.get(type);
@@ -115,46 +115,32 @@ function buildMenuChoices(
       continue;
     }
     
-    // Track resource indices for this category
-    const categoryResourceIndices: number[] = [];
-    const currentCategoryIndex = categoryIndex;
+    // Create group name with count
+    const groupName = `${label} (${resources.length})`;
+    const groupOptions: Array<{ value: DiscoveredResource; label: string; hint: string }> = [];
     
-    // Add section header with bold styling (no newline prefix, selectable)
-    const boldLabel = `\x1b[1m${label} (${resources.length}):\x1b[0m`;
-    choices.push({
-      title: boldLabel,
-      value: currentCategoryIndex,
-      description: 'Select/deselect all items in this category'
-    });
-    
-    // Add resources in this category
+    // Add resources to this group
     for (const resource of resources) {
       const versionSuffix = resource.version ? ` (v${resource.version})` : '';
       const pathHint = getPathHint(resource);
       
-      // Truncate description to max 2 lines (approx 160 chars for typical terminal width)
+      // Build hint: description + path
       const fullDescription = resource.description 
         ? `${resource.description} - ${pathHint}`
         : pathHint;
       const truncatedDescription = truncateToLines(fullDescription, 2);
       
-      categoryResourceIndices.push(globalIndex);
-      
-      choices.push({
-        title: `  ${resource.displayName}${versionSuffix}`,
-        value: globalIndex++,
-        description: truncatedDescription
+      groupOptions.push({
+        value: resource,
+        label: `${resource.displayName}${versionSuffix}`,
+        hint: truncatedDescription
       });
     }
     
-    // Store mapping of category to its resource indices
-    categoryMap.set(currentCategoryIndex, categoryResourceIndices);
-    
-    // Decrement for next category
-    categoryIndex--;
+    groupedOptions[groupName] = groupOptions;
   }
   
-  return { choices, categoryMap };
+  return groupedOptions;
 }
 
 /**
@@ -184,36 +170,6 @@ function truncateToLines(text: string, maxLines: number): string {
   
   // Truncate and add ellipsis
   return text.substring(0, maxChars - 3) + '...';
-}
-
-/**
- * Map selected indices to actual resources
- */
-function mapIndicesToResources(
-  selectedIndices: number[],
-  discovery: ResourceDiscoveryResult
-): SelectedResource[] {
-  const selected: SelectedResource[] = [];
-  
-  for (const index of selectedIndices) {
-    if (index < 0 || index >= discovery.all.length) {
-      logger.warn('Invalid selection index', { index });
-      continue;
-    }
-    
-    const resource = discovery.all[index];
-    
-    selected.push({
-      resourceType: resource.resourceType,
-      resourcePath: resource.resourcePath,
-      displayName: resource.displayName,
-      filePath: resource.filePath,
-      installKind: resource.installKind,
-      version: resource.version
-    });
-  }
-  
-  return selected;
 }
 
 /**

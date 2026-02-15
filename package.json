@@ -43,6 +43,7 @@
     "test": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm tests/run-tests.ts"
   },
   "dependencies": {
+    "@clack/prompts": "^1.0.1",
     "commander": "^14.0.0",
     "fast-glob": "^3.3.3",
     "gray-matter": "^4.0.3",

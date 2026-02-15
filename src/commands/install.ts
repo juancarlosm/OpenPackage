@@ -31,6 +31,7 @@ export function setupInstallCommand(program: Command): void {
     .option('-c, --commands <names...>', 'install specific commands by name (matches frontmatter name or filename)')
     .option('--plugins <names...>', 'install specific plugins from marketplace (bypasses interactive selection)')
     .option('--platforms <platforms...>', 'install to specific platforms (e.g., cursor claudecode opencode)')
+    .option('--list', 'interactively select resources to install (agents, skills, commands, etc.)')
     .option('--dry-run', 'preview changes without applying them')
     .option('--force', 'overwrite existing files')
     .option('--conflicts <strategy>', 'conflict handling strategy: keep-both, overwrite, skip, or ask')
@@ -39,7 +40,6 @@ export function setupInstallCommand(program: Command): void {
     .option('--local', 'resolve and install using only local registry versions, skipping remote metadata and pulls')
     .option('--profile <profile>', 'profile to use for authentication')
     .option('--api-key <key>', 'API key for authentication (overrides profile)')
-    // .option('--list', 'interactively select resources to install (agents, skills, commands, etc.)')
     .action(withErrorHandling(async (
       packageName: string | undefined, 
       options: InstallOptions & { 
