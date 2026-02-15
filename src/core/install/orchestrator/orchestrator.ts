@@ -457,8 +457,10 @@ export class InstallOrchestrator {
       }
     }
 
-    const interactive = canPrompt();
-    const platforms = await resolvePlatforms(execContext.targetDir, options.platforms, { interactive });
+    // Reuse platforms from workspace context when available (avoid duplicate prompt)
+    let platforms = workspaceContext?.platforms?.length
+      ? workspaceContext.platforms
+      : await resolvePlatforms(execContext.targetDir, options.platforms, { interactive: canPrompt() });
 
     const skipCache = options.resolutionMode === 'remote-primary';
     
