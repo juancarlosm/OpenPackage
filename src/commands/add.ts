@@ -4,7 +4,6 @@ import { withErrorHandling } from '../utils/errors.js';
 import { runAddToSourcePipeline, type AddToSourceResult } from '../core/add/add-to-source-pipeline.js';
 import { classifyAddInput, type AddInputClassification } from '../core/add/add-input-classifier.js';
 import { runAddDependencyFlow, type AddDependencyResult } from '../core/add/add-dependency-flow.js';
-import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
 import { canPrompt } from '../utils/file-scanner.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
@@ -34,20 +33,6 @@ async function displayAddResults(data: AddToSourceResult): Promise<void> {
   } else {
     console.log(`✓ Added files: ${filesAdded}`);
   }
-  
-  // Show install hint only for non-workspace-root adds
-  if (!isWorkspaceRoot) {
-    try {
-      const workspaceIndexRecord = await readWorkspaceIndex(cwd);
-      const isInstalled = !!workspaceIndexRecord.index.packages[resolvedName];
-      const label = isInstalled ? 'Changes not synced to workspace.' : 'Package not installed in workspace.';
-      console.log(`\n💡 ${label}`);
-      console.log(`   To ${isInstalled ? 'sync changes' : 'install and sync'}, run:`);
-      console.log(`     opkg install ${resolvedName}`);
-    } catch {
-      // Ignore errors reading workspace index
-    }
-  }
 }
 
 function displayDependencyResult(result: AddDependencyResult, classification: AddInputClassification): void {
@@ -60,10 +45,6 @@ function displayDependencyResult(result: AddDependencyResult, classification: Ad
   const versionSuffix = classification.version ? `@${classification.version}` : '';
   console.log(`✓ Added ${result.packageName}${versionSuffix} to ${result.section}`);
   console.log(`  in ${formatPathForDisplay(result.targetManifest, process.cwd())}`);
-
-  // Show install hint
-  console.log(`\n💡 To install, run:`);
-  console.log(`     opkg install`);
 }
 
 /**
