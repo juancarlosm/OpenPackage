@@ -282,6 +282,8 @@ function looksLikePath(input: string): boolean {
     input.startsWith('../') ||
     input.startsWith('~') ||
     input === '.' ||
+    // Dot-directory paths: .opencode/, .cursor/, .claude/, etc.
+    (input.startsWith('.') && input.length > 1 && input.includes('/')) ||
     (isAbsolute(input) && !input.includes('@'))
   );
 }
@@ -294,6 +296,7 @@ function isUnambiguouslyPath(input: string): boolean {
     input.startsWith('/') ||
     input.startsWith('./') ||
     input.startsWith('../') ||
-    input.startsWith('~')
+    input.startsWith('~') ||
+    (input.startsWith('.') && input.length > 1 && input.includes('/'))
   );
 }
