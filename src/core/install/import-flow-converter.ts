@@ -15,6 +15,7 @@ import { applyMapPipeline, createMapContext } from '../flows/map-pipeline/index.
 import { defaultTransformRegistry } from '../flows/flow-transforms.js';
 import { splitFrontmatter, dumpYaml } from '../../utils/markdown-frontmatter.js';
 import { basename, dirname, extname } from 'path';
+import { stripPlatformSuffixFromFilename } from '../flows/platform-suffix-handler.js';
 import { scoreAgainstSchema } from './file-format-detector.js';
 import type { Flow } from '../../types/flows.js';
 import type { 
@@ -396,7 +397,12 @@ function applyFlowToFile(
   }
   
   // Transform path using flow patterns
-  const transformedPath = transformPath(file.path, flow);
+  let transformedPath = transformPath(file.path, flow);
+  // Strip platform suffix from output path (e.g. agents/foo.opencode.md -> agents/foo.md)
+  const stripped = stripPlatformSuffixFromFilename(transformedPath);
+  if (stripped !== transformedPath) {
+    transformedPath = stripped;
+  }
   
   // Serialize frontmatter back to content
   let transformedContent = file.content;

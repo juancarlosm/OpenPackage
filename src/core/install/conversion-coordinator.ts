@@ -136,13 +136,21 @@ export async function coordinateConversion(
     const needsConversion = shouldPreConvert(formatDetection, options);
     
     if (!needsConversion) {
-      return {
-        wasConverted: false,
-        formatDetection,
-        files: convertToMainPackageFiles(files),
-        errors: [],
-        warnings: []
-      };
+      // Still convert platform-specific groups when package is mostly universal
+      // (e.g. agents/foo.opencode.md in otherwise-universal package)
+      const hasPlatformSpecificGroups = (formatDetection.formatGroups?.size ?? 0) > 0 &&
+        Array.from(formatDetection.formatGroups?.keys() ?? []).some(
+          k => k !== 'universal' && k !== 'unknown'
+        );
+      if (!hasPlatformSpecificGroups) {
+        return {
+          wasConverted: false,
+          formatDetection,
+          files: convertToMainPackageFiles(files),
+          errors: [],
+          warnings: []
+        };
+      }
     }
     
     // Step 3: Perform pre-conversion (Phase 3)

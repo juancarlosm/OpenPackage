@@ -19,6 +19,7 @@ import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
 import { getLocalPackageYmlPath } from '../../../utils/paths.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
 import { ensureContentRoot } from './content-root-cache.js';
+import { resolvePackageByName } from '../../../utils/package-name-resolution.js';
 import { logger } from '../../../utils/logger.js';
 
 const MAX_DEPTH_DEFAULT = 10;
@@ -213,7 +214,24 @@ export class DependencyGraphBuilder {
   ): Promise<ResolutionDependencyNode | null> {
     const declaredInDir = getDeclaredInDir(declaration.declaredIn);
     const pathResolutionDir = declaration.depth === 0 ? this.rootPathResolutionDir : declaredInDir;
-    const id = computeDependencyId(declaration, pathResolutionDir);
+
+    // Resolve registry-only declarations to project/global path when package exists locally
+    let effectiveDeclaration = declaration;
+    if (!declaration.path && !declaration.url) {
+      const resolved = await resolvePackageByName({
+        cwd: this.workspaceRoot,
+        packageName: declaration.name,
+        checkCwd: false,
+        searchWorkspace: true,
+        searchGlobal: true,
+        searchRegistry: false
+      });
+      if (resolved.found && resolved.path && (resolved.sourceType === 'workspace' || resolved.sourceType === 'global')) {
+        effectiveDeclaration = { ...declaration, path: resolved.path };
+      }
+    }
+
+    const id = computeDependencyId(effectiveDeclaration, pathResolutionDir);
 
     if (this.visiting.has(id.key)) {
       this.recordCycle(id);
@@ -228,7 +246,7 @@ export class DependencyGraphBuilder {
 
     this.visiting.add(id.key);
 
-    const source = resolveSourceFromDeclaration(declaration, pathResolutionDir);
+    const source = resolveSourceFromDeclaration(effectiveDeclaration, pathResolutionDir);
 
     const node: ResolutionDependencyNode = {
       id,

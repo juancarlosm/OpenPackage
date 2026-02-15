@@ -280,6 +280,6 @@ async function loadPackageFiles(
   }
   
   await walk(contentRoot, contentRoot, opts);
-  
+
   return files;
 }
