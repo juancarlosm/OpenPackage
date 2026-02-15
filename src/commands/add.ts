@@ -4,7 +4,6 @@ import { withErrorHandling } from '../utils/errors.js';
 import { runAddToSourcePipeline, type AddToSourceResult } from '../core/add/add-to-source-pipeline.js';
 import { classifyAddInput, type AddInputClassification } from '../core/add/add-input-classifier.js';
 import { runAddDependencyFlow, type AddDependencyResult } from '../core/add/add-dependency-flow.js';
-import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
 import { canPrompt } from '../utils/file-scanner.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
@@ -34,20 +33,6 @@ async function displayAddResults(data: AddToSourceResult): Promise<void> {
   } else {
     console.log(`✓ Added files: ${filesAdded}`);
   }
-  
-  // Show install hint only for non-workspace-root adds
-  if (!isWorkspaceRoot) {
-    try {
-      const workspaceIndexRecord = await readWorkspaceIndex(cwd);
-      const isInstalled = !!workspaceIndexRecord.index.packages[resolvedName];
-      const label = isInstalled ? 'Changes not synced to workspace.' : 'Package not installed in workspace.';
-      console.log(`\n💡 ${label}`);
-      console.log(`   To ${isInstalled ? 'sync changes' : 'install and sync'}, run:`);
-      console.log(`     opkg install ${resolvedName}`);
-    } catch {
-      // Ignore errors reading workspace index
-    }
-  }
 }
 
 function displayDependencyResult(result: AddDependencyResult, classification: AddInputClassification): void {
@@ -60,10 +45,6 @@ function displayDependencyResult(result: AddDependencyResult, classification: Ad
   const versionSuffix = classification.version ? `@${classification.version}` : '';
   console.log(`✓ Added ${result.packageName}${versionSuffix} to ${result.section}`);
   console.log(`  in ${formatPathForDisplay(result.targetManifest, process.cwd())}`);
-
-  // Show install hint
-  console.log(`\n💡 To install, run:`);
-  console.log(`     opkg install`);
 }
 
 /**
@@ -131,7 +112,7 @@ export function setupAddCommand(program: Command): void {
   program
     .command('add')
     .argument('[resource-spec]',
-      'resource to add (package[@version], gh@owner/repo, https://github.com/owner/repo, /path/to/local, or installed resource name). If omitted, shows interactive file selector.')
+      'resource to add (package[@version], gh@owner/repo, https://github.com/owner/repo, or /path/to/file). If omitted, shows interactive file selector.')
     .description('Add a dependency to openpackage.yml or copy files to a package')
     .option('--to <package-name>', 'target package (for dependency: which manifest; for copy: which package source)')
     .option('--dev', 'add to dev-dependencies instead of dependencies')
@@ -149,7 +130,6 @@ export function setupAddCommand(program: Command): void {
               '<resource-spec> argument is required in non-interactive mode.\n' +
               'Usage: opkg add <resource-spec> [options]\n\n' +
               'Examples:\n' +
-              '  opkg add cursor-rules                    # Add from workspace resources\n' +
               '  opkg add ./path/to/file.txt              # Add local file\n' +
               '  opkg add gh@owner/repo                   # Add from GitHub\n' +
               '  opkg add package@version                 # Add package dependency'

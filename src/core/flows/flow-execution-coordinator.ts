@@ -200,16 +200,19 @@ async function processSourceFile(
     }
   };
   
-  // Resolve target path - handle switch expressions
+  // Resolve target path - handle switch expressions and FlowPattern
   let rawToPattern: string;
   if (typeof flow.to === 'string') {
     rawToPattern = flow.to;
   } else if (isSwitchExpression(flow.to)) {
     // Resolve switch expression to concrete target path
     rawToPattern = resolveSwitchExpression(flow.to, sourceContext);
+  } else if (typeof flow.to === 'object' && flow.to !== null && 'pattern' in flow.to) {
+    // FlowPattern { pattern: "...", schema?: "..." } - use pattern, not Object.keys
+    rawToPattern = (flow.to as { pattern: string }).pattern;
   } else {
-    // Multi-target flows - use first target
-    rawToPattern = Object.keys(flow.to)[0] ?? '';
+    // Multi-target flows - use first target path key
+    rawToPattern = Object.keys(flow.to as object)[0] ?? '';
   }
   const resolvedToPattern = resolvePattern(rawToPattern, sourceContext, capturedName);
   const targetAbs = resolveTargetFromGlob(

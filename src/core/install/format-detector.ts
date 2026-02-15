@@ -161,18 +161,19 @@ function classifyFile(path: string): {
     };
   }
   
-  // Check for universal subdirectory
-  if (UNIVERSAL_SUBDIRS.includes(firstPart)) {
-    return { type: 'universal' };
-  }
-  
-  // Check for platform suffix in filename (e.g., mcp.claude.jsonc)
+  // Check for platform suffix in filename BEFORE universal subdir
+  // (e.g. agents/git/foo.opencode.md is platform-specific, not universal)
   const platformSuffix = extractPlatformSuffixFromPath(path);
   if (platformSuffix) {
     return {
       type: 'platform-specific',
       platform: platformSuffix
     };
+  }
+  
+  // Check for universal subdirectory
+  if (UNIVERSAL_SUBDIRS.includes(firstPart)) {
+    return { type: 'universal' };
   }
   
   // Root-level files or other directories

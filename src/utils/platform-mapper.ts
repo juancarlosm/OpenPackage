@@ -26,6 +26,42 @@ function extractPatternString(pattern: string | { pattern: string; schema?: stri
 }
 
 /**
+ * Extract all "from" pattern strings from a flow's from field.
+ * Handles string, array, pattern object, and $switch expressions.
+ * For $switch: extracts patterns from both cases and default.
+ */
+function extractFromPatternsFromFlow(flow: Flow): string[] {
+  const from = flow.from;
+  if (typeof from === 'string') {
+    return [from];
+  }
+  if (Array.isArray(from)) {
+    return from.map((p) => extractPatternString(typeof p === 'string' ? p : p as { pattern: string }));
+  }
+  if (typeof from === 'object' && from !== null && 'pattern' in from) {
+    return [extractPatternString(from as { pattern: string })];
+  }
+  if (typeof from === 'object' && from !== null && '$switch' in from) {
+    const sw = (from as { $switch: { cases?: Array<{ value: unknown }>; default?: unknown } }).$switch;
+    const patterns: string[] = [];
+    if (sw.cases) {
+      for (const c of sw.cases) {
+        const v = c.value;
+        if (typeof v === 'string') patterns.push(v);
+        else if (typeof v === 'object' && v !== null && 'pattern' in v) patterns.push((v as { pattern: string }).pattern);
+      }
+    }
+    if (sw.default !== undefined) {
+      const d = sw.default;
+      if (typeof d === 'string') patterns.push(d);
+      else if (typeof d === 'object' && d !== null && 'pattern' in d) patterns.push((d as { pattern: string }).pattern);
+    }
+    return patterns;
+  }
+  return [];
+}
+
+/**
  * Result of mapping a universal path to a platform path.
  *
  * IMPORTANT CONTRACT:
@@ -265,29 +301,40 @@ export function mapWorkspaceFileToUniversal(
 
     if (definition.import && definition.import.length > 0) {
       for (const flow of definition.import) {
-        // Skip switch expressions
-        if (typeof flow.from === 'object' && '$switch' in flow.from) {
-          continue;
+        // Extract from patterns (handles $switch, array, string, pattern object)
+        const fromPatterns = extractFromPatternsFromFlow(flow);
+        if (fromPatterns.length === 0) continue;
+
+        // Find first matching from pattern
+        let matchedFromPattern: string | null = null;
+        for (const p of fromPatterns) {
+          if (matchesFlowPattern(relativePath, p)) {
+            matchedFromPattern = p;
+            break;
+          }
         }
-        const fromPatternRaw = Array.isArray(flow.from) ? flow.from[0] : flow.from;
-        if (!fromPatternRaw) continue;
-        const fromPattern = extractPatternString(fromPatternRaw);
-        
-        // Check if this file matches the full pattern (using relative path)
-        if (!matchesFlowPattern(relativePath, fromPattern)) {
-          continue;
+        if (!matchedFromPattern) continue;
+
+        // Extract universal subdir from 'to' pattern (handle $switch in to)
+        let toPattern: string | undefined;
+        if (typeof flow.to === 'string') {
+          toPattern = flow.to;
+        } else if (typeof flow.to === 'object' && flow.to !== null && '$switch' in flow.to) {
+          const sw = (flow.to as { $switch: { cases?: Array<{ pattern: string; value: unknown }>; default?: unknown } }).$switch;
+          // For workspace add, use default (workspace paths like .opencode/... not ~/.config/...)
+          const d = sw.default;
+          toPattern = typeof d === 'string' ? d : (typeof d === 'object' && d !== null && 'pattern' in d) ? (d as { pattern: string }).pattern : undefined;
+        } else if (typeof flow.to === 'object' && flow.to !== null) {
+          toPattern = Object.keys(flow.to)[0];
         }
-        
-        // Extract universal subdir from 'to' pattern
-        const toPattern = typeof flow.to === 'string' ? flow.to : Object.keys(flow.to)[0];
         if (!toPattern) continue;
-        
+
         const toParts = toPattern.split('/');
         const subdir = toParts[0];
-        
+
         // Extract the relative path by mapping from fromPattern to toPattern
-        const relPath = mapPathUsingFlowPattern(relativePath, fromPattern, toPattern);
-        
+        const relPath = mapPathUsingFlowPattern(relativePath, matchedFromPattern, toPattern);
+
         if (relPath) {
           return { platform, subdir, relPath, flow };
         }

@@ -95,10 +95,10 @@ export async function installPackageByIndexWithFlows(
   logger.debug(`Installing ${packageName}@${version} with flows for platforms: ${platforms.join(', ')}`);
 
   // Resolve package root
-  const resolvedContentRoot = contentRoot ?? await resolvePackageContentRoot({ 
-    cwd, 
-    packageName, 
-    version 
+  const resolvedContentRoot = contentRoot ?? await resolvePackageContentRoot({
+    cwd,
+    packageName,
+    version
   });
 
   // Aggregate results across all platforms

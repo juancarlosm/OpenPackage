@@ -9,7 +9,8 @@ import { minimatch } from 'minimatch';
 import { logger } from '../../utils/logger.js';
 import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
 import { schemaRegistry, getPatternFromFlow } from './schema-registry.js';
-import { getPlatformDefinitions } from '../platforms.js';
+import { getPlatformDefinitions, isPlatformId } from '../platforms.js';
+import { extractPlatformSuffixFromFilename } from '../flows/platform-suffix-handler.js';
 import type { Flow } from '../../types/flows.js';
 import type { 
   DetectionSchema,
@@ -89,8 +90,19 @@ export function detectFileFormat(
     }
   }
   
-  // No matches - default to universal
+  // No matches - use path-based platform suffix if present (e.g. foo.opencode.md)
   if (matches.length === 0) {
+    const pathPlatform = extractPlatformSuffixFromFilename(file.path);
+    if (pathPlatform && isPlatformId(pathPlatform)) {
+      return {
+        platform: pathPlatform,
+        confidence: 0.7,
+        matchedFlow: null,
+        matchedSchema: null,
+        matchedFields: [],
+        path: file.path
+      };
+    }
     return {
       platform: 'universal',
       confidence: 0.3,
