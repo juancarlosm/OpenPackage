@@ -132,7 +132,6 @@ async function handleListUninstall(
 
   // Packages section
   if (multiResourcePackages.length > 0) {
-    choices.push({ title: '── packages ──', disabled: true });
     for (const pkg of multiResourcePackages) {
       const versionSuffix = pkg.version && pkg.version !== '0.0.0' ? ` (v${pkg.version})` : '';
       const scopeTag = formatScopeTag(pkg.scope);
@@ -146,7 +145,6 @@ async function handleListUninstall(
 
   // Resources section
   if (filteredResources.length > 0) {
-    choices.push({ title: '── resources ──', disabled: true });
     for (const resource of filteredResources) {
       const typeLabel = resource.resourceType;
       const fromPkg = resource.packageName && !packageFilter
