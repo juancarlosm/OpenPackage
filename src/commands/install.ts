@@ -31,7 +31,7 @@ export function setupInstallCommand(program: Command): void {
     .option('-c, --commands <names...>', 'install specific commands by name (matches frontmatter name or filename)')
     .option('--plugins <names...>', 'install specific plugins from marketplace (bypasses interactive selection)')
     .option('--platforms <platforms...>', 'install to specific platforms (e.g., cursor claudecode opencode)')
-    .option('--list', 'interactively select resources to install (agents, skills, commands, etc.)')
+    .option('-i, --interactive', 'interactively select resources to install (agents, skills, commands, etc.)')
     .option('--dry-run', 'preview changes without applying them')
     .option('--force', 'overwrite existing files')
     .option('--conflicts <strategy>', 'conflict handling strategy: keep-both, overwrite, skip, or ask')
@@ -48,13 +48,13 @@ export function setupInstallCommand(program: Command): void {
         rules?: string[];
         commands?: string[];
         conflicts?: string;
-        list?: boolean;
+        interactive?: boolean;
       },
       command: Command
     ) => {
       // Validate mutually exclusive options
-      if (options.list && (options.agents || options.skills || options.rules || options.commands)) {
-        throw new Error('--list cannot be used with --agents, --skills, --rules, or --commands. Use --list for interactive selection or specify filters directly.');
+      if (options.interactive && (options.agents || options.skills || options.rules || options.commands)) {
+        throw new Error('--interactive cannot be used with --agents, --skills, --rules, or --commands. Use --interactive for interactive selection or specify filters directly.');
       }
       
       // Get program-level options (for --cwd)

@@ -1,5 +1,5 @@
 /**
- * Integration tests for install command with --list option
+ * Integration tests for install command with --interactive option
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
@@ -7,7 +7,7 @@ import { join } from 'path';
 import { discoverResources } from '../../src/core/install/resource-discoverer.js';
 import { setupTestEnvironment, cleanupTestEnvironment } from '../test-helpers.js';
 
-describe('install --list', () => {
+describe('install --interactive', () => {
   let testDir: string;
 
   beforeEach(async () => {
@@ -37,13 +37,13 @@ describe('install --list', () => {
   });
 
   describe('validation', () => {
-    it('should reject --list with --agents', () => {
+    it('should reject --interactive with --agents', () => {
       // This is validated at CLI level in install.ts
       // The validation ensures mutually exclusive options
       expect(true).toBe(true); // Placeholder
     });
 
-    it('should reject --list with --skills', () => {
+    it('should reject --interactive with --skills', () => {
       // This is validated at CLI level in install.ts
       expect(true).toBe(true); // Placeholder
     });

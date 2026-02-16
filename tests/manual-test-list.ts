@@ -1,5 +1,5 @@
 /**
- * Manual test for --list resource discovery
+ * Manual test for --interactive resource discovery
  * 
  * Run with: npm run build && node dist/tests/manual-test-list.js
  */

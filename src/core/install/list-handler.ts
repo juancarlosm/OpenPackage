@@ -1,7 +1,7 @@
 /**
  * List Handler Module
  * 
- * Handles --list option integration with install orchestrator
+ * Handles --interactive option integration with install orchestrator
  */
 
 import { resolve } from 'path';
@@ -22,7 +22,7 @@ import type { ResourceInstallationSpec } from './convenience-matchers.js';
 import type { SelectedResource } from './resource-types.js';
 
 /**
- * Handle interactive resource selection (--list option)
+ * Handle interactive resource selection (--interactive option)
  * 
  * @param context - Installation context
  * @param options - Normalized install options

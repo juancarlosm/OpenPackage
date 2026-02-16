@@ -16,7 +16,7 @@ import { formatFileSize, formatFileCount } from '../utils/formatters.js';
 import { normalizePackageName } from '../utils/package-name.js';
 
 interface UnpublishCommandOptions extends UnpublishOptions {
-  list?: boolean;
+  interactive?: boolean;
 }
 
 /**
@@ -123,14 +123,14 @@ async function selectVersionsFromPackage(
 }
 
 /**
- * Handle interactive unpublish with --list option
- * Note: --list automatically implies --local mode
+ * Handle interactive unpublish with --interactive option
+ * Note: --interactive automatically implies --local mode
  */
 async function handleListUnpublish(
   packageSpec: string | undefined,
   options: UnpublishCommandOptions
 ): Promise<void> {
-  // --list always operates on local registry (no validation needed)
+  // --interactive always operates on local registry (no validation needed)
   // The --local flag is auto-implied by the action handler
   
   let selectedPackage: string | null = null;
@@ -211,13 +211,13 @@ export function setupUnpublishCommand(program: Command): void {
     .description('Remove package from remote registry (use --local for local unpublishing)')
     .option('--local', 'unpublish from local registry (~/.openpackage/registry)')
     .option('--force', 'skip confirmation prompts')
-    .option('-l, --list', 'interactively select packages/versions to unpublish (implies --local)')
+    .option('-i, --interactive', 'interactively select packages/versions to unpublish (implies --local)')
     .option('--profile <profile>', 'profile to use for authentication (remote only)')
     .option('--api-key <key>', 'API key for authentication (remote only, overrides profile)')
     .action(withErrorHandling(async (packageSpec: string | undefined, options: UnpublishCommandOptions) => {
-      // Handle interactive list mode
-      if (options.list) {
-        // Auto-imply --local when --list is used (list only works with local registry)
+      // Handle interactive mode
+      if (options.interactive) {
+        // Auto-imply --local when --interactive is used (interactive only works with local registry)
         options.local = true;
         await handleListUnpublish(packageSpec, options);
         return;
@@ -225,7 +225,7 @@ export function setupUnpublishCommand(program: Command): void {
       
       // Validate package spec is provided for non-list mode
       if (!packageSpec) {
-        throw new Error('Package specification is required. Usage: opkg unpublish <package[@version]> or use --list for interactive selection');
+        throw new Error('Package specification is required. Usage: opkg unpublish <package[@version]> or use --interactive for interactive selection');
       }
       
       // Run unpublish pipeline (routes to local or remote)

@@ -80,17 +80,17 @@ export class InstallOrchestrator {
     assertTargetDirOutsideMetadata(execContext.targetDir);
     validateResolutionFlags(options);
     
-    // Step 1.5: Determine output mode and validate --list TTY requirement
+    // Step 1.5: Determine output mode and validate --interactive TTY requirement
     const hasConvenienceFilters = Boolean(
       options.plugins || options.agents || options.skills || 
       options.rules || options.commands
     );
-    const isInteractive = canPrompt() && (options.list || !hasConvenienceFilters);
+    const isInteractive = canPrompt() && (options.interactive || !hasConvenienceFilters);
     setOutputMode(isInteractive);
     
-    // Validate --list requires TTY
-    if (options.list && !canPrompt()) {
-      throw new Error('--list requires an interactive terminal (TTY). Use specific filters (--agents, --skills, etc.) for non-interactive installs.');
+    // Validate --interactive requires TTY
+    if (options.interactive && !canPrompt()) {
+      throw new Error('--interactive requires an interactive terminal (TTY). Use specific filters (--agents, --skills, etc.) for non-interactive installs.');
     }
     
     // Step 2: Classify input (use sourceCwd for resolving input paths)
@@ -149,8 +149,8 @@ export class InstallOrchestrator {
         return this.handleMultiResource(result, options, execContext);
       
       default: {
-        // Handle --list option (interactive resource selection)
-        if (options.list) {
+        // Handle --interactive option (interactive resource selection)
+        if (options.interactive) {
           return this.handleList(context, options, execContext);
         }
         
@@ -262,8 +262,8 @@ export class InstallOrchestrator {
    
    spinner.stop();
    
-   // Handle --list: discover and display resources across plugins
-   if (options.list) {
+   // Handle --interactive: discover and display resources across plugins
+   if (options.interactive) {
      return this.handleMarketplaceList(context, marketplace, options, execContext);
    }
    
@@ -377,7 +377,7 @@ export class InstallOrchestrator {
   }
   
   /**
-  * Handle --list for marketplace: discover resources across specified plugins
+  * Handle --interactive for marketplace: discover resources across specified plugins
   * and present a combined interactive selection menu.
   * 
   * If --plugins is specified, only those plugins are included.
@@ -611,7 +611,7 @@ export class InstallOrchestrator {
   }
   
   /**
-   * Handle interactive resource selection (--list option).
+   * Handle interactive resource selection (--interactive option).
    * Discovers all resources, prompts for selection, and installs selected items.
    */
   private async handleList(

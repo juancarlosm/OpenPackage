@@ -42,7 +42,7 @@ export interface ExecutionContext {
   telemetryCollector?: TelemetryCollector;
   
   /**
-   * Indicates interactive mode (--list).
+   * Indicates interactive mode (--interactive).
    * When true, suppress detailed output to keep the interface clean.
    */
   interactive?: boolean;
@@ -64,7 +64,7 @@ export interface ExecutionOptions {
   cwd?: string;
   
   /**
-   * Indicates interactive mode (--list).
+   * Indicates interactive mode (--interactive).
    * When true, commands should operate in interactive selection mode.
    */
   interactive?: boolean;

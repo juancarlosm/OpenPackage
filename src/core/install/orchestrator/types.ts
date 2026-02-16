@@ -15,7 +15,7 @@ export interface NormalizedInstallOptions extends InstallOptions {
   skills?: string[];
   rules?: string[];
   commands?: string[];
-  list?: boolean;
+  interactive?: boolean;
 }
 
 /**

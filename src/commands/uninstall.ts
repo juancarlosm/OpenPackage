@@ -22,7 +22,7 @@ import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
 import { join } from 'path';
 
 interface UninstallCommandOptions extends UninstallOptions {
-  list?: boolean;
+  interactive?: boolean;
 }
 
 async function uninstallCommand(
@@ -32,13 +32,13 @@ async function uninstallCommand(
 ) {
   const programOpts = command.parent?.opts() || {};
 
-  if (options.list) {
+  if (options.interactive) {
     await handleListUninstall(nameArg, options, programOpts);
     return;
   }
 
   if (!nameArg) {
-    throw new ValidationError('Resource or package name is required. Use --list to interactively select.');
+    throw new ValidationError('Resource or package name is required. Use --interactive to interactively select.');
   }
 
   await handleDirectUninstall(nameArg, options, programOpts);
@@ -94,7 +94,7 @@ async function handleDirectUninstall(
 }
 
 // ---------------------------------------------------------------------------
-// Interactive list: opkg un --list [package-name]
+// Interactive selection: opkg un --interactive [package-name]
 // ---------------------------------------------------------------------------
 
 async function handleListUninstall(
@@ -179,7 +179,7 @@ async function handleListUninstall(
   
   if (totalItems === 0) {
     s.stop('No installed resources found');
-    note('Run `opkg install --list` to install resources.', 'Info');
+    note('Run `opkg install --interactive` to install resources.', 'Info');
     outro();
     return;
   }
@@ -539,7 +539,7 @@ export function setupUninstallCommand(program: Command): void {
     .argument('[resource-spec]', 'name of the resource or package to uninstall')
     .option('-g, --global', 'uninstall from home directory (~/) instead of current workspace')
     .option('--dry-run', 'preview changes without applying them')
-    .option('-l, --list', 'interactively select items to uninstall')
+    .option('-i, --interactive', 'interactively select items to uninstall')
     .action(withErrorHandling(async (nameArg: string | undefined, options: UninstallCommandOptions, command: Command) => {
       await uninstallCommand(nameArg, options, command);
     }));

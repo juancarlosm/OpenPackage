@@ -382,14 +382,14 @@ For implementation details, see:
 The `opkg unpublish` command removes packages from registries. Key behaviors:
 - **Default**: Attempts remote unpublish (currently not implemented)
 - **Local mode**: `opkg unpublish <package[@version]> --local` removes from local registry
-- **Interactive mode**: `opkg unpublish --list` auto-implies `--local` and provides interactive selection
+- **Interactive mode**: `opkg unpublish --interactive` auto-implies `--local` and provides interactive selection
 
 Examples:
 ```bash
 opkg unpublish my-package@1.0.0 --local      # Remove specific version from local
 opkg unpublish my-package --local            # Remove all versions from local
-opkg unpublish --list                        # Interactive selection (auto-implies --local)
-opkg unpublish --list --force                # Interactive selection, skip confirmation
+opkg unpublish --interactive                 # Interactive selection (auto-implies --local)
+opkg unpublish --interactive --force         # Interactive selection, skip confirmation
 ```
 
 Note: Remote unpublish is not yet implemented. Use `--local` flag for local registry operations.

@@ -2,7 +2,7 @@
  * Clack Group Multiselect Wrapper
  * 
  * Wrapper around @clack/prompts groupMultiselect
- * for resource selection in install --list command.
+ * for resource selection in install --interactive command.
  */
 
 import { groupMultiselect, isCancel } from '@clack/prompts';

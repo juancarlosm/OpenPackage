@@ -779,7 +779,7 @@ export function validatePluginNames(
 }
 
 /**
- * Resolved plugin info for resource discovery (used by --list).
+ * Resolved plugin info for resource discovery (used by --interactive).
  */
 export interface ResolvedPluginInfo {
   pluginEntry: MarketplacePluginEntry;

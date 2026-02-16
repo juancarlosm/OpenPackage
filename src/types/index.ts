@@ -214,7 +214,7 @@ export interface InstallOptions {
    * Mutually exclusive with --agents and --skills.
    * Ignored for marketplace sources (which already have plugin selection).
    */
-  list?: boolean;
+  interactive?: boolean;
 
   /**
    * Internal: when true, do not write to the workspace manifest during install.

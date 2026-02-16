@@ -26,7 +26,7 @@ export function normalizeInstallOptions(
     skills?: string[];
     rules?: string[];
     commands?: string[];
-    list?: boolean;
+    interactive?: boolean;
   }
 ): NormalizedInstallOptions {
   // Normalize platforms
@@ -52,6 +52,6 @@ export function normalizeInstallOptions(
     skills: options.skills,
     rules: options.rules,
     commands: options.commands,
-    list: options.list,
+    interactive: options.interactive,
   };
 }
