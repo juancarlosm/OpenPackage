@@ -285,7 +285,7 @@ async function preConvertPackage(
   
   // Convert each format group
   const convertedGroups = new Map<PlatformId | SpecialFormat, PackageFile[]>();
-  
+
   for (const [platformId, groupFiles] of formatGroups.entries()) {
     try {
       // Create format group object

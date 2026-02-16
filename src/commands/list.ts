@@ -204,7 +204,8 @@ interface DepsPackageEntry {
 
 function printDepsView(
   results: Array<{ scope: ResourceScope; result: ScopeResult }>,
-  showFiles: boolean
+  showFiles: boolean,
+  headerInfo?: { name: string; version?: string; path: string; type: string }
 ): void {
   const packageMap = new Map<string, DepsPackageEntry>();
 
@@ -229,7 +230,11 @@ function printDepsView(
   }
 
   // Print header showing workspace/package name and path
-  if (results.length > 0) {
+  if (headerInfo) {
+    const version = headerInfo.version ? `@${headerInfo.version}` : '';
+    const typeTag = dim(`[${headerInfo.type}]`);
+    console.log(`${headerInfo.name}${version} ${dim(`(${headerInfo.path})`)} ${typeTag}`);
+  } else if (results.length > 0) {
     const firstResult = results[0].result;
     const version = firstResult.headerVersion ? `@${firstResult.headerVersion}` : '';
     const typeTag = dim(`[${firstResult.headerType}]`);
@@ -762,9 +767,41 @@ async function listCommand(
     return { success: true };
   }
 
+  // Compute header - when in workspace mode (showProject), always use workspace path
+  type HeaderInfo = { name: string; version?: string; path: string; type: 'workspace' | 'package' | 'resource' };
+  let listHeaderInfo: HeaderInfo | undefined;
+  if (showProject) {
+    const projectContext = await createExecutionContext({
+      global: false,
+      cwd: programOpts.cwd
+    });
+    const workspacePath = getDisplayTargetDir(projectContext);
+    const manifestPath = getLocalPackageYmlPath(projectContext.targetDir);
+    let name = 'Unnamed';
+    let version: string | undefined;
+    try {
+      const manifest = await parsePackageYml(manifestPath);
+      name = manifest.name || 'Unnamed';
+      version = manifest.version;
+    } catch {
+      /* ignore */
+    }
+    const headerType = await detectEntityType(projectContext.targetDir);
+    listHeaderInfo = { name, version, path: workspacePath, type: headerType };
+  } else {
+    listHeaderInfo = results.length > 0
+      ? {
+          name: results[0].result.headerName,
+          version: results[0].result.headerVersion,
+          path: results[0].result.headerPath,
+          type: results[0].result.headerType
+        }
+      : undefined;
+  }
+
   // --- Deps view ---
   if (options.deps) {
-    printDepsView(results, !!options.files);
+    printDepsView(results, !!options.files, listHeaderInfo);
     return { success: true };
   }
 
@@ -804,17 +841,7 @@ async function listCommand(
     }
   }
 
-  // Get header info from the first result
-  const headerInfo = results.length > 0 
-    ? { 
-        name: results[0].result.headerName, 
-        version: results[0].result.headerVersion, 
-        path: results[0].result.headerPath,
-        type: results[0].result.headerType
-      }
-    : undefined;
-
-  printResourcesView(mergedResources, !!options.files, headerInfo);
+  printResourcesView(mergedResources, !!options.files, listHeaderInfo);
 
   return { success: true };
 }

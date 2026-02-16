@@ -9,7 +9,7 @@ import { minimatch } from 'minimatch';
 import { logger } from '../../utils/logger.js';
 import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
 import { schemaRegistry, getPatternFromFlow } from './schema-registry.js';
-import { getPlatformDefinitions, isPlatformId } from '../platforms.js';
+import { getPlatformDefinitions, isPlatformId, matchesUniversalPattern } from '../platforms.js';
 import { extractPlatformSuffixFromFilename } from '../flows/platform-suffix-handler.js';
 import type { Flow } from '../../types/flows.js';
 import type { 
@@ -42,8 +42,21 @@ export function detectFileFormat(
     frontmatter = parsed.frontmatter || {};
   }
   
-  // No frontmatter - return unknown
+  // No frontmatter - use path-based fallback for universal locations
   if (!frontmatter || Object.keys(frontmatter).length === 0) {
+    // Files at universal paths (commands/, agents/, rules/, etc.) or config files
+    // are already in universal format; treat as universal, not unknown
+    const normalizedPath = file.path.replace(/\\/g, '/').replace(/^\.\/?/, '');
+    if (matchesUniversalPattern(normalizedPath, targetDir)) {
+      return {
+        platform: 'universal',
+        confidence: 0.3,
+        matchedFlow: null,
+        matchedSchema: null,
+        matchedFields: [],
+        path: file.path
+      };
+    }
     return {
       platform: 'unknown',
       confidence: 0,

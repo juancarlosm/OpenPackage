@@ -368,6 +368,28 @@ export async function detectEnhancedPackageFormat(
     };
   }
   
+  // Pure universal package: openpackage.yml at root, no platform markers
+  // Skip per-file detection; all files are already in universal format
+  if ((markers.hasOpenPackageYml || markers.hasPackageYml) && markers.matches.length === 0) {
+    return {
+      packageFormat: 'universal',
+      detectionMethod: 'package-marker',
+      confidence: 1.0,
+      formatGroups: new Map([['universal', files.map(f => f.path)]]),
+      markers: {
+        matchedPatterns: [],
+        hasOpenPackageYml: markers.hasOpenPackageYml,
+        hasPackageYml: markers.hasPackageYml
+      },
+      analysis: {
+        totalFiles: files.length,
+        analyzedFiles: 0,
+        skippedFiles: files.length,
+        formatDistribution: new Map([['universal', files.length]])
+      }
+    };
+  }
+  
   // Tier 2: Per-file detection (detailed path)
   // Detect format for each file
   const fileFormats = detectFileFormats(files, targetDir);

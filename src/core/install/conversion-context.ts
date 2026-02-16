@@ -147,7 +147,7 @@ export function recordConversionError(
   context.errors.set(filePath, error);
   context.metadata.failedFiles++;
   
-  logger.error(`Recorded conversion error for ${filePath}`, error);
+  logger.debug(`Recorded conversion error for ${filePath}`, error);
 }
 
 /**
