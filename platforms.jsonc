@@ -157,6 +157,10 @@
       {
         "from": "commands/**/*.md",
         "to": ".augment/commands/**/*.md"
+      },
+      {
+        "from": "skills/**/*",
+        "to": ".augment/skills/**/*"
       }
     ],
     "import": [
@@ -167,6 +171,10 @@
       {
         "from": ".augment/commands/**/*.md",
         "to": "commands/**/*.md"
+      },
+      {
+        "from": ".augment/skills/**/*",
+        "to": "skills/**/*"
       }
     ]
   },
