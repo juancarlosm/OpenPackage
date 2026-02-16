@@ -80,6 +80,9 @@ async function handleDirectUninstall(
     return;
   }
 
+  // #region agent log
+  for (const c of selected) { fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'uninstall.ts:handleDirectUninstall',message:'direct uninstall selected',data:{candidateKind:c.kind,packageName:c.package?.packageName ?? c.resource?.packageName},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{}); }
+  // #endregion
   for (const candidate of selected) {
     const ctx = await createExecutionContext({
       global: candidate.resource?.scope === 'global' || candidate.package?.scope === 'global',
@@ -301,64 +304,33 @@ async function handleListUninstall(
 
   for (const selection of selected) {
     if (selection.kind === 'package') {
-      // User selected an entire package - uninstall all its resources
+      // User selected an entire package - use full package uninstall (same as direct uninstall)
+      // so that manifest (openpackage.yml) and workspace index are properly updated.
       const { packageName, scope, resources } = selection;
-      
-      if (resources.length === 0) {
-        // Empty package - uninstall the package metadata itself
-        const ctx = await createExecutionContext({
-          global: scope === 'global',
-          cwd: programOpts.cwd,
-          interactive: true
-        });
-        
-        const candidate: ResolutionCandidate = { 
-          kind: 'package', 
-          package: { 
-            packageName, 
-            scope, 
-            version: undefined, 
-            resourceCount: 0, 
-            targetFiles: [] 
-          } 
-        };
-        
-        try {
-          // Collect files before execution
-          allRemovedFiles.push(...candidate.package!.targetFiles);
-          
-          await executeCandidate(candidate, options, ctx);
-          typeCounts.set('packages', (typeCounts.get('packages') || 0) + 1);
-          uninstalledCount++;
-        } catch (error) {
-          log.error(`Failed to uninstall ${packageName}`);
-          throw error;
+      const pkg = filteredPackages.find(p => p.packageName === packageName && p.scope === scope);
+      const ctx = await createExecutionContext({
+        global: scope === 'global',
+        cwd: programOpts.cwd,
+        interactive: true
+      });
+      const candidate: ResolutionCandidate = {
+        kind: 'package',
+        package: {
+          packageName,
+          scope,
+          version: pkg?.version,
+          resourceCount: resources.length,
+          targetFiles: resources.flatMap(r => r.targetFiles)
         }
-      } else {
-        // Package has resources - uninstall each resource
-        for (const resource of resources) {
-          const candidate: ResolutionCandidate = { kind: 'resource', resource };
-          const ctx = await createExecutionContext({
-            global: scope === 'global',
-            cwd: programOpts.cwd,
-            interactive: true
-          });
-          
-          try {
-            // Collect files before execution
-            allRemovedFiles.push(...resource.targetFiles);
-            
-            await executeCandidate(candidate, options, ctx);
-            
-            // Track by resource type
-            const typePlural = toLabelPlural(normalizeType(resource.resourceType)).toLowerCase();
-            typeCounts.set(typePlural, (typeCounts.get(typePlural) || 0) + 1);
-            uninstalledCount++;
-          } catch (error) {
-            log.error(`Failed to uninstall ${resource.resourceName}`);
-            throw error;
-          }
-        }
+      };
+      try {
+        allRemovedFiles.push(...candidate.package!.targetFiles);
+        await executeCandidate(candidate, options, ctx);
+        typeCounts.set('packages', (typeCounts.get('packages') || 0) + 1);
+        uninstalledCount++;
+      } catch (error) {
+        log.error(`Failed to uninstall ${packageName}`);
+        throw error;
       }
     } else {
       // User selected an individual resource
@@ -417,6 +389,9 @@ async function executeCandidate(
   options: UninstallOptions,
   execContext: ExecutionContext
 ): Promise<void> {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'uninstall.ts:executeCandidate',message:'executeCandidate called',data:{candidateKind:candidate.kind,packageName:candidate.package?.packageName ?? candidate.resource?.packageName},timestamp:Date.now(),hypothesisId:'A',runId:'post-fix'})}).catch(()=>{});
+  // #endregion
   if (candidate.kind === 'package') {
     const pkg = candidate.package!;
     const result = await runUninstallPipeline(pkg.packageName, options, execContext);
