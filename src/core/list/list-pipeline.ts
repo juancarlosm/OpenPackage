@@ -2,7 +2,7 @@ import path from 'path';
 
 import type { CommandResult, ExecutionContext } from '../../types/index.js';
 import { ValidationError } from '../../utils/errors.js';
-import { getLocalOpenPackageDir, getLocalPackageYmlPath, isRootPackage } from '../../utils/paths.js';
+import { getLocalOpenPackageDir, getLocalPackageYmlPath } from '../../utils/paths.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { resolveDeclaredPath } from '../../utils/path-resolution.js';
 import { exists } from '../../utils/fs.js';
@@ -537,15 +537,20 @@ export async function runListPipeline(
 
   // Get workspace config to find root packages
   let rootPackageNames: string[] = [];
+  let workspacePackageName: string | undefined;
   try {
     const config = await parsePackageYml(manifestPath);
-    
+    workspacePackageName = config.name;
     // Root packages are those declared in dependencies/dev-dependencies
     const declaredDeps = [
       ...(config.dependencies || []),
       ...(config['dev-dependencies'] || [])
     ];
     rootPackageNames = declaredDeps.map(dep => dep.name);
+    // Include workspace package in tree roots when it's in the index (so its resources are listed)
+    if (workspacePackageName && packages[workspacePackageName]) {
+      rootPackageNames = [workspacePackageName, ...rootPackageNames];
+    }
   } catch (error) {
     logger.warn(`Failed to read workspace manifest: ${error}`);
   }
@@ -655,14 +660,8 @@ export async function runListPipeline(
     };
   }
 
-  // Check all packages and build reports
+  // Check all packages and build reports (include workspace package so its resources are listed)
   for (const [pkgName, pkgEntry] of Object.entries(packages)) {
-    // Skip the workspace package itself
-    if (await isRootPackage(targetDir, pkgName)) {
-      logger.debug(`Skipping workspace package '${pkgName}' in list`);
-      continue;
-    }
-
     try {
       const report = await checkPackageStatus(targetDir, pkgName, pkgEntry, includeFiles, platforms);
       reports.push(report);
