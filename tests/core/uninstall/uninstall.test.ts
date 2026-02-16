@@ -91,7 +91,7 @@ async function cleanup(paths: string[]) {
   }
 }
 
-// Test: workspace package should not appear in uninstall list
+// Test: workspace package appears in uninstall list (its installed resources can be uninstalled)
 {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'opkg-uninstall-list-home-'));
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'opkg-uninstall-list-ws-'));
@@ -100,6 +100,8 @@ async function cleanup(paths: string[]) {
     const openpkgDir = path.join(workspace, '.openpackage');
     const pkgDir = path.join(openpkgDir, 'packages', 'my-pkg');
     await fs.mkdir(pkgDir, { recursive: true });
+    await fs.mkdir(path.join(workspace, '.opencode', 'command', 'essentials'), { recursive: true });
+    await fs.writeFile(path.join(workspace, '.opencode', 'command', 'essentials', 'cleanup.md'), '# cleanup\n', 'utf8');
 
     // Create workspace manifest with name "test-workspace"
     await fs.writeFile(
@@ -108,7 +110,7 @@ async function cleanup(paths: string[]) {
       'utf8'
     );
 
-    // Create index with both my-pkg AND the workspace package itself (simulating the bug)
+    // Create index with my-pkg AND workspace package with installed resources
     await fs.writeFile(
       path.join(openpkgDir, 'openpackage.index.yml'),
       [
@@ -121,19 +123,25 @@ async function cleanup(paths: string[]) {
         '    files: {}',
         '  test-workspace:',
         '    path: ./.openpackage/',
-        '    files: {}',
+        '    version: 0.0.0',
+        '    files:',
+        '      commands/essentials/cleanup.md:',
+        '        - .opencode/command/essentials/cleanup.md',
         ''
       ].join('\n'),
       'utf8'
     );
 
-    // Run uninstall with --list and --dry-run to see what would be shown
-    // Since this is interactive, we can't test the actual prompt, but we can verify
-    // that the command doesn't error and check that the workspace package would be filtered
+    const { buildWorkspaceResources } = await import('../../../src/core/resources/resource-builder.js');
+    const { resources, packages } = await buildWorkspaceResources(workspace, 'project');
+    assert.ok(packages.some(p => p.packageName === 'test-workspace'), 'workspace package should appear in packages');
+    assert.ok(resources.some(r => r.packageName === 'test-workspace'), 'workspace package resources should appear');
+
+    // Direct uninstall of my-pkg still works
     const res = runCli(['uninstall', 'my-pkg', '--dry-run'], workspace, { HOME: home });
     assert.equal(res.code, 0, `uninstall should succeed: ${res.stderr}`);
 
-    console.log('uninstall list filtering test passed');
+    console.log('uninstall list workspace package test passed');
   } finally {
     await cleanup([workspace, home]);
   }

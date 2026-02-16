@@ -9,7 +9,6 @@
  */
 
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
-import { isRootPackage } from '../../utils/paths.js';
 import { classifySourceKey } from './source-key-classifier.js';
 import { getTargetPath } from '../../utils/workspace-index-helpers.js';
 import { scanUntrackedFiles } from '../list/untracked-files-scanner.js';
@@ -61,12 +60,9 @@ export async function buildWorkspaceResources(
   const resources: ResolvedResource[] = [];
   const resolvedPackages: ResolvedPackage[] = [];
 
-  // Process tracked packages
+  // Process tracked packages (including workspace package — its installed
+  // resources can be uninstalled; manifest removal is skipped for root package)
   for (const [pkgName, pkgEntry] of Object.entries(packages)) {
-    if (await isRootPackage(targetDir, pkgName)) {
-      continue;
-    }
-
     const filesMapping = pkgEntry.files || {};
     const resourceMap = new Map<string, { sourceKeys: Set<string>; targetFiles: string[] }>();
     const allTargetFiles: string[] = [];

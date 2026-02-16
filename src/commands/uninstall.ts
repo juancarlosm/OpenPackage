@@ -381,7 +381,7 @@ async function handleListUninstall(
       allRemovedFiles.map(({ path: p, targetDir }) => join(targetDir, p))
     )].sort((a, b) => a.localeCompare(b));
     const displayFiles = absolutePaths.slice(0, 10);
-    const fileLines = displayFiles.map(f => `   • ${formatPathForDisplay(f, cwd)}`);
+    const fileLines = displayFiles.map(f => `   ${formatPathForDisplay(f, cwd)}`);
     const more = absolutePaths.length > 10 ? `\n   ... and ${absolutePaths.length - 10} more` : '';
     note(fileLines.join('\n') + more, 'Removed files');
   }
