@@ -1,6 +1,7 @@
 import { resolve as resolvePath, join, basename } from 'path';
 
 import type { CommandResult } from '../../types/index.js';
+import type { ExecutionContext } from '../../types/execution-context.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
 import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
@@ -15,6 +16,8 @@ import { getLocalOpenPackageDir } from '../../utils/paths.js';
 
 export interface AddToSourceOptions {
   platformSpecific?: boolean;
+  force?: boolean;
+  execContext?: ExecutionContext;
 }
 
 export interface AddToSourceResult {
@@ -87,7 +90,7 @@ export async function runAddToSourcePipeline(
   // Collect entries - source-collector now handles flow-based mapping
   const entries = await collectSourceEntries(absInputPath, cwd);
 
-  const changed = await copyFilesWithConflictResolution(packageContext, entries);
+  const changed = await copyFilesWithConflictResolution(packageContext, entries, options);
 
   logger.info('Files copied to package source', {
     packageName: packageContext.name,

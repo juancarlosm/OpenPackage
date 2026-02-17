@@ -1,15 +1,17 @@
 import { safePrompts } from '../../utils/prompts.js';
 import { UserCancellationError } from '../../utils/errors.js';
 import type { RemovalEntry } from './removal-collector.js';
+import { PromptTier } from '../../core/interaction-policy.js';
 
 export interface RemovalConfirmationOptions {
   force?: boolean;
   dryRun?: boolean;
+  execContext?: { interactionPolicy?: { canPrompt(tier: PromptTier): boolean } };
 }
 
 /**
  * Confirm removal operation with user.
- * 
+ *
  * @param packageName - Name of the package
  * @param entries - Files to be removed
  * @param options - Confirmation options
@@ -24,6 +26,11 @@ export async function confirmRemoval(
   // Skip confirmation if force flag is set or dry-run
   if (options.force || options.dryRun) {
     return true;
+  }
+
+  const policy = options.execContext?.interactionPolicy;
+  if (!policy?.canPrompt(PromptTier.Confirmation)) {
+    throw new Error('Removal requires confirmation. Use --force in non-interactive mode.');
   }
 
   console.log(`\nThe following ${entries.length} file${entries.length !== 1 ? 's' : ''} will be removed from '${packageName}':`);

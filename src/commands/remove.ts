@@ -4,10 +4,13 @@ import { withErrorHandling } from '../utils/errors.js';
 import { runRemoveFromSourcePipeline, type RemoveFromSourceOptions } from '../core/remove/remove-from-source-pipeline.js';
 import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
-import { canPrompt } from '../utils/file-scanner.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
 import { expandDirectorySelections, hasDirectorySelections, countSelectionTypes } from '../utils/expand-directory-selections.js';
-import { interactivePackageSelect, resolvePackageSelection, WORKSPACE_PACKAGE } from '../utils/interactive-package-selector.js';
+import { interactivePackageSelect, resolvePackageSelection } from '../utils/interactive-package-selector.js';
+import { createExecutionContext } from '../core/execution-context.js';
+import { createInteractionPolicy, PromptTier } from '../core/interaction-policy.js';
+import type { ExecutionContext } from '../types/execution-context.js';
+import { getLocalPackageDir } from '../utils/paths.js';
 
 export function setupRemoveCommand(program: Command): void {
   program
@@ -19,13 +22,24 @@ export function setupRemoveCommand(program: Command): void {
     .option('--force', 'Skip confirmation prompts')
     .option('--dry-run', 'Preview what would be removed without actually deleting')
     .action(
-      withErrorHandling(async (pathArg: string | undefined, options: RemoveFromSourceOptions & { from?: string }) => {
+      withErrorHandling(async (pathArg: string | undefined, options: RemoveFromSourceOptions & { from?: string }, command: Command) => {
         const cwd = process.cwd();
-        
+        const programOpts = command.parent?.opts() || {};
+
+        const execContext = await createExecutionContext({
+          global: false,
+          cwd: programOpts.cwd,
+        });
+
+        const policy = createInteractionPolicy({
+          interactive: !pathArg,
+          force: options.force,
+        });
+        execContext.interactionPolicy = policy;
+
         // If no path argument provided, show interactive selector
         if (!pathArg) {
-          // Check if we're in an interactive terminal
-          if (!canPrompt()) {
+          if (!policy.canPrompt(PromptTier.OptionalMenu)) {
             throw new Error(
               '<path> argument is required in non-interactive mode.\n' +
               'Usage: opkg remove <path> [options]\n\n' +
@@ -44,7 +58,6 @@ export function setupRemoveCommand(program: Command): void {
             // Package specified via --from option
             selectedPackage = options.from;
             // Get package directory (will be validated later by pipeline)
-            const { getLocalPackageDir } = await import('../utils/paths.js');
             packageDir = getLocalPackageDir(cwd, options.from);
           } else {
             // Show interactive package selector
@@ -104,7 +117,7 @@ export function setupRemoveCommand(program: Command): void {
             }
             
             try {
-              await processRemoveResource(selectedPackage ?? undefined, file, options, cwd);
+              await processRemoveResource(selectedPackage ?? undefined, file, options, cwd, execContext);
             } catch (error) {
               console.error(`✗ Failed to remove ${file}: ${error}`);
               // Continue with remaining files
@@ -115,7 +128,7 @@ export function setupRemoveCommand(program: Command): void {
         }
         
         // Process single path argument (existing behavior)
-        await processRemoveResource(options.from, pathArg, options, cwd);
+        await processRemoveResource(options.from, pathArg, options, cwd, execContext);
       })
     );
 }
@@ -127,9 +140,10 @@ async function processRemoveResource(
   packageName: string | undefined,
   pathArg: string,
   options: RemoveFromSourceOptions & { from?: string },
-  cwd: string
+  cwd: string,
+  execContext: ExecutionContext
 ): Promise<void> {
-  const result = await runRemoveFromSourcePipeline(packageName, pathArg, options);
+  const result = await runRemoveFromSourcePipeline(packageName, pathArg, { ...options, execContext });
   if (!result.success) {
     throw new Error(result.error || 'Remove operation failed');
   }

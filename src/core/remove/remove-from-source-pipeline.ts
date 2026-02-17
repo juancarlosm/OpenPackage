@@ -1,6 +1,7 @@
 import { resolve as resolvePath, join, basename } from 'path';
 
 import type { CommandResult } from '../../types/index.js';
+import type { ExecutionContext } from '../../types/execution-context.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
 import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
@@ -17,6 +18,7 @@ import { cleanupEmptyParents } from '../../utils/cleanup-empty-parents.js';
 export interface RemoveFromSourceOptions {
   force?: boolean;
   dryRun?: boolean;
+  execContext?: ExecutionContext;
 }
 
 export interface RemoveFromSourceResult {

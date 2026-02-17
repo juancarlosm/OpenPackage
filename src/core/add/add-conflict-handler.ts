@@ -7,6 +7,7 @@ import { UserCancellationError } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import type { SourceEntry } from './source-collector.js';
 import type { PackageContext } from '../package-context.js';
+import { PromptTier } from '../../core/interaction-policy.js';
 import { applyMapPipeline, createMapContext, splitMapPipeline } from '../flows/map-pipeline/index.js';
 import { defaultTransformRegistry } from '../flows/flow-transforms.js';
 import { parseMarkdownDocument, serializeMarkdownDocument } from '../flows/markdown.js';
@@ -65,12 +66,20 @@ function transformMarkdownWithFlowMap(
   return { transformed: true, output };
 }
 
+export interface CopyFilesWithConflictResolutionOptions {
+  force?: boolean;
+  execContext?: { interactionPolicy?: { canPrompt(tier: PromptTier): boolean } };
+}
+
 export async function copyFilesWithConflictResolution(
   packageContext: Pick<PackageContext, 'name' | 'packageRootDir'>,
-  entries: SourceEntry[]
+  entries: SourceEntry[],
+  options: CopyFilesWithConflictResolutionOptions = {}
 ): Promise<PackageFile[]> {
   const changedFiles: PackageFile[] = [];
   const { name } = packageContext;
+  const policy = options.execContext?.interactionPolicy;
+  const forceOverwrite = options.force ?? false;
 
   for (const entry of entries) {
     // Resolve target path based on registry path format
@@ -89,7 +98,16 @@ export async function copyFilesWithConflictResolution(
         continue;
       }
 
-      const decision = await promptConflictDecision(name, entry.registryPath);
+      let decision: ConflictDecision;
+      if (forceOverwrite) {
+        decision = 'overwrite';
+      } else if (policy?.canPrompt(PromptTier.Confirmation)) {
+        decision = await promptConflictDecision(name, entry.registryPath);
+      } else {
+        console.log(`⚠️  Skipping '${entry.registryPath}' (already exists). Use --force to overwrite.`);
+        continue;
+      }
+
       if (decision === 'keep-existing') {
         logger.debug(`Kept existing file for ${entry.registryPath}`);
         continue;

@@ -1,14 +1,17 @@
 import { Command } from 'commander';
+import { join } from 'path';
+
+import type { ExecutionContext } from '../types/execution-context.js';
 
 import { withErrorHandling } from '../utils/errors.js';
 import { runAddToSourcePipeline, type AddToSourceResult } from '../core/add/add-to-source-pipeline.js';
 import { classifyAddInput, type AddInputClassification } from '../core/add/add-input-classifier.js';
 import { runAddDependencyFlow, type AddDependencyResult } from '../core/add/add-dependency-flow.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
-import { canPrompt } from '../utils/file-scanner.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
 import { expandDirectorySelections, hasDirectorySelections, countSelectionTypes } from '../utils/expand-directory-selections.js';
-import { join } from 'path';
+import { createExecutionContext } from '../core/execution-context.js';
+import { createInteractionPolicy, PromptTier } from '../core/interaction-policy.js';
 
 /**
  * Display add operation results in install-style format
@@ -54,7 +57,8 @@ function displayDependencyResult(result: AddDependencyResult, classification: Ad
 async function processAddResource(
   resourceSpec: string,
   options: any,
-  cwd: string
+  cwd: string,
+  execContext: ExecutionContext
 ): Promise<void> {
   const classification = await classifyAddInput(resourceSpec, cwd, {
     copy: options.copy,
@@ -76,17 +80,13 @@ async function processAddResource(
       throw new Error('--dev can only be used when adding a dependency, not when copying files');
     }
     const resource = classification.resolvedResource!;
-
-    const { createExecutionContext } = await import('../core/execution-context.js');
-    const path = await import('path');
     const ctx = await createExecutionContext({
       global: resource.scope === 'global',
     });
-
-    const absPath = resource.sourcePath || path.default.join(ctx.targetDir, resource.targetFiles[0]);
+    const absPath = resource.sourcePath || join(ctx.targetDir, resource.targetFiles[0]);
 
     const packageName = options.to;
-    const result = await runAddToSourcePipeline(packageName, absPath, options);
+    const result = await runAddToSourcePipeline(packageName, absPath, { ...options, execContext });
     if (!result.success) {
       throw new Error(result.error || 'Add operation failed');
     }
@@ -99,7 +99,7 @@ async function processAddResource(
       throw new Error('--dev can only be used when adding a dependency, not when copying files');
     }
     const packageName = options.to;
-    const result = await runAddToSourcePipeline(packageName, classification.copySourcePath!, options);
+    const result = await runAddToSourcePipeline(packageName, classification.copySourcePath!, { ...options, execContext });
     if (!result.success) {
       throw new Error(result.error || 'Add operation failed');
     }
@@ -119,14 +119,26 @@ export function setupAddCommand(program: Command): void {
     .option('--dev', 'add to dev-dependencies instead of dependencies')
     .option('--copy', 'force copy mode (copy files instead of recording dependency)')
     .option('--platform-specific', 'save platform-specific variants for platform subdir inputs')
+    .option('--force', 'overwrite existing files without prompting')
     .action(
-      withErrorHandling(async (resourceSpec: string | undefined, options) => {
+      withErrorHandling(async (resourceSpec: string | undefined, options, command: Command) => {
         const cwd = process.cwd();
-        
+        const programOpts = command.parent?.opts() || {};
+
+        const execContext = await createExecutionContext({
+          global: false,
+          cwd: programOpts.cwd,
+        });
+
+        const policy = createInteractionPolicy({
+          interactive: !resourceSpec,
+          force: options.force,
+        });
+        execContext.interactionPolicy = policy;
+
         // If no resource spec provided, show interactive file selector
         if (!resourceSpec) {
-          // Check if we're in an interactive terminal
-          if (!canPrompt()) {
+          if (!policy.canPrompt(PromptTier.OptionalMenu)) {
             throw new Error(
               '<resource-spec> argument is required in non-interactive mode.\n' +
               'Usage: opkg add <resource-spec> [options]\n\n' +
@@ -136,7 +148,7 @@ export function setupAddCommand(program: Command): void {
               '  opkg add package@version                 # Add package dependency'
             );
           }
-          
+
           // Show interactive file selector
           const selectedFiles = await interactiveFileSelect({ cwd, includeDirs: true });
           
@@ -168,7 +180,7 @@ export function setupAddCommand(program: Command): void {
             }
             
             try {
-              await processAddResource(absPath, options, cwd);
+              await processAddResource(absPath, options, cwd, execContext);
             } catch (error) {
               console.error(`✗ Failed to add ${file}: ${error}`);
               // Continue with remaining files
@@ -179,7 +191,7 @@ export function setupAddCommand(program: Command): void {
         }
         
         // Process single resource spec (existing behavior)
-        await processAddResource(resourceSpec, options, cwd);
+        await processAddResource(resourceSpec, options, cwd, execContext);
       })
     );
 }
