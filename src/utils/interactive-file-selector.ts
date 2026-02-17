@@ -37,6 +37,9 @@ export interface FileSelectionOptions {
   
   /** Fuzzy search threshold (0-1, default: 0.5) */
   fuzzyThreshold?: number;
+  
+  /** Whether to include directories in results (default: false) */
+  includeDirs?: boolean;
 }
 
 /**
@@ -65,21 +68,27 @@ export async function interactiveFileSelect(
   const {
     cwd = process.cwd(),
     basePath,
-    message = 'Select files to add',
-    placeholder = 'Type to search files...',
+    message,
+    placeholder,
     maxItems = 10,
     excludeDirs = [],
     showIntro = true,
-    fuzzyThreshold = 0.5
+    fuzzyThreshold = 0.5,
+    includeDirs = false
   } = options;
+  
+  // Set smart defaults based on whether directories are included
+  const finalMessage = message || (includeDirs ? 'Select files or directories to add' : 'Select files to add');
+  const finalPlaceholder = placeholder || (includeDirs ? 'Type to search...' : 'Type to search files...');
   
   const scanDir = basePath || cwd;
   
   try {
     // Show helpful intro note
     if (showIntro) {
+      const itemType = includeDirs ? 'files and directories' : 'files';
       note(
-        'The selected files will be shown above as you select them.\n' +
+        `The selected ${itemType} will be shown above as you select them.\n` +
         'Type to search • Space to select • Enter to confirm',
         'Interactive File Selection'
       );
@@ -87,7 +96,7 @@ export async function interactiveFileSelect(
     
     // Scan workspace for all files
     logger.debug('Scanning workspace for files', { scanDir });
-    const allFiles = await scanWorkspaceFiles({ cwd, basePath, excludeDirs });
+    const allFiles = await scanWorkspaceFiles({ cwd, basePath, excludeDirs, includeDirs });
     
     // Check if any files found
     if (allFiles.length === 0) {
@@ -100,9 +109,9 @@ export async function interactiveFileSelect(
     
     // Display the file selector with dynamic header
     const selectedFiles = await promptFileSelector({
-      message,
+      message: finalMessage,
       files: allFiles,
-      placeholder,
+      placeholder: finalPlaceholder,
       maxItems,
       fuzzyThreshold
     });

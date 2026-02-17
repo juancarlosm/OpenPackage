@@ -7,6 +7,7 @@ import { runAddDependencyFlow, type AddDependencyResult } from '../core/add/add-
 import { formatPathForDisplay } from '../utils/formatters.js';
 import { canPrompt } from '../utils/file-scanner.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
+import { expandDirectorySelections, hasDirectorySelections, countSelectionTypes } from '../utils/expand-directory-selections.js';
 import { join } from 'path';
 
 /**
@@ -137,22 +138,33 @@ export function setupAddCommand(program: Command): void {
           }
           
           // Show interactive file selector
-          const selectedFiles = await interactiveFileSelect({ cwd });
+          const selectedFiles = await interactiveFileSelect({ cwd, includeDirs: true });
           
           // Handle cancellation or empty selection
           if (!selectedFiles || selectedFiles.length === 0) {
             return;
           }
           
+          // Expand any directory selections to individual files
+          let filesToProcess: string[];
+          if (hasDirectorySelections(selectedFiles)) {
+            const counts = countSelectionTypes(selectedFiles);
+            console.log(`\nExpanding ${counts.dirs} director${counts.dirs === 1 ? 'y' : 'ies'} and ${counts.files} file${counts.files === 1 ? '' : 's'}...`);
+            filesToProcess = await expandDirectorySelections(selectedFiles, cwd);
+            console.log(`Found ${filesToProcess.length} total file${filesToProcess.length === 1 ? '' : 's'} to add`);
+          } else {
+            filesToProcess = selectedFiles;
+          }
+          
           // Process each selected file sequentially
           console.log(); // Add spacing before results
-          for (let i = 0; i < selectedFiles.length; i++) {
-            const file = selectedFiles[i];
+          for (let i = 0; i < filesToProcess.length; i++) {
+            const file = filesToProcess[i];
             const absPath = join(cwd, file);
             
             // Show progress for multiple files
-            if (selectedFiles.length > 1) {
-              console.log(`\n[${i + 1}/${selectedFiles.length}] Processing: ${file}`);
+            if (filesToProcess.length > 1) {
+              console.log(`\n[${i + 1}/${filesToProcess.length}] Processing: ${file}`);
             }
             
             try {

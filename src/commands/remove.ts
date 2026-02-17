@@ -6,6 +6,7 @@ import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
 import { canPrompt } from '../utils/file-scanner.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
+import { expandDirectorySelections, hasDirectorySelections, countSelectionTypes } from '../utils/expand-directory-selections.js';
 import { interactivePackageSelect, resolvePackageSelection, WORKSPACE_PACKAGE } from '../utils/interactive-package-selector.js';
 
 export function setupRemoveCommand(program: Command): void {
@@ -71,8 +72,9 @@ export function setupRemoveCommand(program: Command): void {
           const selectedFiles = await interactiveFileSelect({
             cwd,
             basePath: packageDir,
-            message: `Select files to remove from ${packageLabel}`,
-            placeholder: 'Type to search files...'
+            message: `Select files or directories to remove from ${packageLabel}`,
+            placeholder: 'Type to search...',
+            includeDirs: true
           });
           
           // Handle cancellation or empty selection
@@ -80,14 +82,25 @@ export function setupRemoveCommand(program: Command): void {
             return;
           }
           
+          // Expand any directory selections to individual files
+          let filesToProcess: string[];
+          if (hasDirectorySelections(selectedFiles)) {
+            const counts = countSelectionTypes(selectedFiles);
+            console.log(`\nExpanding ${counts.dirs} director${counts.dirs === 1 ? 'y' : 'ies'} and ${counts.files} file${counts.files === 1 ? '' : 's'}...`);
+            filesToProcess = await expandDirectorySelections(selectedFiles, packageDir);
+            console.log(`Found ${filesToProcess.length} total file${filesToProcess.length === 1 ? '' : 's'} to remove`);
+          } else {
+            filesToProcess = selectedFiles;
+          }
+          
           // Step 3: Process each selected file sequentially
           console.log(); // Add spacing before results
-          for (let i = 0; i < selectedFiles.length; i++) {
-            const file = selectedFiles[i];
+          for (let i = 0; i < filesToProcess.length; i++) {
+            const file = filesToProcess[i];
             
             // Show progress for multiple files
-            if (selectedFiles.length > 1) {
-              console.log(`\n[${i + 1}/${selectedFiles.length}] Processing: ${file}`);
+            if (filesToProcess.length > 1) {
+              console.log(`\n[${i + 1}/${filesToProcess.length}] Processing: ${file}`);
             }
             
             try {

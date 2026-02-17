@@ -51,6 +51,9 @@ export interface FileScanOptions {
   
   /** Whether to follow symbolic links (default: false) */
   followSymlinks?: boolean;
+  
+  /** Whether to include directories in results (default: false) */
+  includeDirs?: boolean;
 }
 
 /**
@@ -73,7 +76,7 @@ function isExcludedDir(fullPath: string, excludeDirs: Set<string>): boolean {
  * Scan workspace for all non-junk files
  * 
  * @param options - Scanning options
- * @returns Array of relative file paths from cwd (or basePath if specified)
+ * @returns Array of relative file paths (and optionally directory paths with '/' suffix) from cwd (or basePath if specified)
  * 
  * @example
  * const files = await scanWorkspaceFiles({ cwd: '/path/to/workspace' });
@@ -86,6 +89,14 @@ function isExcludedDir(fullPath: string, excludeDirs: Set<string>): boolean {
  *   basePath: '/workspace/.openpackage/packages/my-pkg'
  * });
  * // Returns files relative to basePath: ['file1.txt', 'subdir/file2.txt', ...]
+ * 
+ * @example
+ * // Include directories in results
+ * const filesAndDirs = await scanWorkspaceFiles({ 
+ *   cwd: '/path/to/workspace',
+ *   includeDirs: true
+ * });
+ * // Returns: ['src/', 'src/index.ts', 'src/utils/', 'src/utils/helper.ts', ...]
  */
 export async function scanWorkspaceFiles(
   options: FileScanOptions = {}
@@ -95,7 +106,8 @@ export async function scanWorkspaceFiles(
     basePath,
     excludeDirs = [],
     maxFiles = 10000,
-    followSymlinks = false
+    followSymlinks = false,
+    includeDirs = false
   } = options;
   
   // Use basePath if provided, otherwise use cwd
@@ -108,6 +120,7 @@ export async function scanWorkspaceFiles(
   ]);
   
   const files: string[] = [];
+  const dirs: string[] = [];
   let fileCount = 0;
   
   try {
@@ -131,7 +144,7 @@ export async function scanWorkspaceFiles(
     };
     
     // Walk files and collect relative paths
-    for await (const filePath of walkFiles(scanDir, { filter, followSymlinks })) {
+    for await (const filePath of walkFiles(scanDir, { filter, followSymlinks, includeDirs })) {
       // Stop if we've hit the max files limit
       if (fileCount >= maxFiles) {
         logger.debug(`File scan limit reached: ${maxFiles} files`);
@@ -146,15 +159,36 @@ export async function scanWorkspaceFiles(
         continue;
       }
       
-      files.push(relativePath);
+      // Check if this is a directory (when includeDirs is enabled)
+      if (includeDirs) {
+        const fs = await import('fs');
+        const stat = await fs.promises.stat(filePath);
+        if (stat.isDirectory()) {
+          // Add '/' suffix to directories for visual distinction
+          dirs.push(relativePath + '/');
+        } else {
+          files.push(relativePath);
+        }
+      } else {
+        files.push(relativePath);
+      }
+      
       fileCount++;
     }
     
-    // Sort files for better UX
-    files.sort((a, b) => {
-      // Prioritize files in root directory
-      const aDepth = a.split('/').length;
-      const bDepth = b.split('/').length;
+    // Sort files and directories for better UX
+    // Directories first, then files, both alphabetically within their group
+    const allItems = [...dirs.sort(), ...files.sort()];
+    
+    // Apply depth-based sorting to prioritize shallow items
+    allItems.sort((a, b) => {
+      // Remove trailing '/' for directory depth calculation
+      const aPath = a.endsWith('/') ? a.slice(0, -1) : a;
+      const bPath = b.endsWith('/') ? b.slice(0, -1) : b;
+      
+      // Prioritize items in root directory
+      const aDepth = aPath.split('/').length;
+      const bDepth = bPath.split('/').length;
       
       if (aDepth !== bDepth) {
         return aDepth - bDepth;
@@ -164,14 +198,14 @@ export async function scanWorkspaceFiles(
       return a.localeCompare(b);
     });
     
-    logger.debug(`Scanned ${files.length} files in workspace`, { scanDir });
+    logger.debug(`Scanned ${allItems.length} items in workspace`, { scanDir, includeDirs });
+    
+    return allItems;
     
   } catch (error) {
     logger.error('Error scanning workspace files', { error, scanDir });
     throw new Error(`Failed to scan workspace files: ${error}`);
   }
-  
-  return files;
 }
 
 /**

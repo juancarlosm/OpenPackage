@@ -143,6 +143,23 @@ export class FileSelectorWithHeader extends AutocompletePrompt<FileOption> {
   }
 
   /**
+   * Get a smart label for the current selection (e.g., "2 dirs, 1 file" or "3 files")
+   */
+  private getSelectionLabel(): string {
+    const count = this.selectedValues.length;
+    const dirs = this.selectedValues.filter(v => v.endsWith('/')).length;
+    const files = count - dirs;
+    
+    if (dirs === 0) {
+      return `${files} file${files === 1 ? '' : 's'}`;
+    } else if (files === 0) {
+      return `${dirs} dir${dirs === 1 ? '' : 's'}`;
+    } else {
+      return `${dirs} dir${dirs === 1 ? '' : 's'}, ${files} file${files === 1 ? '' : 's'}`;
+    }
+  }
+
+  /**
    * Render the selected files header using Clack's simple log-style format
    */
   private renderSelectedFilesHeader(): string {
@@ -152,7 +169,7 @@ export class FileSelectorWithHeader extends AutocompletePrompt<FileOption> {
     // Title line with guide
     const title = count === 0 
       ? `Selected: ${pico.dim('none (use Space to select)')}`
-      : `Selected: ${pico.cyan(`${count} file${count === 1 ? '' : 's'}`)}`;
+      : `Selected: ${pico.cyan(this.getSelectionLabel())}`;
     
     lines.push(`${pico.cyan('│')}  ${title}`);
     
@@ -264,8 +281,7 @@ export class FileSelectorWithHeader extends AutocompletePrompt<FileOption> {
     const symbol = pico.green('◇');  // Green hollow diamond for success
     const bar = pico.gray('│');
     
-    const count = this.selectedValues.length;
-    const status = pico.dim(`${count} file${count === 1 ? '' : 's'} selected`);
+    const status = pico.dim(this.getSelectionLabel() + ' selected');
     
     return `${symbol}  ${this.message}\n${bar}  ${status}`;
   }
