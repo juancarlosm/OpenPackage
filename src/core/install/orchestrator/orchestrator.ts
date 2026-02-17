@@ -9,10 +9,11 @@ import type {
 } from './types.js';
 import { 
   promptBaseSelection, 
-  canPrompt, 
   handleAmbiguityNonInteractive,
   type BaseMatch 
 } from '../ambiguity-prompts.js';
+import { createInteractionPolicy, PromptTier } from '../../interaction-policy.js';
+import type { InteractionPolicy } from '../../interaction-policy.js';
 import { setOutputMode, output } from '../../../utils/output.js';
 import {
   parseMarketplace,
@@ -80,18 +81,20 @@ export class InstallOrchestrator {
     assertTargetDirOutsideMetadata(execContext.targetDir);
     validateResolutionFlags(options);
     
-    // Step 1.5: Determine output mode and validate --interactive TTY requirement
+    // Step 1.5: Create interaction policy (single source of truth for prompting)
+    // This validates --interactive + TTY requirement and throws early if invalid
+    const policy = createInteractionPolicy({
+      interactive: options.interactive,
+      force: options.force,
+    });
+    execContext.interactionPolicy = policy;
+    
+    // Set output mode based on policy (clack UI vs plain console)
     const hasConvenienceFilters = Boolean(
       options.plugins || options.agents || options.skills || 
       options.rules || options.commands
     );
-    const isInteractive = canPrompt() && (options.interactive || !hasConvenienceFilters);
-    setOutputMode(isInteractive);
-    
-    // Validate --interactive requires TTY
-    if (options.interactive && !canPrompt()) {
-      throw new Error('--interactive requires an interactive terminal (TTY). Use specific filters (--agents, --skills, etc.) for non-interactive installs.');
-    }
+    setOutputMode(policy.isTTY && (policy.mode === 'always' || !hasConvenienceFilters));
     
     // Step 2: Classify input (use sourceCwd for resolving input paths)
     const classification = await classifyInput(input, options, execContext);
@@ -113,7 +116,7 @@ export class InstallOrchestrator {
     const preprocessResult = await strategy.preprocess(context, options, execContext);
     
     // Step 6: Route based on result
-    return this.routeToHandler(preprocessResult, options, execContext);
+    return this.routeToHandler(preprocessResult, options, execContext, policy);
   }
   
   /**
@@ -134,30 +137,30 @@ export class InstallOrchestrator {
   private async routeToHandler(
     result: PreprocessResult,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    policy: InteractionPolicy
   ): Promise<CommandResult> {
     const { context, specialHandling } = result;
     
     switch (specialHandling) {
       case 'marketplace':
-        return this.handleMarketplace(result, options, execContext);
+        return this.handleMarketplace(result, options, execContext, policy);
       
       case 'ambiguous':
-        return this.handleAmbiguous(result, options, execContext);
+        return this.handleAmbiguous(result, options, execContext, policy);
       
       case 'multi-resource':
-        return this.handleMultiResource(result, options, execContext);
+        return this.handleMultiResource(result, options, execContext, policy);
       
       default: {
         // Handle --interactive option (interactive resource selection)
-        if (options.interactive) {
+        if (policy.mode === 'always' && options.interactive) {
           return this.handleList(context, options, execContext);
         }
         
         // Normal pipeline flow: resolve platforms once if not set
         if (context.platforms.length === 0) {
-          const interactive = canPrompt();
-          context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive });
+          context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
         }
         // For path/git sources with manifests, install root first (updates manifest),
         // then run executor for dependencies only (with skipManifestUpdate)
@@ -187,10 +190,11 @@ export class InstallOrchestrator {
     options: NormalizedInstallOptions,
     execContext: ExecutionContext
   ): Promise<CommandResult> {
+    const policy = execContext.interactionPolicy;
     const platforms =
       context.platforms.length > 0
         ? context.platforms
-        : await resolvePlatforms(context.targetDir, options.platforms, { interactive: canPrompt() });
+        : await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false });
 
     const skipCache = options.resolutionMode === 'remote-primary';
     
@@ -244,7 +248,8 @@ export class InstallOrchestrator {
   private async handleMarketplace(
    result: PreprocessResult,
    options: NormalizedInstallOptions,
-   execContext: ExecutionContext
+   execContext: ExecutionContext,
+   policy: InteractionPolicy
   ): Promise<CommandResult> {
    const { context } = result;
    
@@ -263,7 +268,7 @@ export class InstallOrchestrator {
    spinner.stop();
    
    // Handle --interactive: discover and display resources across plugins
-   if (options.interactive) {
+   if (policy.mode === 'always' && options.interactive) {
      return this.handleMarketplaceList(context, marketplace, options, execContext);
    }
    
@@ -327,7 +332,7 @@ export class InstallOrchestrator {
        success: anySuccess,
        error: allSuccess ? undefined : 'Some plugins failed to install'
      };
-   } else {
+   } else if (policy.canPrompt(PromptTier.Required)) {
      // Interactive: prompt user for single plugin selection
      selectedPlugin = await promptPluginSelection(marketplace);
      
@@ -345,6 +350,14 @@ export class InstallOrchestrator {
      }
      
      installMode = mode;
+   } else {
+     // Non-interactive without --plugins: error with actionable message
+     const pluginNames = marketplace.plugins.map(p => p.name).join(', ');
+     throw new Error(
+       `Marketplace '${marketplace.name}' requires plugin selection.\n` +
+       `Use --plugins to specify plugins in non-interactive mode.\n` +
+       `Available plugins: ${pluginNames}`
+     );
    }
    
    // Verify it's a git source
@@ -561,14 +574,14 @@ export class InstallOrchestrator {
   private async handleAmbiguous(
     result: PreprocessResult,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    policy: InteractionPolicy
   ): Promise<CommandResult> {
     const { context, ambiguousMatches } = result;
     
     if (!ambiguousMatches || ambiguousMatches.length === 0) {
       if (context.platforms.length === 0) {
-        const interactive = canPrompt();
-        context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive });
+        context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
       }
       return runUnifiedInstallPipeline(context);
     }
@@ -585,7 +598,7 @@ export class InstallOrchestrator {
     
     let selectedMatch: BaseMatch;
     
-    if (options.force || !canPrompt()) {
+    if (options.force || !policy.canPrompt(PromptTier.Disambiguation)) {
       selectedMatch = handleAmbiguityNonInteractive(matches);
     } else {
       const resourcePath = context.source.resourcePath || context.source.gitPath || '';
@@ -604,8 +617,7 @@ export class InstallOrchestrator {
     });
 
     if (context.platforms.length === 0) {
-      const interactive = canPrompt();
-      context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive });
+      context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
     }
     return runUnifiedInstallPipeline(context);
   }
@@ -629,7 +641,8 @@ export class InstallOrchestrator {
   private async handleMultiResource(
     result: PreprocessResult,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    policy: InteractionPolicy
   ): Promise<CommandResult> {
     const { context, resourceContexts, workspaceContext } = result;
     const dependencyContexts = resourceContexts ?? [];
@@ -639,8 +652,7 @@ export class InstallOrchestrator {
       (workspaceContext?.platforms.length === 0);
 
     if (needsPlatforms) {
-      const interactive = canPrompt();
-      const resolvedPlatforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive });
+      const resolvedPlatforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
       for (const ctx of dependencyContexts) {
         if (ctx.platforms.length === 0) ctx.platforms = resolvedPlatforms;
       }
@@ -704,9 +716,10 @@ export class InstallOrchestrator {
     }
 
     // Reuse platforms from workspace context when available (avoid duplicate prompt)
+    const policy = execContext.interactionPolicy;
     let platforms = workspaceContext?.platforms?.length
       ? workspaceContext.platforms
-      : await resolvePlatforms(execContext.targetDir, options.platforms, { interactive: canPrompt() });
+      : await resolvePlatforms(execContext.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false });
 
     const skipCache = options.resolutionMode === 'remote-primary';
     

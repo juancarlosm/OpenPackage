@@ -1,5 +1,7 @@
 import { join } from 'path';
 import { InstallOptions } from '../../../types/index.js';
+import type { InteractionPolicy } from '../../../core/interaction-policy.js';
+import { PromptTier } from '../../../core/interaction-policy.js';
 import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import { checkExistingPackageInMarkdownFiles } from '../../openpackage.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
@@ -32,7 +34,8 @@ async function getInstalledPackageVersion(cwd: string, packageName: string): Pro
  */
 export async function checkAndHandleAllPackageConflicts(
   resolvedPackages: ResolvedPackage[],
-  options: InstallOptions
+  options: InstallOptions,
+  policy?: InteractionPolicy
 ): Promise<{ shouldProceed: boolean; skippedPackages: string[]; forceOverwritePackages: Set<string> }> {
   const cwd = process.cwd();
   const skippedPackages: string[] = [];
@@ -61,11 +64,16 @@ export async function checkAndHandleAllPackageConflicts(
       }
       
       // Prompt per package overwrite confirmation when existing detected
-      const confirmed = await promptPackageOverwrite(resolved.name, existingVersion);
-      if (confirmed) {
-        forceOverwritePackages.add(resolved.name);
-      } else {
+      if (policy && !policy.canPrompt(PromptTier.Confirmation)) {
+        console.log(`⚠️  Skipping '${resolved.name}' (already exists). Use --force to overwrite.`);
         skippedPackages.push(resolved.name);
+      } else {
+        const confirmed = await promptPackageOverwrite(resolved.name, existingVersion);
+        if (confirmed) {
+          forceOverwritePackages.add(resolved.name);
+        } else {
+          skippedPackages.push(resolved.name);
+        }
       }
       continue;
     }

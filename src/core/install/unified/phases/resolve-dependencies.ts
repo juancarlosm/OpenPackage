@@ -7,6 +7,8 @@ import { resolveDependencies } from '../../../dependency-resolver/resolver.js';
 import { gatherGlobalVersionConstraints, gatherRootVersionConstraints } from '../../../openpackage.js';
 import { VersionConflictError } from '../../../../utils/errors.js';
 import { promptVersionSelection } from '../../../../utils/prompts.js';
+import type { InteractionPolicy } from '../../../../core/interaction-policy.js';
+import { PromptTier } from '../../../../core/interaction-policy.js';
 import type { PackageRemoteResolutionOutcome } from '../../types.js';
 
 interface DependencyResolutionResult {
@@ -27,7 +29,8 @@ async function resolveDependenciesForInstall(
   packageName: string,
   cwd: string,
   version: string | undefined,
-  options: InstallationContext['options']
+  options: InstallationContext['options'],
+  policy?: InteractionPolicy
 ): Promise<DependencyResolutionResult> {
   const globalConstraints = await gatherGlobalVersionConstraints(cwd);
   const rootConstraints = await gatherRootVersionConstraints(cwd);
@@ -78,6 +81,8 @@ async function resolveDependenciesForInstall(
       let chosenVersion: string | null = null;
       if (options.force) {
         chosenVersion = [...available].sort((a, b) => semver.rcompare(a, b))[0] || null;
+      } else if (policy && !policy.canPrompt(PromptTier.ConflictResolution)) {
+        throw new Error(`Version conflict for '${conflictName}'. Available versions: ${available.join(', ')}. Use --force to auto-select latest, or run interactively to choose.`);
       } else {
         chosenVersion = await promptVersionSelection(conflictName, available, 'to install');
       }
@@ -110,7 +115,8 @@ export async function resolveDependenciesPhase(ctx: InstallationContext): Promis
       ctx.source.packageName,
       ctx.targetDir,
       ctx.source.version,
-      ctx.options
+      ctx.options,
+      ctx.execution?.interactionPolicy
     );
     
     // Add warnings
@@ -140,7 +146,8 @@ export async function resolveDependenciesPhase(ctx: InstallationContext): Promis
           ctx.source.packageName,
           ctx.targetDir,
           ctx.source.version,
-          ctx.options
+          ctx.options,
+          ctx.execution?.interactionPolicy
         );
         
         ctx.resolvedPackages = refreshed.resolvedPackages;

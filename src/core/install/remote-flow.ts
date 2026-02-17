@@ -10,7 +10,7 @@ import {
 } from '../remote-pull.js';
 import { packageManager } from '../package.js';
 import { getVersionInfoFromDependencyTree } from '../../utils/install-helpers.js';
-import { promptOverwriteConfirmation } from '../../utils/prompts.js';
+
 import { Spinner } from '../../utils/spinner.js';
 import { computeMissingDownloadKeys, createDownloadKey } from './download-keys.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';

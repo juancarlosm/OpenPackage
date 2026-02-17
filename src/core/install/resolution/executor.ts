@@ -10,7 +10,7 @@ import { PackageLoader } from './package-loader.js';
 import { InstallationPlanner } from './installation-planner.js';
 import { solveVersions, createInteractiveConflictHandler, type VersionSolution, type SolverOptions } from './version-solver.js';
 import { promptVersionSelection } from '../../../utils/prompts.js';
-import { canPrompt } from '../ambiguity-prompts.js';
+import { PromptTier } from '../../../core/interaction-policy.js';
 import type {
   DependencyGraph,
   ExecutorOptions,
@@ -58,7 +58,7 @@ export class DependencyResolutionExecutor {
       const force = this.options.plannerOptions?.installOptions?.force ?? false;
       
       const solverOptions: SolverOptions = { force };
-      if (!force && canPrompt()) {
+      if (!force && this.execContext.interactionPolicy?.canPrompt(PromptTier.ConflictResolution)) {
         solverOptions.onConflict = createInteractiveConflictHandler(promptVersionSelection);
       }
       

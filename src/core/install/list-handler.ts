@@ -8,7 +8,7 @@ import { resolve } from 'path';
 import { logger } from '../../utils/logger.js';
 import { output } from '../../utils/output.js';
 import { cancel } from '@clack/prompts';
-import { canPrompt } from './ambiguity-prompts.js';
+import { PromptTier } from '../../core/interaction-policy.js';
 import { discoverResources } from './resource-discoverer.js';
 import { promptResourceSelection, displaySelectionSummary } from './resource-selection-menu.js';
 import { buildResourceInstallContexts } from './unified/context-builders.js';
@@ -87,36 +87,26 @@ export async function handleListSelection(
   // Interactive or non-interactive selection
   let selected: SelectedResource[];
   
-  if (canPrompt()) {
-    // Interactive mode: show menu
-    selected = await promptResourceSelection(
-      discovery,
-      context.source.packageName,
-      context.source.version
-    );
-    
-    if (selected.length === 0) {
-      cancel('No resources selected. Installation cancelled.');
-      return {
-        success: true,
-        data: { installed: 0, skipped: 0 }
-      };
-    }
-    
-    // Display selection summary
-    displaySelectionSummary(selected);
-  } else {
-    // Non-interactive mode: install all resources
-    console.log('⚠️  Non-interactive mode: installing all discovered resources');
-    selected = discovery.all.map(r => ({
-      resourceType: r.resourceType,
-      resourcePath: r.resourcePath,
-      displayName: r.displayName,
-      filePath: r.filePath,
-      installKind: r.installKind,
-      version: r.version
-    }));
+  const policy = execContext.interactionPolicy;
+  if (!policy?.canPrompt(PromptTier.OptionalMenu)) {
+    throw new Error('Interactive resource selection requires a TTY. Use --agents, --skills, --rules, or --commands to specify resources directly.');
   }
+
+  selected = await promptResourceSelection(
+    discovery,
+    context.source.packageName,
+    context.source.version
+  );
+  
+  if (selected.length === 0) {
+    cancel('No resources selected. Installation cancelled.');
+    return {
+      success: true,
+      data: { installed: 0, skipped: 0 }
+    };
+  }
+  
+  displaySelectionSummary(selected);
   
   // Convert selected resources to ResourceInstallationSpec format
   const resourceSpecs: ResourceInstallationSpec[] = selected.map(s => ({

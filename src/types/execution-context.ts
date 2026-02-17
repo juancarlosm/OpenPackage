@@ -6,6 +6,7 @@
  */
 
 import type { TelemetryCollector } from '../utils/telemetry.js';
+import type { InteractionPolicy } from '../core/interaction-policy.js';
 
 /**
  * ExecutionContext - Single source of truth for directory resolution
@@ -46,6 +47,12 @@ export interface ExecutionContext {
    * When true, suppress detailed output to keep the interface clean.
    */
   interactive?: boolean;
+  
+  /**
+   * Interaction policy controlling prompt behavior across all tiers.
+   * Created once at command entry and threaded through all handlers.
+   */
+  interactionPolicy?: InteractionPolicy;
 }
 
 /**
