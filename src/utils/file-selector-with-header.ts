@@ -70,6 +70,24 @@ export class FileSelectorWithHeader extends AutocompletePrompt<FileOption> {
 
     // Override the options to provide dynamic filtering
     this.setupFuzzyFiltering();
+
+    // Disable wrap-around: stay at top when pressing up at first item
+    this.setupNoOverscroll();
+  }
+
+  /**
+   * Prevent wrap-around: stay at top when pressing up at first item (don't jump to last)
+   */
+  private setupNoOverscroll(): void {
+    this.on('key', (_char: string | undefined, key: Key) => {
+      const len = this.filteredOptions.length;
+      if (len <= 1) return;
+
+      if (key.name === 'up' && this.cursor === len - 1) {
+        // Cursor wrapped from 0 to end; emit synthetic down to undo
+        this.emit('key', undefined, { name: 'down', ctrl: false, meta: false, shift: false } as Key);
+      }
+    });
   }
 
   /**
@@ -212,21 +230,35 @@ export class FileSelectorWithHeader extends AutocompletePrompt<FileOption> {
   }
 
   /**
-   * Render the options list
+   * Render the options list with sliding window to keep cursor in view
    */
   private renderOptionsList(): string {
     const lines: string[] = [];
-    const visibleOptions = this.filteredOptions.slice(0, this.maxVisibleItems);
+    const totalOptions = this.filteredOptions.length;
+    const maxItems = this.maxVisibleItems;
 
-    if (visibleOptions.length === 0) {
+    if (totalOptions === 0) {
       lines.push(`${pico.cyan('│')}  ${pico.gray('No matches found')}`);
       return lines.join('\n');
+    }
+
+    // Sliding window: scroll so cursor stays in view
+    let visibleStart = 0;
+    if (this.cursor >= maxItems - 3) {
+      visibleStart = Math.max(0, Math.min(this.cursor - maxItems + 3, totalOptions - maxItems));
+    }
+    const visibleEnd = Math.min(visibleStart + maxItems, totalOptions);
+    const visibleOptions = this.filteredOptions.slice(visibleStart, visibleEnd);
+
+    // Show "more above" indicator when scrolled down
+    if (visibleStart > 0) {
+      lines.push(`${pico.cyan('│')}  ${pico.gray(`... ${visibleStart} above`)}`);
     }
 
     for (let i = 0; i < visibleOptions.length; i++) {
       const option = visibleOptions[i];
       const isSelected = this.selectedValues.includes(option.value);
-      const isCursor = i === this.cursor;
+      const isCursor = visibleStart + i === this.cursor;
 
       // Checkbox
       const checkbox = isSelected ? pico.cyan('◼') : pico.dim('◻');
@@ -247,9 +279,9 @@ export class FileSelectorWithHeader extends AutocompletePrompt<FileOption> {
       lines.push(`${pico.cyan('│')} ${cursorMark} ${checkbox} ${fileName}`);
     }
 
-    // Show scroll indicator
-    if (this.filteredOptions.length > this.maxVisibleItems) {
-      const remaining = this.filteredOptions.length - this.maxVisibleItems;
+    // Show "more below" indicator when there are more items
+    if (visibleEnd < totalOptions) {
+      const remaining = totalOptions - visibleEnd;
       lines.push(`${pico.cyan('│')}  ${pico.gray(`... ${remaining} more`)}`);
     }
 
