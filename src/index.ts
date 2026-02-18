@@ -17,6 +17,7 @@ import { setupInstallCommand } from './commands/install.js';
 import { setupUninstallCommand } from './commands/uninstall.js';
 import { setupListCommand } from './commands/list.js';
 import { setupSearchCommand } from './commands/search.js';
+import { setupViewCommand } from './commands/view.js';
 
 import { setupPublishCommand } from './commands/publish.js';
 import { setupUnpublishCommand } from './commands/unpublish.js';
@@ -132,6 +133,7 @@ setupInstallCommand(program);
 setupUninstallCommand(program);
 setupListCommand(program);
 setupSearchCommand(program);
+setupViewCommand(program);
 setupPublishCommand(program);
 setupUnpublishCommand(program);
 

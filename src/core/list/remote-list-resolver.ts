@@ -200,7 +200,7 @@ async function resolveGitList(
   };
 }
 
-async function collectFiles(dir: string, root: string): Promise<string[]> {
+export async function collectFiles(dir: string, root: string): Promise<string[]> {
   const { readdir } = await import('fs/promises');
   const results: string[] = [];
 
