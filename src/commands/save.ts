@@ -6,7 +6,7 @@ import { runSaveToSourcePipeline, type SaveToSourceOptions } from '../core/save/
 export function setupSaveCommand(program: Command): void {
   program
     .command('save')
-    .argument('<resource-spec>', 'resource spec to save workspace changes to')
+    .argument('<package-spec>', 'resource spec to save workspace changes to')
     .description('Save workspace edits back to mutable package source')
     .option('-f, --force', 'auto-select newest when conflicts occur')
     .action(

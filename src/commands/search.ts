@@ -14,10 +14,15 @@ import { FILE_PATTERNS } from '../constants/index.js';
 
 // ANSI color codes
 const DIM = '\x1b[2m';
+const CYAN = '\x1b[36m';
 const RESET = '\x1b[0m';
 
 function dim(text: string): string {
   return `${DIM}${text}${RESET}`;
+}
+
+function cyan(text: string): string {
+  return `${CYAN}${text}${RESET}`;
 }
 
 interface SearchOptions {
@@ -150,7 +155,7 @@ async function scanRegistryDirectory(query?: string): Promise<PackageMatch[]> {
 function displaySection(title: string, matches: PackageMatch[], showAll: boolean): void {
   if (matches.length === 0) return;
 
-  console.log(dim(title));
+  console.log(cyan(title));
 
   for (let i = 0; i < matches.length; i++) {
     const pkg = matches[i];
@@ -175,8 +180,6 @@ function displaySection(title: string, matches: PackageMatch[], showAll: boolean
       console.log(`${connector}${pkg.name}`);
     }
   }
-
-  console.log();
 }
 
 function displayResults(result: SearchResult, showAll: boolean): void {
@@ -187,17 +190,17 @@ function displayResults(result: SearchResult, showAll: boolean): void {
   let hasAny = false;
 
   if (project.length > 0) {
-    displaySection('Project Packages (./.openpackage/packages):', project, showAll);
+    displaySection(`[Project Packages] ${dim('(./.openpackage/packages)')}`, project, showAll);
     hasAny = true;
   }
 
   if (global.length > 0) {
-    displaySection('Global Packages (~/.openpackage/packages):', global, showAll);
+    displaySection(`[Global Packages] ${dim('(~/.openpackage/packages)')}`, global, showAll);
     hasAny = true;
   }
 
   if (registry.length > 0) {
-    displaySection('Registry (~/.openpackage/registry):', registry, showAll);
+    displaySection(`[Local Registry] ${dim('(~/.openpackage/registry)')}`, registry, showAll);
     hasAny = true;
   }
 

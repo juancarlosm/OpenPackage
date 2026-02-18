@@ -15,7 +15,7 @@ import type { SetCommandOptions } from '../core/set/set-types.js';
 export function setupSetCommand(program: Command): void {
   program
     .command('set')
-    .argument('[package]', 'package name or path (optional if cwd is a package)')
+    .argument('[package-spec]', 'package name or path (optional if cwd is a package)')
     .description('Update package manifest fields')
     .option('--ver <version>', 'set package version (must be valid semver)')
     .option('--name <name>', 'set package name')

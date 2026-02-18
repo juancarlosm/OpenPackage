@@ -19,13 +19,13 @@ export function setupRemoveCommand(program: Command): void {
   program
     .command('remove')
     .alias('rm')
-    .argument('[target]', 'file, directory, or dependency to remove. If omitted, shows interactive file selector.')
+    .argument('[resource-spec]', 'file, directory, or dependency to remove. If omitted, shows interactive file selector.')
     .description('Remove files or dependencies from a mutable package source or workspace package')
     .option('--from <package-name>', 'source package name (defaults to workspace package)')
     .option('--force', 'Skip confirmation prompts')
     .option('--dry-run', 'Preview what would be removed without actually deleting')
     .action(
-        withErrorHandling(async (pathArg: string | undefined, options: RemoveFromSourceOptions & { from?: string }, command: Command) => {
+        withErrorHandling(async (resource: string | undefined, options: RemoveFromSourceOptions & { from?: string }, command: Command) => {
         const cwd = process.cwd();
         const programOpts = command.parent?.opts() || {};
 
@@ -35,20 +35,20 @@ export function setupRemoveCommand(program: Command): void {
         });
 
         const policy = createInteractionPolicy({
-          interactive: !pathArg,
+          interactive: !resource,
           force: options.force,
         });
         execContext.interactionPolicy = policy;
 
-        // Set output mode: interactive (clack UI) when no path provided, plain console otherwise
-        setOutputMode(!pathArg);
+        // Set output mode: interactive (clack UI) when no resource provided, plain console otherwise
+        setOutputMode(!resource);
 
-        // If no path argument provided, show interactive selector
-        if (!pathArg) {
+        // If no resource provided, show interactive selector
+        if (!resource) {
           if (!policy.canPrompt(PromptTier.OptionalMenu)) {
             throw new Error(
-              '<path> argument is required in non-interactive mode.\n' +
-              'Usage: opkg remove <path> [options]\n\n' +
+              '<resource> argument is required in non-interactive mode.\n' +
+              'Usage: opkg remove <resource> [options]\n\n' +
               'Examples:\n' +
               '  opkg remove file.txt                        # Remove file from workspace package\n' +
               '  opkg remove file.txt --from package-name    # Remove from specific package\n' +
@@ -141,8 +141,8 @@ export function setupRemoveCommand(program: Command): void {
           return;
         }
         
-        // Process single path argument (existing behavior)
-        await processRemoveResource(options.from, pathArg, options, cwd, execContext);
+        // Process single resource (existing behavior)
+        await processRemoveResource(options.from, resource, options, cwd, execContext);
       })
     );
 }
@@ -203,13 +203,13 @@ async function handleRemoveResult(
 
 async function processRemoveResource(
   packageName: string | undefined,
-  pathArg: string,
+  resource: string,
   options: RemoveFromSourceOptions & { from?: string },
   cwd: string,
   execContext: ExecutionContext
 ): Promise<void> {
   let headerShown = false;
-  const result = await runRemoveFromSourcePipeline(packageName, pathArg, {
+  const result = await runRemoveFromSourcePipeline(packageName, resource, {
     ...options,
     execContext,
     beforeConfirm: (info) => {

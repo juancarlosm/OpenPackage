@@ -110,8 +110,8 @@ program
       output += 'All commands:\n\n';
       output += '    install, uninstall, list,\n';
       output += '    new, add, remove, save, set,\n';
-      output += '    publish, unpublish, search,\n';
-      output += '    login, logout\n\n';
+      output += '    publish, unpublish, search, view,\n';
+      output += '    login, logout, config\n\n';
       
       // Version
       const version = cmd.version();

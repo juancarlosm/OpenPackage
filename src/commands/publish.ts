@@ -7,7 +7,7 @@ import type { PublishOptions } from '../core/publish/publish-types.js';
 export function setupPublishCommand(program: Command): void {
   program
     .command('publish')
-    .argument('[package]', 'package name or path (optional if cwd is a package)')
+    .argument('[package-spec]', 'package name or path (optional if cwd is a package)')
     .description('Publish package to remote registry (use --local for local publishing)')
     .option('--local', 'publish to local registry (~/.openpackage/registry)')
     .option('--force', 'overwrite existing version without confirmation')

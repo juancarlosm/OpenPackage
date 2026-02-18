@@ -1,7 +1,7 @@
 import type { ListPackageReport, ListTreeNode, ListResourceGroup, ListFileMapping } from './list-pipeline.js';
 import type { RemoteListResult } from './remote-list-resolver.js';
 import { renderResourceGroup, type TreeRenderConfig, type EnhancedFileMapping, type EnhancedResourceGroup, type ResourceScope } from './list-tree-renderer.js';
-import { formatScopeBadge } from '../../utils/formatters.js';
+import { formatScopeBadge, formatPathForDisplay } from '../../utils/formatters.js';
 import type { ScopeResult, HeaderInfo } from './scope-data-collector.js';
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ export function printResourcesView(
   groups: EnhancedResourceGroup[],
   showFiles: boolean,
   headerInfo?: HeaderInfo,
-  options?: { showScopeBadges?: boolean }
+  options?: { showScopeBadges?: boolean; pathBaseForDisplay?: string }
 ): void {
   // Print header showing workspace/package name and path if provided
   if (headerInfo) {
@@ -265,13 +265,15 @@ export function printResourcesView(
   }
 
   const showScopeBadges = options?.showScopeBadges !== false;
+  const pathBase = options?.pathBaseForDisplay;
 
   const config: TreeRenderConfig<EnhancedFileMapping> = {
-    formatPath: (file) => formatFilePath(file),
+    formatPath: (file) =>
+      pathBase ? formatPathForDisplay(file.target, pathBase) : formatFilePath(file),
     isMissing: (file) => file.status === 'missing',
     sortFiles: (a, b) => {
-      const pathA = formatFilePath(a);
-      const pathB = formatFilePath(b);
+      const pathA = pathBase ? formatPathForDisplay(a.target, pathBase) : formatFilePath(a);
+      const pathB = pathBase ? formatPathForDisplay(b.target, pathBase) : formatFilePath(b);
       return pathA.localeCompare(pathB);
     },
     ...(showScopeBadges && {

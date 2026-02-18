@@ -91,7 +91,7 @@ async function resolveLocalPackage(
   const files = await collectFiles(packageDir, packageDir);
   const fileList: ListFileMapping[] = files.map(f => ({
     source: f,
-    target: f,
+    target: join(packageDir, f),
     exists: true
   }));
   const resourceGroups = fileList.length > 0 ? groupFilesIntoResources(fileList) : undefined;
@@ -308,7 +308,7 @@ function printLocalPackageView(
       }))
     }));
 
-    printResourcesView(enhanced, showFiles, headerInfo, { showScopeBadges: false });
+    printResourcesView(enhanced, showFiles, headerInfo, { showScopeBadges: false, pathBaseForDisplay: report.path });
   } else {
     console.log(`${headerInfo.name}${headerInfo.version ? `@${headerInfo.version}` : ''} ${dim(`(${headerInfo.path})`)} ${dim(`[${headerInfo.type}]`)}`);
     console.log(dim('  (no resources)'));

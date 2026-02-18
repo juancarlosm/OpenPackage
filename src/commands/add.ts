@@ -159,7 +159,7 @@ async function processAddResource(
 export function setupAddCommand(program: Command): void {
   program
     .command('add')
-    .argument('[target]',
+    .argument('[resource-spec]',
       'resource to add (package[@version], gh@owner/repo, https://github.com/owner/repo, or /path/to/file). If omitted, shows interactive file selector.')
     .description('Add a dependency to openpackage.yml or copy files to a package')
     .option('--to <package-name>', 'target package (for dependency: which manifest; for copy: which package source)')
@@ -168,7 +168,7 @@ export function setupAddCommand(program: Command): void {
     .option('--platform-specific', 'save platform-specific variants for platform subdir inputs')
     .option('--force', 'overwrite existing files without prompting')
     .action(
-      withErrorHandling(async (target: string | undefined, options, command: Command) => {
+      withErrorHandling(async (resource: string | undefined, options, command: Command) => {
         const cwd = process.cwd();
         const programOpts = command.parent?.opts() || {};
 
@@ -178,20 +178,20 @@ export function setupAddCommand(program: Command): void {
         });
 
         const policy = createInteractionPolicy({
-          interactive: !target,
+          interactive: !resource,
           force: options.force,
         });
         execContext.interactionPolicy = policy;
 
-        // Set output mode: interactive (clack UI) when no target, plain console otherwise
-        setOutputMode(!target);
+        // Set output mode: interactive (clack UI) when no resource, plain console otherwise
+        setOutputMode(!resource);
 
-        // If no target provided, show interactive file selector
-        if (!target) {
+        // If no resource provided, show interactive file selector
+        if (!resource) {
           if (!policy.canPrompt(PromptTier.OptionalMenu)) {
             throw new Error(
-              '<target> argument is required in non-interactive mode.\n' +
-              'Usage: opkg add <target> [options]\n\n' +
+              '<resource-spec> argument is required in non-interactive mode.\n' +
+              'Usage: opkg add <resource-spec> [options]\n\n' +
               'Examples:\n' +
               '  opkg add ./path/to/file.txt              # Add local file\n' +
               '  opkg add gh@owner/repo                   # Add from GitHub\n' +
@@ -240,8 +240,8 @@ export function setupAddCommand(program: Command): void {
           return;
         }
         
-        // Process single target (existing behavior)
-        await processAddResource(target, options, cwd, execContext);
+        // Process single resource (existing behavior)
+        await processAddResource(resource, options, cwd, execContext);
       })
     );
 }
