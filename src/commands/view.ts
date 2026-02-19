@@ -350,7 +350,7 @@ function printLocalPackageView(
     console.log(`${headerInfo.name}${headerInfo.version ? `@${headerInfo.version}` : ''} ${dim(`(${headerInfo.path})`)} ${dim(`[${headerInfo.type}]`)}`);
     printMetadataSection(metadata);
     console.log(sectionHeader('Resources', 0));
-    console.log(dim('  (no resources)'));
+    console.log(dim('└── (no resources)'));
   }
 
   if (report.dependencies !== undefined) {

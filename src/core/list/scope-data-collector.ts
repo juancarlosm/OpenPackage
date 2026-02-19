@@ -222,6 +222,7 @@ export function mergeTrackedAndUntrackedResources(
         const resourcesMap = typeMap.get(group.resourceType)!;
 
         for (const resource of group.resources) {
+          const pkgName = node.report.name;
           if (!resourcesMap.has(resource.name)) {
             const enhancedFiles: EnhancedFileMapping[] = resource.files.map(f => ({
               ...f,
@@ -234,8 +235,13 @@ export function mergeTrackedAndUntrackedResources(
               resourceType: resource.resourceType,
               files: enhancedFiles,
               status: 'tracked',
-              scopes: new Set([scope])
+              scopes: new Set([scope]),
+              packages: new Set([pkgName])
             });
+          } else {
+            const existing = resourcesMap.get(resource.name)!;
+            if (!existing.packages) existing.packages = new Set();
+            existing.packages.add(pkgName);
           }
         }
       }
@@ -271,6 +277,7 @@ export function mergeTrackedAndUntrackedResources(
           files: [enhancedFile],
           status: 'untracked',
           scopes: new Set([scope])
+          // no packages for untracked resources
         });
       } else {
         resourcesMap.get(fullName)!.files.push(enhancedFile);
@@ -325,13 +332,20 @@ export function mergeResourcesAcrossScopes(
           resourcesMap.set(resource.name, {
             ...resource,
             scopes: new Set([scope]),
-            files: [...resource.files]
+            files: [...resource.files],
+            packages: resource.packages ? new Set(resource.packages) : undefined
           });
         } else {
           const existing = resourcesMap.get(resource.name)!;
           existing.scopes.add(scope);
           existing.files.push(...resource.files);
           existing.status = calculateResourceStatus(existing.files);
+          if (resource.packages) {
+            existing.packages = existing.packages ?? new Set();
+            for (const pkg of resource.packages) {
+              existing.packages.add(pkg);
+            }
+          }
         }
       }
     }

@@ -71,7 +71,7 @@ export async function buildWorkspaceResources(
       const { resourceType, resourceName } = classifySourceKey(sourceKey);
 
       const key = resourceType === 'other'
-        ? 'other::uncategorized'
+        ? 'other::other'
         : `${resourceType}::${resourceName}`;
 
       if (!resourceMap.has(key)) {

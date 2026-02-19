@@ -280,7 +280,7 @@ async function discoverMCP(
       resources.push({
         resourceType: 'mcp',
         resourcePath,
-        displayName: 'MCP Server Configuration',
+        displayName: 'configs',
         description: 'Model Context Protocol server configuration',
         filePath,
         installKind: 'file'

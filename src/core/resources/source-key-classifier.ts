@@ -5,7 +5,7 @@ export function classifySourceKey(sourceKey: string): { resourceType: ResourceTy
   const parts = normalized.split('/');
 
   if (parts.length === 1 && (sourceKey === 'mcp.json' || sourceKey === 'mcp.jsonc')) {
-    return { resourceType: 'mcp', resourceName: 'MCP Server Configuration' };
+    return { resourceType: 'mcp', resourceName: 'configs' };
   }
 
   const firstDir = parts[0];

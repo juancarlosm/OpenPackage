@@ -1,6 +1,6 @@
 import type { ListPackageReport, ListTreeNode, ListResourceGroup, ListFileMapping } from './list-pipeline.js';
 import type { RemoteListResult } from './remote-list-resolver.js';
-import { flattenResourceGroups, renderFlatResourceList, type TreeRenderConfig, type EnhancedFileMapping, type EnhancedResourceGroup, type EnhancedResourceInfo, type ResourceScope } from './list-tree-renderer.js';
+import { flattenResourceGroups, renderFlatResourceList, getChildPrefix, type TreeRenderConfig, type EnhancedFileMapping, type EnhancedResourceGroup, type EnhancedResourceInfo, type ResourceScope } from './list-tree-renderer.js';
 import { formatScopeBadge, formatPathForDisplay } from '../../utils/formatters.js';
 import type { ScopeResult, HeaderInfo } from './scope-data-collector.js';
 import type { ViewMetadataEntry } from './view-metadata.js';
@@ -134,7 +134,7 @@ export function printRemotePackageDetail(
   }
   // If no content available at all, show a message
   else if (pkg.totalFiles === 0) {
-    console.log(dim('  (no files)'));
+    console.log(dim('└── (no files)'));
   }
 
   if (showDeps) {
@@ -165,19 +165,18 @@ function printDepTreeNode(
   showFiles: boolean
 ): void {
   const hasChildren = node.children.length > 0;
-  const hasResources = showFiles && node.report.resourceGroups && node.report.resourceGroups.length > 0;
-  const hasBranches = hasChildren || hasResources;
+  const hasFiles = showFiles && node.report.fileList && node.report.fileList.length > 0;
+  const hasBranches = hasChildren || hasFiles;
 
   const connector = isLast
     ? (hasBranches ? '└─┬ ' : '└── ')
     : (hasBranches ? '├─┬ ' : '├── ');
-  const childPrefix = prefix + (isLast ? '  ' : '│ ');
+  const childPrefix = getChildPrefix(prefix, isLast);
 
   console.log(`${prefix}${connector}${formatPackageLine(node.report)}`);
 
-  if (hasResources) {
-    const flatResources = flattenResourceGroups(node.report.resourceGroups!);
-    renderFlatResourceList(flatResources, childPrefix, true, LIST_FILE_CONFIG);
+  if (hasFiles) {
+    printFileList(node.report.fileList!, childPrefix);
   }
 
   node.children.forEach((child, index) => {
@@ -213,6 +212,16 @@ export function printDepsView(
     return;
   }
 
+  // Option 1: When workspace is the header, exclude it from the tree to avoid duplication.
+  // Its files are shown under the header when -f is used.
+  let workspaceEntry: DepsPackageEntry | undefined;
+  if (headerInfo?.type === 'workspace' && headerInfo.name) {
+    workspaceEntry = packageMap.get(headerInfo.name);
+    if (workspaceEntry) {
+      packageMap.delete(headerInfo.name);
+    }
+  }
+
   // Print header showing workspace/package name and path
   if (headerInfo) {
     const version = headerInfo.version ? `@${headerInfo.version}` : '';
@@ -228,25 +237,32 @@ export function printDepsView(
   const entries = Array.from(packageMap.values())
     .sort((a, b) => a.report.name.localeCompare(b.report.name));
 
+  console.log(sectionHeader('Dependencies', entries.length));
+
+  // If workspace was excluded, show its files under the header when -f is used.
+  // Use empty prefix so workspace files appear as siblings of dep entries.
+  if (workspaceEntry && showFiles && workspaceEntry.report.fileList && workspaceEntry.report.fileList.length > 0) {
+    printFileList(workspaceEntry.report.fileList, '');
+  }
+
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const isLast = i === entries.length - 1;
     const hasChildren = entry.children.length > 0;
-    const hasResources = showFiles && entry.report.resourceGroups && entry.report.resourceGroups.length > 0;
-    const hasBranches = hasChildren || hasResources;
+    const hasFiles = showFiles && entry.report.fileList && entry.report.fileList.length > 0;
+    const hasBranches = hasChildren || hasFiles;
 
     const scopeBadge = dim(formatScopeBadge(entry.scopes));
     const connector = isLast
       ? (hasBranches ? '└─┬ ' : '└── ')
       : (hasBranches ? '├─┬ ' : '├── ');
-    const childPrefix = isLast ? '  ' : '│ ';
+    const childPrefix = getChildPrefix('', isLast);
 
     console.log(`${connector}${formatPackageLine(entry.report)} ${scopeBadge}`);
 
-    // Show resource groups for the top-level package if files are requested
-    if (hasResources) {
-      const flatResources = flattenResourceGroups(entry.report.resourceGroups!);
-      renderFlatResourceList(flatResources, childPrefix, true, LIST_FILE_CONFIG);
+    // Show flat file list for the package when -f is requested
+    if (hasFiles) {
+      printFileList(entry.report.fileList!, childPrefix);
     }
 
     for (let ci = 0; ci < entry.children.length; ci++) {
@@ -286,6 +302,12 @@ export function printResourcesView(
   const showScopeBadges = options?.showScopeBadges !== false;
   const pathBase = options?.pathBaseForDisplay;
 
+  // Show package label only when listing workspace (not a specific package).
+  // Temporarily disabled behind feature flag; set OPKG_LIST_SHOW_PACKAGE_LABELS=true to enable.
+  const showPackageLabels =
+    headerInfo?.type !== 'package' &&
+    process.env.OPKG_LIST_SHOW_PACKAGE_LABELS === 'true';
+
   const config: TreeRenderConfig<EnhancedFileMapping> = {
     formatPath: (file) =>
       pathBase ? formatPathForDisplay(file.target, pathBase) : formatFilePath(file),
@@ -297,10 +319,18 @@ export function printResourcesView(
     },
     ...(showScopeBadges && {
       getResourceBadge: (scopes) => scopes ? dim(formatScopeBadge(scopes)) : ''
+    }),
+    ...(showPackageLabels && {
+      getResourcePackageLabels: (packages) => {
+        if (!packages || packages.size === 0) return [];
+        return Array.from(packages)
+          .sort()
+          .map((pkg) => dim(`(${pkg})`));
+      }
     })
   };
 
   const flatResources = flattenResourceGroups(groups);
-  console.log(sectionHeader('Resources', flatResources.length));
+  console.log(sectionHeader('Installed', flatResources.length));
   renderFlatResourceList(flatResources, '', showFiles, config);
 }

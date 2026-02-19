@@ -197,22 +197,23 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
- * Format a single scope as a tag (e.g., " [global]" or " [project]")
+ * Format a single scope as a tag.
+ * Only [global] is shown — [project] is the default context and omitted to reduce noise.
  */
 export function formatScopeTag(scope: string): string {
-  return scope === 'global' ? ' [global]' : ' [project]';
+  return scope === 'global' ? ' [global]' : '';
 }
 
 /**
- * Format one or more scopes as a badge (e.g., "[project]", "[global]", or "[project, global]")
+ * Format one or more scopes as a badge.
+ * Only [global] is shown — [project] is the default context and omitted to reduce noise.
  */
 export function formatScopeBadge(scopes: Set<string> | string): string {
   if (typeof scopes === 'string') {
-    return scopes === 'global' ? '[global]' : '[project]';
+    return scopes === 'global' ? '[global]' : '';
   }
-  const sorted = Array.from(scopes).sort();
-  const badges = sorted.map(s => s === 'project' ? 'project' : 'global').join(', ');
-  return `[${badges}]`;
+  const hasGlobal = scopes.has('global');
+  return hasGlobal ? '[global]' : '';
 }
 
 /**

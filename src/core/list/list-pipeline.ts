@@ -600,7 +600,7 @@ export async function runListPipeline(
       }
     }
 
-    // If --all, recursively load nested dependencies
+    // If full tree (deps view), recursively load nested dependencies
     if (all) {
       const loadNestedDeps = async (names: string[]) => {
         for (const name of names) {

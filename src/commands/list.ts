@@ -16,7 +16,6 @@ import type { EnhancedResourceGroup, ResourceScope } from '../core/list/list-tre
 
 interface ListOptions {
   scope?: string;
-  all?: boolean;
   files?: boolean;
   tracked?: boolean;
   untracked?: boolean;
@@ -41,10 +40,6 @@ async function listCommand(
 
   if (packageName && options.untracked) {
     throw new ValidationError('Cannot use --untracked with a specific package.');
-  }
-
-  if (options.all && options.untracked) {
-    throw new ValidationError('Cannot use --all with --untracked.');
   }
 
   if (options.deps && options.untracked) {
@@ -75,7 +70,7 @@ async function listCommand(
       showGlobal,
       pipelineOptions: {
         files: options.files,
-        all: options.all,
+        all: true, // Always build full tree: deps view needs it for display, resources view needs it to collect from transitive deps
         tracked: options.tracked,
         untracked: options.untracked,
         platforms: options.platforms
@@ -193,8 +188,7 @@ export function setupListCommand(program: Command): void {
     .description('List installed resources and packages')
     .argument('[resource-spec]', 'filter by a specific installed package')
     .option('-s, --scope <scope>', 'workspace scope: project or global (default: both)')
-    .option('-d, --deps', 'show dependency tree instead of resources')
-    .option('-a, --all', 'show full dependency tree including transitive dependencies')
+    .option('-d, --deps', 'show dependency tree (full tree including transitive dependencies)')
     .option('-f, --files', 'show individual file paths')
     .option('-t, --tracked', 'show only tracked resources (skip untracked scan)')
     .option('-u, --untracked', 'show only untracked resources')

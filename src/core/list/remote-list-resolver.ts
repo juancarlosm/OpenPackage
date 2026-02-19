@@ -1,5 +1,6 @@
 import { relative, join } from 'path';
 
+import { FILE_PATTERNS } from '../../constants/index.js';
 import type { ExecutionContext } from '../../types/index.js';
 import type { InputClassification, RegistryClassification, GitClassification } from '../install/orchestrator/types.js';
 import { fetchRemotePackageMetadata } from '../remote-pull.js';
@@ -234,6 +235,12 @@ async function resolveGitList(
   };
 }
 
+/** Manifest and index files excluded from resource listing */
+const NON_RESOURCE_FILES = new Set<string>([
+  FILE_PATTERNS.OPENPACKAGE_YML,
+  FILE_PATTERNS.OPENPACKAGE_INDEX_YML
+]);
+
 export async function collectFiles(dir: string, root: string): Promise<string[]> {
   const { readdir } = await import('fs/promises');
   const results: string[] = [];
@@ -244,6 +251,7 @@ export async function collectFiles(dir: string, root: string): Promise<string[]>
       if (entry.name.startsWith('.')) continue;
       const fullPath = join(dir, entry.name);
       if (entry.isFile()) {
+        if (NON_RESOURCE_FILES.has(entry.name)) continue;
         results.push(relative(root, fullPath));
       } else if (entry.isDirectory()) {
         const nested = await collectFiles(fullPath, root);

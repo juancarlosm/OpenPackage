@@ -71,11 +71,11 @@ export function deriveResourceFullName(path: string, resourceType: ResourceTypeI
   const normalizedType = resourceType as ResourceTypeId;
 
   if (normalizedType === 'mcp') {
-    return 'mcps/MCP Server Configuration';
+    return 'mcps/configs';
   }
 
   if (normalizedType === 'other') {
-    return 'other/uncategorized';
+    return 'other';
   }
 
   const def = getResourceTypeDef(normalizedType);

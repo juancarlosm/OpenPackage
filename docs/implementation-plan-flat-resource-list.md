@@ -48,7 +48,7 @@ export function deriveResourceFullName(
 - **File-based types** (rules, agents, commands, hooks): Path under category → strip extension from last segment → namespace. E.g. `basics/custom-rules.mdc` → `basics/custom-rules`.
 - **Skill (directory-based):** Path under category → first segment is skill dir → namespace = that dir. E.g. `my-skill/readme.md` → `my-skill`.
 - **Other:** Same as file-based.
-- **MCP:** Single special identifier `mcps/MCP Server Configuration` or similar.
+- **MCP:** Single special identifier `mcps/configs`.
 - **Platform-prefixed paths** (e.g. `.cursor/rules/...`): Strip known platform roots to get `rules/...`, then apply above.
 
 **Dependencies:** `resource-registry` (DIR_TO_TYPE, toPluralKey), `resource-naming` (stripExtension).
@@ -96,7 +96,7 @@ export function deriveResourceFullName(
 - `file.category` = `rules` (from flow pattern)
 - Call `deriveResourceFullName(file.workspacePath, normalizeType(file.category))` to get full name.
 - Use full name as resource key and `resource.name`.
-- Handle `other` type: keep `uncategorized` as namespace, full name = `other/uncategorized`.
+- Handle `other` type: full name = `other`.
 
 **Merge logic:**
 - Deduplication key remains `resource.name` (which is now `category/namespace`).
@@ -186,8 +186,8 @@ list-printers ← printResourcesView (updated)
 
 1. **Skills with multiple files:** All files in `skills/my-skill/` map to one resource `skills/my-skill`. Namespace = directory name.
 2. **Nested rules:** `rules/basics/custom-rules.mdc` → `rules/basics/custom-rules`.
-3. **Other type:** Single synthetic resource `other/uncategorized` with all uncategorized files.
-4. **MCP:** `mcps/MCP Server Configuration` (or adjust to fit MCP semantics).
+3. **Other type:** Single synthetic resource `other` with all uncategorized files.
+4. **MCP:** `mcps/configs`.
 5. **Platform prefix:** `.cursor/rules/foo.mdc`, `.opencode/rules/foo.mdc` → both resolve to `rules/foo`. Dedup by full name.
 6. **Same resource, multiple platforms:** One resource `rules/custom-rules` with multiple files across `.cursor/` and `.opencode/`.
 

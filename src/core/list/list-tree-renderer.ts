@@ -20,6 +20,8 @@ export interface EnhancedResourceInfo {
   files: EnhancedFileMapping[];
   status: 'tracked' | 'partial' | 'untracked' | 'mixed';
   scopes: Set<ResourceScope>;
+  /** Package(s) this resource belongs to (tracked resources only) */
+  packages?: Set<string>;
 }
 
 /**
@@ -42,6 +44,8 @@ export interface TreeRenderConfig<TFile> {
   sortFiles: (a: TFile, b: TFile) => number;
   /** Optional badge/suffix for resource names */
   getResourceBadge?: (scopes?: Set<ResourceScope>) => string;
+  /** Optional dimmed package labels shown under resource name, one line per package (vertical bar, no connector) */
+  getResourcePackageLabels?: (packages?: Set<string>) => string[];
 }
 
 // ANSI color codes
@@ -130,18 +134,30 @@ export function renderResource<TFile>(
   showFiles: boolean,
   config: TreeRenderConfig<TFile>
 ): void {
-  const hasFiles = showFiles && resource.files.length > 0;
-  const connector = getTreeConnector(isLast, hasFiles);
-  
+  const enhanced = resource as EnhancedResourceInfo;
+  const packageLabels = config.getResourcePackageLabels?.(enhanced.packages) ?? [];
+
+  // Single source of truth: file branches (├─┬/└─┬) only when -f and resource has files.
+  // Package-only uses ├──/└──; double │ for package labels only when file branches exist.
+  const hasFileBranches = showFiles && resource.files.length > 0;
+
+  const connector = getTreeConnector(isLast, hasFileBranches);
+  const childPrefix = getChildPrefix(prefix, isLast);
+  const packagePrefix = hasFileBranches ? childPrefix + '│ ' : childPrefix;
+
   // Resource name with optional badge
-  const badge = config.getResourceBadge?.(
-    (resource as EnhancedResourceInfo).scopes
-  ) ?? '';
+  const badge = config.getResourceBadge?.(enhanced.scopes) ?? '';
   console.log(`${prefix}${connector}${resource.name}${badge ? ' ' + badge : ''}`);
-  
+
+  // Package labels: dimmed (package) under resource name, one per package.
+  // With -f: align (package) with resource name (no extra spacing); without -f: 2 spaces.
+  const packageSpacing = hasFileBranches ? '' : '  ';
+  for (const label of packageLabels) {
+    console.log(`${packagePrefix}${packageSpacing}${label}`);
+  }
+
   // Render files if requested
-  if (hasFiles) {
-    const childPrefix = getChildPrefix(prefix, isLast);
+  if (hasFileBranches) {
     const sortedFiles = [...(resource.files as TFile[])].sort(config.sortFiles);
     renderFlatFileList(sortedFiles, childPrefix, config);
   }
@@ -164,22 +180,29 @@ export function flattenResourceGroups<T extends { name: string; files: unknown[]
 /**
  * Render a flat list of resources (no category grouping).
  * Each resource is displayed as category/namespace with optional file children.
+ * @param hasMoreSiblings - when true, the last resource uses ├ instead of └ (more siblings follow)
  */
 export function renderFlatResourceList<TFile>(
   resources: (ListResourceInfo | EnhancedResourceInfo)[],
   prefix: string,
   showFiles: boolean,
-  config: TreeRenderConfig<TFile>
+  config: TreeRenderConfig<TFile>,
+  hasMoreSiblings?: boolean
 ): void {
   for (let ri = 0; ri < resources.length; ri++) {
     const resource = resources[ri];
-    const isLast = ri === resources.length - 1;
+    const isNaturalLast = ri === resources.length - 1;
+    const isLast = hasMoreSiblings ? false : isNaturalLast;
     renderResource(resource, prefix, isLast, showFiles, config);
   }
 }
 
 /**
- * Render a single resource group with all its resources
+ * Render a single resource group with all its resources.
+ * Reserved for potential future hierarchical (grouped) display.
+ * Currently unused; list/view use renderFlatResourceList.
+ *
+ * @deprecated Unused - kept for potential hierarchical view support
  */
 export function renderResourceGroup<TFile>(
   group: ListResourceGroup | EnhancedResourceGroup,

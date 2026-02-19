@@ -54,15 +54,15 @@ function createFile(source: string, target: string, exists = true): ListFileMapp
   console.log('✓ Skill produces skills/my-skill');
 }
 
-// Other consolidates to other/uncategorized
+// Other consolidates to other
 {
   const files: ListFileMapping[] = [
     createFile('unknown/foo.md', '.cursor/unknown/foo.md'),
   ];
   const groups = groupFilesIntoResources(files);
   assert.equal(groups[0].resourceType, 'other');
-  assert.equal(groups[0].resources[0].name, 'other/uncategorized');
-  console.log('✓ Other type produces other/uncategorized');
+  assert.equal(groups[0].resources[0].name, 'other');
+  console.log('✓ Other type produces other');
 }
 
 // Platform-suffixed variants group under same resource

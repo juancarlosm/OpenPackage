@@ -124,7 +124,6 @@ Use the list command to show an overview of packages and files installed.
 | --- | --- |
 | `-p, --project`              | Lists only project scoped packages & resource file count |
 | `-g, --global`               | Lists only user scoped packages & resource file count |
-| `-a, --all`                  | Lists all packages recursively (includes nested) |
 | `-f, --files`                | Lists all resource files |
 | `-t, --tracked`              | Lists all packages & resources tracked by OpenPackage |
 | `-u, --untracked`            | Lists all resources not tracked by OpenPackage |

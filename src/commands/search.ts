@@ -152,10 +152,10 @@ async function scanRegistryDirectory(query?: string): Promise<PackageMatch[]> {
 
 // ── Display ──────────────────────────────────────────────────────
 
-function displaySection(title: string, matches: PackageMatch[], showAll: boolean): void {
+function displaySection(title: string, subtitle: string, matches: PackageMatch[], showAll: boolean): void {
   if (matches.length === 0) return;
 
-  console.log(cyan(title));
+  console.log(`${cyan(title)} ${dim(subtitle)}`);
 
   for (let i = 0; i < matches.length; i++) {
     const pkg = matches[i];
@@ -190,17 +190,17 @@ function displayResults(result: SearchResult, showAll: boolean): void {
   let hasAny = false;
 
   if (project.length > 0) {
-    displaySection(`[Project Packages] ${dim('(./.openpackage/packages)')}`, project, showAll);
+    displaySection('[Project Packages]', '(./.openpackage/packages)', project, showAll);
     hasAny = true;
   }
 
   if (global.length > 0) {
-    displaySection(`[Global Packages] ${dim('(~/.openpackage/packages)')}`, global, showAll);
+    displaySection('[Global Packages]', '(~/.openpackage/packages)', global, showAll);
     hasAny = true;
   }
 
   if (registry.length > 0) {
-    displaySection(`[Local Registry] ${dim('(~/.openpackage/registry)')}`, registry, showAll);
+    displaySection('[Local Registry]', '(~/.openpackage/registry)', registry, showAll);
     hasAny = true;
   }
 

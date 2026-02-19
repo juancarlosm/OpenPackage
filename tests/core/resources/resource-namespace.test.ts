@@ -53,8 +53,8 @@ import {
 
 // deriveResourceFullName - mcp and other
 {
-  assert.equal(deriveResourceFullName('mcp.json', 'mcp'), 'mcps/MCP Server Configuration');
-  assert.equal(deriveResourceFullName('anything', 'other'), 'other/uncategorized');
+  assert.equal(deriveResourceFullName('mcp.json', 'mcp'), 'mcps/configs');
+  assert.equal(deriveResourceFullName('anything', 'other'), 'other');
   console.log('✓ deriveResourceFullName mcp and other');
 }
 
