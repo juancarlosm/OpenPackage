@@ -50,7 +50,8 @@ export class ConversionInstallStrategy extends BaseStrategy {
   
   async install(
     context: FlowInstallContext,
-    options?: InstallOptions
+    options?: InstallOptions,
+    forceOverwrite: boolean = false
   ): Promise<FlowInstallResult> {
     const { packageName, packageRoot, workspaceRoot, platform, dryRun } = context;
     
@@ -108,7 +109,8 @@ export class ConversionInstallStrategy extends BaseStrategy {
         conversionResult.convertedPackage,
         conversionResult.updatedContext || conversionContext,
         context,
-        options
+        options,
+        forceOverwrite
       );
       
     } catch (error) {
@@ -167,7 +169,8 @@ export class ConversionInstallStrategy extends BaseStrategy {
     convertedPackage: Package,
     conversionContext: PackageConversionContext,
     context: FlowInstallContext,
-    options?: InstallOptions
+    options?: InstallOptions,
+    forceOverwrite: boolean = false
   ): Promise<FlowInstallResult> {
     let tempPackageRoot: string | null = null;
     
@@ -193,7 +196,7 @@ export class ConversionInstallStrategy extends BaseStrategy {
         conversionContext
       };
       
-      const installResult = await flowStrategy.install(convertedContext, options);
+      const installResult = await flowStrategy.install(convertedContext, options, forceOverwrite);
       
       // Cleanup temp directory
       await cleanupTempDirectory(tempPackageRoot);

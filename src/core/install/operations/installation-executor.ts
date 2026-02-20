@@ -25,7 +25,7 @@ export interface InstallationPhasesParams {
   cwd: string;
   packages: ResolvedPackage[];
   platforms: Platform[];
-  conflictResult: ConflictSummary;
+  conflictResult?: ConflictSummary;
   options: InstallOptions;
   targetDir: string;
   matchedPattern?: string;
@@ -64,6 +64,9 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
     try {
       // Extract originalContentRoot if it was stored during conversion
       const originalContentRoot = (resolved as any).originalContentRoot;
+
+      // Check if the package-level conflict phase confirmed an overwrite for this package
+      const forceOverwrite = conflictResult?.forceOverwritePackages?.has(resolved.name) ?? false;
       
       const installResult: IndexInstallResult = await installPackageByIndex(
         cwd,
@@ -76,7 +79,8 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
         resolved.marketplaceMetadata,
         matchedPattern,
         resolved.resourceVersion,
-        originalContentRoot  // Pass original path for index writing
+        originalContentRoot,  // Pass original path for index writing
+        forceOverwrite        // Phase 5: propagate package-level overwrite decision
       );
 
       totalInstalled += installResult.installed;

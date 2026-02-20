@@ -27,7 +27,8 @@ export abstract class BaseStrategy implements InstallationStrategy {
   
   abstract install(
     context: FlowInstallContext,
-    options?: InstallOptions
+    options?: InstallOptions,
+    forceOverwrite?: boolean
   ): Promise<FlowInstallResult>;
   
   /**

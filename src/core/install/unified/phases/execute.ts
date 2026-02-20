@@ -37,7 +37,7 @@ export async function executeInstallationPhase(
   }
 
   // Get conflict result from context
-  const conflictResult = (ctx as any).conflictResult;
+  const conflictResult = ctx.conflictResult;
 
   // Execute installation
   const outcome = await performIndexBasedInstallationPhases({

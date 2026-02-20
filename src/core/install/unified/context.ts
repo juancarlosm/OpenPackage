@@ -2,6 +2,7 @@ import type { Platform } from '../../platforms.js';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { ResolvedPackage } from '../../dependency-resolver/types.js';
 import type { WorkspaceIndex } from '../../../types/workspace-index.js';
+import type { ConflictSummary } from '../operations/installation-executor.js';
 
 /**
  * Source information for package installation
@@ -155,4 +156,12 @@ export interface InstallationContext {
   
   /** Conversion errors (non-fatal, logged but don't stop installation) */
   conversionErrors?: Error[];
+
+  // === Conflict resolution results (set during conflicts phase) ===
+  /**
+   * Result from the package-level conflict phase.
+   * Carries forceOverwritePackages (packages the user confirmed to overwrite)
+   * and skippedPackages (packages removed from the install set).
+   */
+  conflictResult?: ConflictSummary;
 }

@@ -83,7 +83,8 @@ export interface InstallationStrategy {
    */
   install(
     context: FlowInstallContext,
-    options?: InstallOptions
+    options?: InstallOptions,
+    forceOverwrite?: boolean
   ): Promise<FlowInstallResult>;
   
   /**

@@ -90,7 +90,8 @@ export async function installPackageByIndexWithFlows(
   },
   matchedPattern?: string,  // Phase 4: Pattern from base detection
   resourceVersion?: string,  // Resource-specific version (for agents/skills)
-  originalContentRoot?: string  // Original source path before conversion (for index)
+  originalContentRoot?: string,  // Original source path before conversion (for index)
+  forceOverwrite?: boolean  // Phase 5: Package was confirmed for overwrite at package-level conflict phase
 ): Promise<IndexInstallResult> {
   logger.debug(`Installing ${packageName}@${version} with flows for platforms: ${platforms.join(', ')}`);
 
@@ -204,7 +205,7 @@ export async function installPackageByIndexWithFlows(
     };
 
     try {
-      const result = await installPackageWithFlows(installContext, options);
+      const result = await installPackageWithFlows(installContext, options, forceOverwrite ?? false);
 
       // Aggregate target paths + per-source mapping for workspace index
       for (const absTarget of result.targetPaths ?? []) {

@@ -16,8 +16,8 @@ export async function processConflictsPhase(ctx: InstallationContext): Promise<b
   // Update resolved packages based on conflict resolution
   ctx.resolvedPackages = ctx.resolvedPackages.filter(pkg => !conflictResult.skippedPackages.includes(pkg.name));
   
-  // Store conflict result in context for later use
-  (ctx as any).conflictResult = conflictResult;
+  // Store conflict result in context for use in the execute phase
+  ctx.conflictResult = conflictResult;
   
   return true;
 }

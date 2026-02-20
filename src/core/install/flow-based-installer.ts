@@ -50,7 +50,8 @@ export type {
  */
 export async function installPackageWithFlows(
   installContext: FlowInstallContext,
-  options?: InstallOptions
+  options?: InstallOptions,
+  forceOverwrite: boolean = false
 ): Promise<FlowInstallResult> {
   const {
     packageName,
@@ -99,7 +100,7 @@ export async function installPackageWithFlows(
     };
     
     const strategy = selectInstallStrategy(enrichedContext, options);
-    const strategyResult = await strategy.install(enrichedContext, options);
+    const strategyResult = await strategy.install(enrichedContext, options, forceOverwrite);
     
     // Log results using shared utility
     logInstallationResult(strategyResult, packageName, platform, dryRun ?? false);
