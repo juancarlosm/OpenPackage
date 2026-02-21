@@ -24,13 +24,13 @@ export function validateConflictStrategy(
   
   const normalized = strategy.toLowerCase();
   const allowedStrategies: InstallOptions['conflictStrategy'][] = [
-    'keep-both', 'overwrite', 'skip', 'ask'
+    'namespace', 'overwrite', 'skip', 'ask'
   ];
   
   if (!allowedStrategies.includes(normalized as any)) {
     throw new Error(
       `Invalid --conflicts value '${strategy}'. ` +
-      `Use one of: keep-both, overwrite, skip, ask.`
+      `Use one of: namespace, overwrite, skip, ask.`
     );
   }
   

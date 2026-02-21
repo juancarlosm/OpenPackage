@@ -1,5 +1,6 @@
 import { basename } from 'path';
 import { extractGitHubInfo } from './git-url-parser.js';
+import { DIR_TO_TYPE } from '../core/resources/resource-registry.js';
 import { logger } from './logger.js';
 
 /**
@@ -239,6 +240,112 @@ export function splitPackageNameForTelemetry(packageName: string): {
     baseName: packageName,
     resourcePath: undefined
   };
+}
+
+/**
+ * Strip a file extension from a path segment (e.g. "code-reviewer.md" → "code-reviewer").
+ */
+function stripExtension(segment: string): string {
+  const dotIdx = segment.lastIndexOf('.');
+  return dotIdx > 0 ? segment.slice(0, dotIdx) : segment;
+}
+
+/**
+ * Derive a short, human-readable namespace slug from a full package name.
+ *
+ * Uses "smart leaf detection": walks the sub-path segments and identifies
+ * the meaningful name segment that sits before the first resource-type
+ * directory marker (rules, agents, commands, skills, hooks — as defined
+ * by DIR_TO_TYPE in the resource registry).
+ *
+ * The slug uses `/` as separators so it produces real nested directories.
+ *
+ * ### Escalation for uniqueness
+ *
+ * If `existingSlugs` is provided, the function progressively escalates
+ * to avoid collisions:
+ *   1. `leaf`               (e.g. "feature-dev")
+ *   2. `repo/leaf`          (e.g. "claude-plugins/feature-dev")
+ *   3. `owner/repo/leaf`    (e.g. "anthropics/claude-plugins/feature-dev")
+ *
+ * For repo-level packages (no sub-path):
+ *   1. `repo`               (e.g. "essentials")
+ *   2. `owner/repo`         (e.g. "anthropics/essentials")
+ *
+ * For plain registry names (not scoped): returned as-is with no escalation.
+ *
+ * ### Examples
+ *
+ *  | Package Name                                                  | Slug (no collision) |
+ *  |---------------------------------------------------------------|---------------------|
+ *  | gh@owner/repo/plugins/foo/commands/bar/baz/hello.md           | foo                 |
+ *  | gh@anthropics/claude-plugins/plugins/feature-dev/agents/x.md  | feature-dev         |
+ *  | gh@anthropics/essentials                                      | essentials          |
+ *  | gh@owner/repo/agents/designer.md                              | repo                |
+ *  | gh@owner/repo/tools/linter                                    | repo                |
+ *  | my-plain-package                                              | my-plain-package    |
+ *  | @scope/package-name                                           | package-name        |
+ *
+ * @param packageName    Full canonical package name
+ * @param existingSlugs  Set of slugs already in use by other installed packages.
+ *                       When provided, the function escalates to avoid collisions.
+ */
+export function deriveNamespaceSlug(
+  packageName: string,
+  existingSlugs?: Set<string>
+): string {
+  const parsed = parseScopedPluginName(packageName);
+
+  // ── Plain registry name (not scoped) ──────────────────────────────────
+  if (!parsed) {
+    return packageName;
+  }
+
+  const { username, repo, plugin } = parsed;
+  const resourceDirNames = new Set(Object.keys(DIR_TO_TYPE));
+
+  // ── Determine the leaf ────────────────────────────────────────────────
+  let leaf: string;
+
+  if (!plugin) {
+    // Repo-level package: gh@owner/repo — leaf is repo
+    leaf = repo;
+  } else {
+    const segments = plugin.split('/');
+    const markerIndex = segments.findIndex(seg => resourceDirNames.has(seg));
+
+    if (markerIndex > 0) {
+      // Segment immediately before the first resource marker
+      leaf = stripExtension(segments[markerIndex - 1]);
+    } else {
+      // Marker at index 0 (e.g. "agents/designer.md") or no marker found
+      // Both cases fall back to repo
+      leaf = repo;
+    }
+  }
+
+  // ── Build escalation candidates ───────────────────────────────────────
+  const candidates: string[] = !plugin
+    ? [repo, `${username}/${repo}`]
+    : leaf === repo
+      ? // Leaf is already the repo — start at repo, escalate to owner/repo
+        [repo, `${username}/${repo}`]
+      : [leaf, `${repo}/${leaf}`, `${username}/${repo}/${leaf}`];
+
+  // ── Pick the shortest non-colliding slug ──────────────────────────────
+  if (!existingSlugs || existingSlugs.size === 0) {
+    return candidates[0];
+  }
+
+  for (const candidate of candidates) {
+    if (!existingSlugs.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  // All candidates collide (extremely unlikely) — fall back to full name
+  // with problematic characters stripped
+  return packageName.replace(/^gh@/, '').replace(/@/g, '');
 }
 
 /**

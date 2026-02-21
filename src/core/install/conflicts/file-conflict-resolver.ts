@@ -2,10 +2,11 @@
  * File-Level Conflict Resolver
  *
  * Detects and resolves file-level conflicts for flow-based installs.
- * Provides a clean API for the FlowBasedInstallStrategy to use.
+ * Uses package-name namespacing to organise conflicting files into
+ * per-package subdirectories, preserving all versions on disk.
  */
 
-import { dirname, join, parse as parsePath } from 'path';
+import { dirname, join } from 'path';
 import { promises as fs } from 'fs';
 
 import { exists, ensureDir, readTextFile, walkFiles } from '../../../utils/fs.js';
@@ -19,6 +20,7 @@ import { getRegistryDirectories } from '../../directory.js';
 import { sep } from 'path';
 import { safePrompts } from '../../../utils/prompts.js';
 import { logger } from '../../../utils/logger.js';
+import { deriveNamespaceSlug } from '../../../utils/plugin-naming.js';
 import type { InstallOptions } from '../../../types/index.js';
 import type { WorkspaceConflictOwner } from '../../../utils/workspace-index-ownership.js';
 import type { WorkspaceIndexFileMapping } from '../../../types/workspace-index.js';
@@ -32,7 +34,7 @@ import {
 // Internal Types
 // ============================================================================
 
-type ConflictResolution = 'keep-both' | 'skip' | 'overwrite';
+type ConflictResolution = 'namespace' | 'skip' | 'overwrite';
 
 interface PackageIndexRecord {
   path: string;
@@ -60,7 +62,7 @@ export interface OwnershipContext {
   expandedIndexes: ExpandedIndexesContext;
   /** Paths the current package already owned (so re-installs skip the conflict check) */
   previousOwnedPaths: Set<string>;
-  /** Raw index records keyed by package name (needed for keep-both index updates) */
+  /** Raw index records keyed by package name (needed for namespace index updates) */
   indexByPackage: Map<string, PackageIndexRecord>;
 }
 
@@ -76,13 +78,39 @@ export interface TargetEntry {
    * Leave undefined if you want to skip the content-diff check for that branch.
    */
   content?: string;
+  /**
+   * The resolved `flow.to` pattern that produced this target path.
+   * Used to derive the namespace insertion point (the base directory of the
+   * pattern, i.e. everything before the first glob character).
+   * e.g. "rules/**\/*.md" → base = "rules"
+   */
+  flowToPattern?: string;
+  /**
+   * True when the flow that produced this entry uses a merge strategy
+   * (deep, shallow, or composite).  Merge-flow targets are excluded from
+   * namespacing because they intentionally combine content from multiple
+   * packages into a single file (e.g. mcp.json, settings.json).
+   */
+  isMergeFlow?: boolean;
 }
 
 export interface ConflictResolutionResult {
-  /** Targets that should proceed to flow execution */
+  /** Targets that should proceed to flow execution (paths may be rewritten to namespaced form) */
   allowedTargets: TargetEntry[];
   /** Human-readable warnings/notes accumulated during resolution */
   warnings: string[];
+  /**
+   * True when at least one conflict triggered bulk namespacing for the
+   * installing package.  The flow-based strategy uses this to rewrite the
+   * flow `to` patterns before executing flows so that the executor writes
+   * files to the correct namespaced locations.
+   */
+  packageWasNamespaced: boolean;
+  /**
+   * The package name used as the namespace directory segment.
+   * Only set when packageWasNamespaced is true.
+   */
+  namespaceDir?: string;
 }
 
 // ============================================================================
@@ -148,12 +176,12 @@ async function promptConflictResolution(message: string): Promise<ConflictResolu
     name: 'choice',
     message,
     choices: [
-      { title: 'Keep both (renames existing)', value: 'keep-both' },
-      { title: 'Skip (keeps existing)',         value: 'skip'      },
-      { title: 'Overwrite (replaces existing)', value: 'overwrite' }
+      { title: 'Namespace (organise by package name)', value: 'namespace' },
+      { title: 'Skip (keeps existing)',                value: 'skip'      },
+      { title: 'Overwrite (replaces existing)',        value: 'overwrite' }
     ]
   });
-  return ((response as any).choice as ConflictResolution | undefined) ?? 'skip';
+  return ((response as any).choice as ConflictResolution | undefined) ?? 'namespace';
 }
 
 async function promptContentDifferenceResolution(
@@ -200,32 +228,120 @@ async function hasContentDifference(absPath: string, newContent: string): Promis
 }
 
 // ============================================================================
-// Private: generate a non-colliding .local path
+// Private: derive a namespaced path for a target
 // ============================================================================
 
-async function generateLocalPath(cwd: string, relPath: string): Promise<string> {
-  const parsed = parsePath(relPath);
-  const directory = parsed.dir ? parsed.dir.replace(/\\/g, '/') : '';
+/**
+ * Insert `packageName` as a subdirectory immediately after the base directory
+ * of the flow's `to` pattern.
+ *
+ * The insertion point is the longest non-glob prefix of `flowToPattern`.
+ * For example:
+ *   relPath="rules/git/commits.md", packageName="acme", flowToPattern="rules/**\/*.md"
+ *   → base="rules" → "rules/acme/git/commits.md"
+ *
+ *   relPath=".cursor/rules/my-rule.mdc", packageName="corp", flowToPattern=".cursor/rules/**"
+ *   → base=".cursor/rules" → ".cursor/rules/corp/my-rule.mdc"
+ *
+ *   relPath="agents/helper.md", packageName="my-pkg", flowToPattern="agents/*"
+ *   → base="agents" → "agents/my-pkg/helper.md"
+ *
+ * When `flowToPattern` is undefined (no metadata available), falls back to
+ * inserting the namespace after the first path segment.
+ */
+export function generateNamespacedPath(
+  relPath: string,
+  packageName: string,
+  flowToPattern: string | undefined
+): string {
+  const normalized = relPath.replace(/\\/g, '/');
 
-  let baseName = `${parsed.name}.local${parsed.ext}`;
-  let candidate = directory ? `${directory}/${baseName}` : baseName;
-  if (!(await exists(join(cwd, candidate)))) {
-    return normalizePathForProcessing(candidate);
-  }
-
-  let increment = 1;
-  while (true) {
-    baseName = `${parsed.name}.local-${increment}${parsed.ext}`;
-    candidate = directory ? `${directory}/${baseName}` : baseName;
-    if (!(await exists(join(cwd, candidate)))) {
-      return normalizePathForProcessing(candidate);
+  // Derive the base directory from the flow pattern (everything before the first glob)
+  let baseDir = '';
+  if (flowToPattern) {
+    const patternNorm = flowToPattern.replace(/\\/g, '/');
+    const firstGlob = patternNorm.search(/[*?{]/);
+    if (firstGlob > 0) {
+      // Strip trailing slash from the prefix before the glob
+      const prefix = patternNorm.slice(0, firstGlob).replace(/\/$/, '');
+      // The base is the directory portion of the prefix
+      const lastSlash = prefix.lastIndexOf('/');
+      baseDir = lastSlash >= 0 ? prefix.slice(0, lastSlash) : '';
+      // If prefix itself ends with a complete segment (no trailing slash was present),
+      // the full prefix is the base dir
+      if (!patternNorm[firstGlob - 1]?.match(/\//)) {
+        baseDir = prefix.includes('/') ? prefix.slice(0, prefix.lastIndexOf('/')) : '';
+      } else {
+        baseDir = prefix;
+      }
+    } else if (firstGlob === -1) {
+      // Literal pattern — base is the directory of the literal target
+      const lastSlash = patternNorm.lastIndexOf('/');
+      baseDir = lastSlash >= 0 ? patternNorm.slice(0, lastSlash) : '';
     }
-    increment++;
   }
+
+  if (!baseDir) {
+    // Fallback: insert namespace after the first path segment
+    const parts = normalized.split('/');
+    if (parts.length <= 1) {
+      return `${packageName}/${normalized}`;
+    }
+    return `${parts[0]}/${packageName}/${parts.slice(1).join('/')}`;
+  }
+
+  // Verify the target actually starts with the base dir
+  const baseDirSlash = baseDir.endsWith('/') ? baseDir : `${baseDir}/`;
+  if (normalized.startsWith(baseDirSlash) || normalized === baseDir) {
+    const rest = normalized.slice(baseDirSlash.length);
+    return rest ? `${baseDir}/${packageName}/${rest}` : `${baseDir}/${packageName}`;
+  }
+
+  // Fallback if base doesn't match (shouldn't happen in normal usage)
+  const parts = normalized.split('/');
+  if (parts.length <= 1) {
+    return `${packageName}/${normalized}`;
+  }
+  return `${parts[0]}/${packageName}/${parts.slice(1).join('/')}`;
+}
+
+/**
+ * Rewrite a flow's `to` pattern to insert `packageName` after the pattern's
+ * base directory.  This is used to redirect an entire flow's output into a
+ * namespaced subdirectory without changing individual source files.
+ *
+ * Examples:
+ *   "rules/**\/*.md" + "acme"  → "rules/acme/**\/*.md"
+ *   ".cursor/rules/**"  + "corp"  → ".cursor/rules/corp/**"
+ *   "agents/*"          + "my-pkg" → "agents/my-pkg/*"
+ *   ".cursor/mcp.json"  + "pkg"    → ".cursor/pkg/mcp.json"  (literal)
+ */
+export function namespaceFlowToPattern(pattern: string, packageName: string): string {
+  const normalized = pattern.replace(/\\/g, '/');
+  const firstGlob = normalized.search(/[*?{]/);
+
+  if (firstGlob === -1) {
+    // Literal path — insert namespace before the filename
+    const lastSlash = normalized.lastIndexOf('/');
+    if (lastSlash < 0) return `${packageName}/${normalized}`;
+    return `${normalized.slice(0, lastSlash)}/${packageName}/${normalized.slice(lastSlash + 1)}`;
+  }
+
+  // Find the last '/' before the first glob — that's the insertion point
+  const prefix = normalized.slice(0, firstGlob);
+  const lastSlash = prefix.lastIndexOf('/');
+  if (lastSlash < 0) {
+    // Pattern starts directly with a glob (e.g. "*.md") — prefix with namespace
+    return `${packageName}/${normalized}`;
+  }
+
+  const baseDir = prefix.slice(0, lastSlash); // e.g. "rules"
+  const rest = normalized.slice(lastSlash + 1); // e.g. "**/*.md"
+  return `${baseDir}/${packageName}/${rest}`;
 }
 
 // ============================================================================
-// Private: update owner's workspace index after a keep-both rename
+// Private: update owner's workspace index after a namespace move
 // ============================================================================
 
 async function updateOwnerIndexAfterRename(
@@ -352,8 +468,8 @@ export function classifyFileConflict(
  *   1. Per-path override (`options.conflictDecisions`)
  *   2. `--force` flag
  *   3. Configured strategy (`options.conflictStrategy`, when not 'ask')
- *   4. TTY prompt (interactive mode)
- *   5. Skip fallback (non-interactive)
+ *   4. Default: 'namespace' for owned-by-other, TTY prompt for exists-unowned
+ *   5. Non-interactive fallback: namespace (owned-by-other) / skip (exists-unowned)
  *
  * @param conflictType    - 'owned-by-other' or 'exists-unowned'
  * @param relPath         - Workspace-relative path (for display / per-path key lookup)
@@ -383,10 +499,12 @@ export async function resolveFileConflict(
 
   // 2. Force flag or package-level force-overwrite confirmation
   if (options.force || forceOverwrite) {
+    // --force still namespaces owned-by-other (both packages keep their file);
+    // for unowned files --force overwrites since there's no package to namespace to.
     const resolution: ConflictResolution =
-      conflictType === 'owned-by-other' ? 'keep-both' : 'overwrite';
+      conflictType === 'owned-by-other' ? 'namespace' : 'overwrite';
     const warning = conflictType === 'owned-by-other'
-      ? `Keeping both: renaming ${normalized} (owned by ${ownerName}) due to --force.`
+      ? `Namespacing ${normalized} (owned by ${ownerName}) due to --force.`
       : `Overwriting ${normalized} (content differs, --force active).`;
     return { decision: resolution, warning };
   }
@@ -407,112 +525,257 @@ export async function resolveFileConflict(
     return { decision, warning };
   }
 
-  // 4. TTY prompt
-  if (interactive) {
-    if (conflictType === 'owned-by-other') {
-      const decision = await promptConflictResolution(
-        `File ${normalized} is managed by package ${ownerName}. How would you like to proceed?`
-      );
-      return { decision };
-    } else {
-      const decision = await promptContentDifferenceResolution(normalized, sourcePath);
-      return { decision };
-    }
+  // 4a. Default for owned-by-other: always namespace (no prompt needed)
+  if (conflictType === 'owned-by-other') {
+    return { decision: 'namespace' };
   }
 
-  // 5. Non-interactive fallback: skip
-  const warning = conflictType === 'owned-by-other'
-    ? `Skipping ${normalized} (owned by ${ownerName}) — non-interactive mode.`
-    : `Skipping ${normalized} (content differs) — non-interactive mode.`;
+  // 4b. exists-unowned: prompt in interactive mode
+  if (interactive) {
+    const decision = await promptContentDifferenceResolution(normalized, sourcePath);
+    return { decision };
+  }
+
+  // 5. Non-interactive fallback for exists-unowned: skip
+  const warning = `Skipping ${normalized} (content differs) — non-interactive mode.`;
   return { decision: 'skip', warning };
 }
 
 /**
- * Execute the keep-both strategy for a single target:
- * renames the existing file to a .local path and updates the owner's index entry.
+ * Execute the namespace strategy for an `owned-by-other` conflict:
+ * moves the existing file (owned by another package) into its own namespace
+ * subdirectory and updates that package's workspace index entry.
+ *
+ * The incoming file's namespaced path is computed separately via
+ * `generateNamespacedPath()` and is NOT written here — that is handled
+ * by the flow executor after the target entries are rewritten.
+ *
+ * @param ownerNamespaceSlug  The derived short slug for the owner package
+ *                            (computed via deriveNamespaceSlug).
  */
-export async function executeKeepBoth(
+export async function executeNamespace(
   cwd: string,
   targetRelPath: string,
-  owner: WorkspaceConflictOwner | undefined,
+  owner: WorkspaceConflictOwner,
   ownershipContext: OwnershipContext,
-  dryRun: boolean
-): Promise<{ localRelPath: string; warning: string }> {
+  flowToPattern: string | undefined,
+  dryRun: boolean,
+  ownerNamespaceSlug: string
+): Promise<{ ownerNamespacedPath: string; warning: string }> {
   const normalized = normalizePathForProcessing(targetRelPath);
-  const absTarget = join(cwd, normalized);
-  const localRelPath = await generateLocalPath(cwd, normalized);
+  const ownerNamespacedPath = generateNamespacedPath(normalized, ownerNamespaceSlug, flowToPattern);
 
   if (dryRun) {
-    const ownerNote = owner ? ` from ${owner.packageName}` : '';
     return {
-      localRelPath,
-      warning: `Would rename existing ${normalized}${ownerNote} to ${localRelPath} and install new file at ${normalized}.`
+      ownerNamespacedPath,
+      warning: `Would move ${normalized} (owned by ${owner.packageName}) → ${ownerNamespacedPath} to make room for incoming namespaced file.`
     };
   }
 
-  const absLocalPath = join(cwd, localRelPath);
-  await ensureDir(dirname(absLocalPath));
-  await fs.rename(absTarget, absLocalPath);
+  const absTarget = join(cwd, normalized);
+  const absNamespaced = join(cwd, ownerNamespacedPath);
+  await ensureDir(dirname(absNamespaced));
+  await fs.rename(absTarget, absNamespaced);
 
-  if (owner) {
-    await updateOwnerIndexAfterRename(
-      cwd,
-      owner,
-      normalized,
-      localRelPath,
-      ownershipContext.indexByPackage
-    );
-    // Update in-memory ownership map so subsequent targets in this run see the rename
-    ownershipContext.expandedIndexes.installedPathOwners.delete(normalized);
-    ownershipContext.expandedIndexes.installedPathOwners.set(
-      normalizePathForProcessing(localRelPath),
-      owner
-    );
-  }
+  await updateOwnerIndexAfterRename(
+    cwd,
+    owner,
+    normalized,
+    ownerNamespacedPath,
+    ownershipContext.indexByPackage
+  );
 
-  const ownerNote = owner ? ` from ${owner.packageName}` : '';
+  // Update in-memory ownership map so subsequent targets in this run see the move
+  ownershipContext.expandedIndexes.installedPathOwners.delete(normalized);
+  ownershipContext.expandedIndexes.installedPathOwners.set(
+    normalizePathForProcessing(ownerNamespacedPath),
+    owner
+  );
+
   return {
-    localRelPath,
-    warning: `Renamed existing ${normalized}${ownerNote} to ${localRelPath}.`
+    ownerNamespacedPath,
+    warning: `Moved ${normalized} (owned by ${owner.packageName}) → ${ownerNamespacedPath} (namespaced).`
   };
 }
 
 /**
  * Resolve conflicts for a batch of target paths.
  *
- * For each target:
- *  - 'owned-by-other': apply the decision cascade; on keep-both execute the rename.
- *  - 'exists-unowned' with content diff: apply the decision cascade.
- *  - No conflict / same content: allow through.
+ * ### Namespacing strategy (default)
  *
- * @returns allowedTargets (filtered list to pass to flow execution) + accumulated warnings.
+ * This function uses a **two-pass** approach for the `namespace` strategy:
+ *
+ * **Pass 1 — detection:**
+ *   Iterate all targets and classify each.  If ANY non-merge-flow target has a
+ *   conflict (`owned-by-other` OR `exists-unowned`), mark the entire package
+ *   for bulk namespacing.
+ *
+ * **Pass 2 — application:**
+ *   - Rewrite ALL non-merge-flow target paths to their namespaced form so that
+ *     the executor writes every file for this package under
+ *     `<base>/<packageName>/<rest>`.
+ *   - For `owned-by-other` conflicts: also physically move the existing owner's
+ *     file into its own namespace and update the owner's workspace index.
+ *   - For `exists-unowned` conflicts: leave the existing unowned file in place
+ *     (it is the "original"); only the incoming file is namespaced (which is
+ *     already the case from the bulk rewrite).
+ *
+ * ### Non-namespace strategies
+ *   When the resolved strategy is `skip` or `overwrite` (set via
+ *   `--conflicts skip|overwrite` or per-path overrides), the original
+ *   per-file behaviour is preserved and no bulk namespacing occurs.
+ *
+ * @param cwd                  - Workspace root
+ * @param targets              - Pre-computed target entries (from computeTargetEntries)
+ * @param ownershipContext     - Ownership context built by buildOwnershipContext
+ * @param options              - Install options
+ * @param installingPackageName - Name of the package being installed (used as namespace dir)
+ * @param forceOverwrite       - True when the package-level phase confirmed an overwrite
  */
 export async function resolveConflictsForTargets(
   cwd: string,
   targets: TargetEntry[],
   ownershipContext: OwnershipContext,
   options: InstallOptions,
+  installingPackageName: string,
   forceOverwrite: boolean = false
 ): Promise<ConflictResolutionResult> {
-  const allowedTargets: TargetEntry[] = [];
   const warnings: string[] = [];
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   const isDryRun = Boolean(options.dryRun);
 
+  // -------------------------------------------------------------------------
+  // Compute namespace slugs for all known packages
+  // -------------------------------------------------------------------------
+
+  // Build the set of slugs already claimed by other installed packages
+  const otherPackageNames = Array.from(ownershipContext.indexByPackage.keys());
+  const slugByPackageName = new Map<string, string>();
+  const existingSlugs = new Set<string>();
+
+  for (const name of otherPackageNames) {
+    const slug = deriveNamespaceSlug(name, existingSlugs);
+    slugByPackageName.set(name, slug);
+    existingSlugs.add(slug);
+  }
+
+  // Derive the installing package's slug (avoiding collisions with other packages)
+  const installingSlug = deriveNamespaceSlug(installingPackageName, existingSlugs);
+
+  // -------------------------------------------------------------------------
+  // Pass 1: Classify all targets to determine whether bulk namespacing applies
+  // -------------------------------------------------------------------------
+
+  type Classification =
+    | { type: 'none' }
+    | { type: 'owned-by-other'; owner: WorkspaceConflictOwner }
+    | { type: 'exists-unowned' };
+
+  const classifications: Classification[] = [];
+  let shouldNamespacePackage = false;
+
   for (const target of targets) {
+    // Merge-flow targets are never namespaced
+    if (target.isMergeFlow) {
+      classifications.push({ type: 'none' });
+      continue;
+    }
+
     const classification = classifyFileConflict(target.relPath, ownershipContext);
 
     if (classification.type === 'none') {
-      allowedTargets.push(target);
+      classifications.push({ type: 'none' });
       continue;
     }
 
     if (classification.type === 'owned-by-other') {
-      const owner = classification.owner!;
+      classifications.push({ type: 'owned-by-other', owner: classification.owner! });
+
+      // Determine the resolution for this file to see if namespacing will apply
+      const { decision } = await resolveFileConflict(
+        'owned-by-other',
+        target.relPath,
+        classification.owner!.packageName,
+        undefined,
+        options,
+        interactive,
+        forceOverwrite
+      );
+
+      if (decision === 'namespace') {
+        shouldNamespacePackage = true;
+      }
+      continue;
+    }
+
+    // exists-unowned
+    const absTarget = join(cwd, normalizePathForProcessing(target.relPath));
+    const fileExists = await exists(absTarget);
+    if (!fileExists) {
+      classifications.push({ type: 'none' });
+      continue;
+    }
+
+    // Check content difference if we have content
+    if (target.content !== undefined) {
+      const contentDiffers = await hasContentDifference(absTarget, target.content);
+      if (!contentDiffers) {
+        classifications.push({ type: 'none' });
+        continue;
+      }
+    }
+
+    classifications.push({ type: 'exists-unowned' });
+
+    // For exists-unowned the incoming file gets namespaced (no owner to move)
+    const { decision } = await resolveFileConflict(
+      'exists-unowned',
+      target.relPath,
+      undefined,
+      undefined,
+      options,
+      interactive,
+      forceOverwrite
+    );
+
+    if (decision === 'namespace') {
+      shouldNamespacePackage = true;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Pass 2: Apply resolutions
+  // -------------------------------------------------------------------------
+
+  const allowedTargets: TargetEntry[] = [];
+
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    const cls = classifications[i];
+
+    // ── No conflict (or merge-flow) ──────────────────────────────────────
+    if (cls.type === 'none') {
+      if (shouldNamespacePackage && !target.isMergeFlow) {
+        // Bulk namespacing: rewrite this non-conflicting file's path too
+        const namespacedRel = generateNamespacedPath(
+          target.relPath,
+          installingSlug,
+          target.flowToPattern
+        );
+        const namespacedAbs = join(cwd, namespacedRel);
+        allowedTargets.push({ ...target, relPath: namespacedRel, absPath: namespacedAbs });
+      } else {
+        allowedTargets.push(target);
+      }
+      continue;
+    }
+
+    // ── owned-by-other ────────────────────────────────────────────────────
+    if (cls.type === 'owned-by-other') {
       const { decision, warning } = await resolveFileConflict(
         'owned-by-other',
         target.relPath,
-        owner.packageName,
+        cls.owner.packageName,
         undefined,
         options,
         interactive,
@@ -522,20 +785,33 @@ export async function resolveConflictsForTargets(
 
       if (decision === 'skip') continue;
 
-      if (decision === 'keep-both') {
+      if (decision === 'namespace') {
         try {
-          const { warning: keepBothWarning } = await executeKeepBoth(
+          // Move the existing owner's file into its namespace
+          const ownerSlug = slugByPackageName.get(cls.owner.packageName)
+            ?? deriveNamespaceSlug(cls.owner.packageName, existingSlugs);
+          const { warning: nsWarn } = await executeNamespace(
             cwd,
             target.relPath,
-            owner,
+            cls.owner,
             ownershipContext,
-            isDryRun
+            target.flowToPattern,
+            isDryRun,
+            ownerSlug
           );
-          warnings.push(keepBothWarning);
-          allowedTargets.push(target);
+          warnings.push(nsWarn);
+
+          // Rewrite this incoming target to its namespaced path
+          const namespacedRel = generateNamespacedPath(
+            target.relPath,
+            installingSlug,
+            target.flowToPattern
+          );
+          const namespacedAbs = join(cwd, namespacedRel);
+          allowedTargets.push({ ...target, relPath: namespacedRel, absPath: namespacedAbs });
         } catch (error) {
-          warnings.push(`Failed to rename ${target.relPath}: ${error}`);
-          // Do not add to allowedTargets — skip on rename failure
+          warnings.push(`Failed to namespace ${target.relPath}: ${error}`);
+          // Do not add to allowedTargets on failure
         }
         continue;
       }
@@ -547,31 +823,14 @@ export async function resolveConflictsForTargets(
         );
       }
       if (isDryRun) {
-        warnings.push(`Would overwrite ${target.relPath} (currently owned by ${owner.packageName}).`);
+        warnings.push(`Would overwrite ${target.relPath} (currently owned by ${cls.owner.packageName}).`);
       }
       allowedTargets.push(target);
       continue;
     }
 
-    // exists-unowned: check content diff first
-    if (classification.type === 'exists-unowned') {
-      const absTarget = join(cwd, normalizePathForProcessing(target.relPath));
-      if (!(await exists(absTarget))) {
-        // File no longer exists on disk — no conflict
-        allowedTargets.push(target);
-        continue;
-      }
-
-      // If we have content to compare, check for differences
-      if (target.content !== undefined) {
-        const contentDiffers = await hasContentDifference(absTarget, target.content);
-        if (!contentDiffers) {
-          // Same content — allow write without prompting
-          allowedTargets.push(target);
-          continue;
-        }
-      }
-
+    // ── exists-unowned ────────────────────────────────────────────────────
+    if (cls.type === 'exists-unowned') {
       const { decision, warning } = await resolveFileConflict(
         'exists-unowned',
         target.relPath,
@@ -585,20 +844,26 @@ export async function resolveConflictsForTargets(
 
       if (decision === 'skip') continue;
 
-      if (decision === 'keep-both') {
-        try {
-          const { warning: keepBothWarning } = await executeKeepBoth(
-            cwd,
-            target.relPath,
-            undefined,
-            ownershipContext,
-            isDryRun
+      if (decision === 'namespace') {
+        // Leave the existing unowned file in place; only namespace the incoming file
+        const namespacedRel = generateNamespacedPath(
+          target.relPath,
+          installingSlug,
+          target.flowToPattern
+        );
+        const namespacedAbs = join(cwd, namespacedRel);
+        if (isDryRun) {
+          warnings.push(
+            `Would install ${target.relPath} as ${namespacedRel} ` +
+            `(existing unowned file kept at original path).`
           );
-          warnings.push(keepBothWarning);
-          allowedTargets.push(target);
-        } catch (error) {
-          warnings.push(`Failed to rename ${target.relPath}: ${error}`);
+        } else {
+          warnings.push(
+            `Installed as ${namespacedRel} ` +
+            `(existing unowned file kept at ${target.relPath}).`
+          );
         }
+        allowedTargets.push({ ...target, relPath: namespacedRel, absPath: namespacedAbs });
         continue;
       }
 
@@ -611,5 +876,10 @@ export async function resolveConflictsForTargets(
     }
   }
 
-  return { allowedTargets, warnings };
+  return {
+    allowedTargets,
+    warnings,
+    packageWasNamespaced: shouldNamespacePackage,
+    namespaceDir: shouldNamespacePackage ? installingSlug : undefined
+  };
 }

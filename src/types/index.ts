@@ -179,8 +179,8 @@ export interface InstallOptions {
   local?: boolean;
   profile?: string;
   apiKey?: string;
-  conflictStrategy?: 'ask' | 'keep-both' | 'overwrite' | 'skip';
-  conflictDecisions?: Record<string, 'keep-both' | 'overwrite' | 'skip'>;
+  conflictStrategy?: 'ask' | 'namespace' | 'overwrite' | 'skip';
+  conflictDecisions?: Record<string, 'namespace' | 'overwrite' | 'skip'>;
   resolutionMode?: 'default' | 'remote-primary' | 'local-only';
   global?: boolean;
   /**

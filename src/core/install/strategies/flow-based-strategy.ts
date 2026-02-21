@@ -29,8 +29,10 @@ import { resolveSwitchExpression } from '../../flows/switch-resolver.js';
 import {
   buildOwnershipContext,
   resolveConflictsForTargets,
+  namespaceFlowToPattern,
   type TargetEntry,
 } from '../conflicts/file-conflict-resolver.js';
+import { normalizePathForProcessing } from '../../../utils/path-normalization.js';
 import { logger } from '../../../utils/logger.js';
 import { readWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
 
@@ -106,19 +108,29 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
         );
 
         // Resolve conflicts — get back the filtered set of allowed targets
-        const { allowedTargets, warnings } = await resolveConflictsForTargets(
+        const { allowedTargets, warnings, packageWasNamespaced, namespaceDir } = await resolveConflictsForTargets(
           workspaceRoot,
           targets,
           ownershipContext,
           effectiveOptions,
+          packageName,
           forceOverwrite
         );
         conflictWarnings.push(...warnings);
 
-        // Rebuild filteredSources keeping only flows whose targets were allowed
-        const allowedRelPaths = new Set(allowedTargets.map(t => t.relPath));
+        // When bulk namespacing was triggered, rewrite every non-merge flow's
+        // `to` pattern so the executor writes files to namespaced locations.
+        const sourcesToExecute = packageWasNamespaced && namespaceDir
+          ? this.rewriteFlowsForNamespace(filteredSources, namespaceDir)
+          : filteredSources;
+
+        // Rebuild filteredSources keeping only flows whose targets were allowed.
+        // Normalize paths to ensure consistent comparison (conflict resolver uses normalizePathForProcessing).
+        const allowedRelPaths = new Set(
+          allowedTargets.map(t => normalizePathForProcessing(t.relPath))
+        );
         const prunedSources = this.pruneSourcesByAllowedTargets(
-          filteredSources,
+          sourcesToExecute,
           flowContext,
           allowedRelPaths
         );
@@ -163,6 +175,9 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
   /**
    * Pre-compute the workspace-relative target path for each (flow, source) pair
    * using the same resolution logic as the flow execution coordinator.
+   * Each entry is annotated with the resolved `to` pattern and merge-flow flag
+   * so that the conflict resolver can derive namespace insertion points and
+   * correctly exclude merge flows from namespacing.
    */
   private computeTargetEntries(
     flowSources: Map<Flow, string[]>,
@@ -172,6 +187,11 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
 
     for (const [flow, sources] of flowSources) {
       const firstPattern = getFirstFromPattern(flow.from);
+      // A flow is a merge flow when its merge strategy is not plain 'replace'
+      // (deep, shallow, and composite all produce merged/combined output)
+      const isMergeFlow = Boolean(
+        flow.merge && flow.merge !== 'replace'
+      );
 
       for (const sourceRel of sources) {
         try {
@@ -211,7 +231,12 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
           const targetRelRaw = relative(flowContext.workspaceRoot, targetAbs);
           const targetRel = targetRelRaw.replace(/\\/g, '/');
 
-          entries.push({ relPath: targetRel, absPath: targetAbs });
+          entries.push({
+            relPath: targetRel,
+            absPath: targetAbs,
+            flowToPattern: resolvedToPattern,
+            isMergeFlow
+          });
         } catch {
           // If target resolution fails for a source, skip it — the executor
           // will handle the error properly during execution.
@@ -220,6 +245,81 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
     }
 
     return entries;
+  }
+
+  /**
+   * Rewrite the `to` pattern of every non-merge flow to include the namespace
+   * subdirectory.  Returns a new Map — the original is not mutated.
+   *
+   * Merge flows (deep / shallow / composite) are left untouched because they
+   * produce a single combined output file that is intentionally shared across
+   * packages.
+   */
+  private rewriteFlowsForNamespace(
+    flowSources: Map<Flow, string[]>,
+    namespaceDir: string
+  ): Map<Flow, string[]> {
+    const rewritten = new Map<Flow, string[]>();
+
+    for (const [flow, sources] of flowSources) {
+      const isMerge = Boolean(flow.merge && flow.merge !== 'replace');
+      if (isMerge) {
+        // Keep merge flows exactly as-is
+        rewritten.set(flow, sources);
+        continue;
+      }
+
+      // Rewrite the `to` field to include the namespace
+      let newTo: Flow['to'];
+      if (typeof flow.to === 'string') {
+        newTo = namespaceFlowToPattern(flow.to, namespaceDir);
+      } else if (
+        typeof flow.to === 'object' &&
+        flow.to !== null &&
+        '$switch' in flow.to
+      ) {
+        // SwitchExpression — rewrite each case value and the default
+        const sw = flow.to as any;
+        const rewriteSwitchValue = (v: any): any => {
+          if (typeof v === 'string') return namespaceFlowToPattern(v, namespaceDir);
+          if (typeof v === 'object' && v !== null && 'pattern' in v) {
+            return { ...v, pattern: namespaceFlowToPattern(v.pattern, namespaceDir) };
+          }
+          return v;
+        };
+        newTo = {
+          $switch: {
+            ...sw.$switch,
+            cases: sw.$switch.cases.map((c: any) => ({
+              ...c,
+              value: rewriteSwitchValue(c.value)
+            })),
+            ...(sw.$switch.default !== undefined
+              ? { default: rewriteSwitchValue(sw.$switch.default) }
+              : {})
+          }
+        } as unknown as Flow['to'];
+      } else if (
+        typeof flow.to === 'object' &&
+        flow.to !== null &&
+        'pattern' in flow.to
+      ) {
+        newTo = { pattern: namespaceFlowToPattern((flow.to as any).pattern, namespaceDir) } as Flow['to'];
+      } else if (typeof flow.to === 'object' && flow.to !== null) {
+        // MultiTargetFlows — rewrite each key
+        const multi: Record<string, any> = {};
+        for (const [key, val] of Object.entries(flow.to as object)) {
+          multi[namespaceFlowToPattern(key, namespaceDir)] = val;
+        }
+        newTo = multi as Flow['to'];
+      } else {
+        newTo = flow.to;
+      }
+
+      rewritten.set({ ...flow, to: newTo }, sources);
+    }
+
+    return rewritten;
   }
 
   /**
@@ -272,7 +372,7 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
             sourceContext
           );
           const targetRelRaw = relative(flowContext.workspaceRoot, targetAbs);
-          const targetRel = targetRelRaw.replace(/\\/g, '/');
+          const targetRel = normalizePathForProcessing(targetRelRaw);
 
           if (allowedRelPaths.has(targetRel)) {
             keptSources.push(sourceRel);

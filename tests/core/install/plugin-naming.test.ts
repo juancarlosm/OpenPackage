@@ -5,7 +5,8 @@ import {
   generateMarketplaceName,
   parseScopedPluginName,
   isScopedPluginName,
-  detectOldGitHubNaming
+  detectOldGitHubNaming,
+  deriveNamespaceSlug
 } from '../../../src/utils/plugin-naming.js';
 
 describe('Plugin Naming', () => {
@@ -265,6 +266,189 @@ describe('Plugin Naming', () => {
       });
       
       assert.strictEqual(newName, null);
+    });
+  });
+
+  describe('deriveNamespaceSlug', () => {
+    // ── Smart leaf detection ──────────────────────────────────────────────
+
+    it('should extract leaf before resource marker (plugins/foo/commands/...)', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/repo/plugins/foo/commands/bar/baz/hello.md'),
+        'foo'
+      );
+    });
+
+    it('should extract leaf before agents marker (plugins/feature-dev/agents/...)', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@anthropics/claude-plugins-official/plugins/feature-dev/agents/code-reviewer.md'),
+        'feature-dev'
+      );
+    });
+
+    it('should extract leaf before rules marker (packages/my-pkg/rules/...)', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/repo/packages/my-pkg/rules/foo.md'),
+        'my-pkg'
+      );
+    });
+
+    it('should extract leaf before skills marker', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/repo/tools/helper/skills/react/SKILL.md'),
+        'helper'
+      );
+    });
+
+    it('should extract leaf before hooks marker', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/repo/ext/my-ext/hooks/pre-commit.sh'),
+        'my-ext'
+      );
+    });
+
+    // ── Resource marker at index 0 → fall back to repo ────────────────────
+
+    it('should fall back to repo when resource marker is first segment (agents/designer.md)', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/my-repo/agents/designer.md'),
+        'my-repo'
+      );
+    });
+
+    it('should fall back to repo when resource marker is first segment (rules/foo.md)', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/my-repo/rules/foo.md'),
+        'my-repo'
+      );
+    });
+
+    // ── No resource marker → fall back to repo ───────────────────────────
+
+    it('should fall back to repo when no resource marker found (tools/linter)', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/my-repo/tools/linter'),
+        'my-repo'
+      );
+    });
+
+    it('should fall back to repo for single non-marker segment', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/my-repo/some-path'),
+        'my-repo'
+      );
+    });
+
+    // ── Repo-level packages (no sub-path) ─────────────────────────────────
+
+    it('should use repo name for repo-level package', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@anthropics/essentials'),
+        'essentials'
+      );
+    });
+
+    it('should use repo name for old format repo-level package', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('@anthropics/essentials'),
+        'essentials'
+      );
+    });
+
+    // ── Plain registry names ──────────────────────────────────────────────
+
+    it('should return plain registry name as-is', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('my-plain-package'),
+        'my-plain-package'
+      );
+    });
+
+    // ── Old scoped format (@scope/name) ───────────────────────────────────
+
+    it('should use repo for @scope/name without sub-path', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('@scope/package-name'),
+        'package-name'
+      );
+    });
+
+    it('should detect leaf in old format with sub-path', () => {
+      assert.strictEqual(
+        deriveNamespaceSlug('@owner/repo/plugins/feature-dev/agents/x.md'),
+        'feature-dev'
+      );
+    });
+
+    // ── File extension stripping ──────────────────────────────────────────
+
+    it('should strip file extension from leaf segment', () => {
+      // Path: src/my-tool.md/agents/... — leaf is "my-tool.md", ext stripped
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/repo/src/my-tool.md/agents/designer.md'),
+        'my-tool'
+      );
+    });
+
+    // ── Escalation for uniqueness ─────────────────────────────────────────
+
+    it('should escalate to repo/leaf on collision with existing slug', () => {
+      const existing = new Set(['feature-dev']);
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@anthropics/claude-plugins/plugins/feature-dev/agents/x.md', existing),
+        'claude-plugins/feature-dev'
+      );
+    });
+
+    it('should escalate to owner/repo/leaf on double collision', () => {
+      const existing = new Set(['feature-dev', 'claude-plugins/feature-dev']);
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@anthropics/claude-plugins/plugins/feature-dev/agents/x.md', existing),
+        'anthropics/claude-plugins/feature-dev'
+      );
+    });
+
+    it('should escalate repo-level to owner/repo on collision', () => {
+      const existing = new Set(['essentials']);
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@anthropics/essentials', existing),
+        'anthropics/essentials'
+      );
+    });
+
+    it('should not escalate when no collision exists', () => {
+      const existing = new Set(['other-package']);
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@anthropics/essentials', existing),
+        'essentials'
+      );
+    });
+
+    it('should not escalate plain registry names even with collisions', () => {
+      const existing = new Set(['my-package']);
+      // Plain names have no escalation path — returned as-is
+      assert.strictEqual(
+        deriveNamespaceSlug('my-package', existing),
+        'my-package'
+      );
+    });
+
+    it('should handle empty existingSlugs set without escalating', () => {
+      const existing = new Set<string>();
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/repo/plugins/foo/agents/bar.md', existing),
+        'foo'
+      );
+    });
+
+    // ── Escalation when leaf equals repo ──────────────────────────────────
+
+    it('should escalate from repo to owner/repo when leaf=repo and collision', () => {
+      const existing = new Set(['my-repo']);
+      assert.strictEqual(
+        deriveNamespaceSlug('gh@owner/my-repo/agents/designer.md', existing),
+        'owner/my-repo'
+      );
     });
   });
 });

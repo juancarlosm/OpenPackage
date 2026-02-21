@@ -37,7 +37,7 @@ export function normalizeInstallOptions(
 
   // Normalize and validate conflict strategy
   const rawConflictStrategy = options.conflicts ?? options.conflictStrategy;
-  const conflictStrategy = validateConflictStrategy(rawConflictStrategy) ?? 'ask';
+  const conflictStrategy = validateConflictStrategy(rawConflictStrategy) ?? 'namespace';
 
   // Determine resolution mode
   const resolutionMode = determineResolutionMode(options);
