@@ -141,7 +141,7 @@ export class InstallOrchestrator {
     policy: InteractionPolicy
   ): Promise<CommandResult> {
     const { context, specialHandling } = result;
-    
+
     switch (specialHandling) {
       case 'marketplace':
         return this.handleMarketplace(result, options, execContext, policy);
@@ -267,11 +267,11 @@ export class InstallOrchestrator {
    
    spinner.stop();
    
-   // Handle --interactive: discover and display resources across plugins
-   if (policy.mode === 'always' && options.interactive) {
-     return this.handleMarketplaceList(context, marketplace, options, execContext);
-   }
-   
+   // Marketplace already has interactive plugin selection (promptPluginSelection, promptInstallMode).
+   // Per InstallOptions.interactive: "Ignored for marketplace sources (which already have plugin selection)."
+   // Using -i here would trigger handleMarketplaceList which loads ALL plugins upfront (e.g. 56 git clones)
+   // before any prompt—causing a long hang. Use the normal flow: pick plugin first, then load only that one.
+
    let selectedPlugin: string;
    let installMode: 'full' | 'partial' = 'full';
    
@@ -336,18 +336,18 @@ export class InstallOrchestrator {
      // Interactive: prompt user for single plugin selection
      selectedPlugin = await promptPluginSelection(marketplace);
      
-     if (!selectedPlugin) {
-       output.info('No plugin selected. Installation cancelled.');
-       return { success: true, data: { installed: 0, skipped: 0 } };
-     }
-     
-     // Prompt for install mode
-     const mode = await promptInstallMode(selectedPlugin);
-     
-     if (!mode) {
-       output.info('Installation cancelled.');
-       return { success: true, data: { installed: 0, skipped: 0 } };
-     }
+      if (!selectedPlugin) {
+        cancel('No plugin selected. Installation cancelled.');
+        return { success: true, data: { installed: 0, skipped: 0 } };
+      }
+      
+      // Prompt for install mode
+      const mode = await promptInstallMode(selectedPlugin);
+      
+      if (!mode) {
+        cancel('Installation cancelled.');
+        return { success: true, data: { installed: 0, skipped: 0 } };
+      }
      
      installMode = mode;
    } else {
@@ -506,7 +506,7 @@ export class InstallOrchestrator {
      marketplace.name,
      undefined
    );
-   
+
    if (selected.length === 0) {
      cancel('No resources selected. Installation cancelled.');
      return { success: true, data: { installed: 0, skipped: 0 } };
