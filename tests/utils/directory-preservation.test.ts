@@ -16,11 +16,35 @@ import {
 {
   const cwd = '/workspace';
   
-  // Directory patterns
+  // Dotfile directory patterns (these are platform root dirs, NOT file extensions)
   assert.equal(
     extractDirectoryFromPattern('.cursor', cwd),
     path.join(cwd, '.cursor'),
-    'Should extract simple directory'
+    'Should extract dotfile directory .cursor'
+  );
+  
+  assert.equal(
+    extractDirectoryFromPattern('.claude', cwd),
+    path.join(cwd, '.claude'),
+    'Should extract dotfile directory .claude'
+  );
+  
+  assert.equal(
+    extractDirectoryFromPattern('.agents', cwd),
+    path.join(cwd, '.agents'),
+    'Should extract dotfile directory .agents'
+  );
+  
+  assert.equal(
+    extractDirectoryFromPattern('.goosehints', cwd),
+    path.join(cwd, '.goosehints'),
+    'Should extract dotfile directory .goosehints'
+  );
+  
+  assert.equal(
+    extractDirectoryFromPattern('.opencode', cwd),
+    path.join(cwd, '.opencode'),
+    'Should extract dotfile directory .opencode'
   );
   
   assert.equal(
@@ -29,7 +53,7 @@ import {
     'Should extract directory with trailing slash'
   );
   
-  // File patterns
+  // File path patterns (should extract parent directory)
   assert.equal(
     extractDirectoryFromPattern('.claude-plugin/plugin.json', cwd),
     path.join(cwd, '.claude-plugin'),
@@ -39,20 +63,26 @@ import {
   assert.equal(
     extractDirectoryFromPattern('.agent', cwd),
     path.join(cwd, '.agent'),
-    'Should treat extension-less pattern as directory'
+    'Should treat single-segment dotfile as directory'
   );
   
-  // Root files (should return null)
+  // Root files (should return null — no directory to preserve)
   assert.equal(
     extractDirectoryFromPattern('CLAUDE.md', cwd),
     null,
-    'Should return null for root file'
+    'Should return null for root file CLAUDE.md'
   );
   
   assert.equal(
     extractDirectoryFromPattern('AGENTS.md', cwd),
     null,
-    'Should return null for root file'
+    'Should return null for root file AGENTS.md'
+  );
+  
+  assert.equal(
+    extractDirectoryFromPattern('crush.json', cwd),
+    null,
+    'Should return null for root file crush.json'
   );
   
   console.log('✓ extractDirectoryFromPattern tests passed');

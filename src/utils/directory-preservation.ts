@@ -36,8 +36,10 @@ export function extractDirectoryFromPattern(pattern: string, targetDir: string):
   const normalized = pattern.replace(/\\/g, '/');
   
   // Check if it's a directory or a file
-  // Directories either end with / or have no extension
-  const hasExtension = /\.[a-z0-9]+$/i.test(normalized);
+  // A dotfile directory (e.g., ".cursor", ".claude") is a single segment starting with "."
+  // and no path separators — distinct from a file extension like "file.md"
+  const isDotfileDir = /^\.[^./]+$/.test(normalized);
+  const hasExtension = !isDotfileDir && /\.[a-z0-9]+$/i.test(normalized);
   const isDirectory = normalized.endsWith('/') || !hasExtension;
   
   let dirPath: string;
