@@ -6,8 +6,8 @@
 
 import { resolve } from 'path';
 import { logger } from '../../utils/logger.js';
-import { output } from '../../utils/output.js';
-import { cancel } from '@clack/prompts';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 import { PromptTier } from '../../core/interaction-policy.js';
 import { discoverResources } from './resource-discoverer.js';
 import { promptResourceSelection, displaySelectionSummary } from './resource-selection-menu.js';
@@ -38,6 +38,8 @@ export async function handleListSelection(
     packageName: context.source.packageName
   });
   
+  const out = resolveOutput(execContext);
+  
   // Load source to get content root and base detection
   const loader = getLoaderForSource(context.source);
   const loaded = await loader.load(context.source, options, execContext);
@@ -64,7 +66,7 @@ export async function handleListSelection(
   });
   
   // Discover all resources with spinner
-  const s = output.spinner();
+  const s = out.spinner();
   s.start('Discovering resources');
   
   const discovery = await discoverResources(basePath, repoRoot);
@@ -77,7 +79,7 @@ export async function handleListSelection(
   
   // Check if any resources found
   if (discovery.total === 0) {
-    console.log('⚠️  No installable resources found in this package');
+    out.warn('No installable resources found in this package');
     return {
       success: true,
       data: { installed: 0, skipped: 0 }
@@ -99,7 +101,7 @@ export async function handleListSelection(
   );
   
   if (selected.length === 0) {
-    cancel('No resources selected. Installation cancelled.');
+    out.warn('No resources selected. Installation cancelled.');
     return {
       success: true,
       data: { installed: 0, skipped: 0 }

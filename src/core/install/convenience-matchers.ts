@@ -10,6 +10,8 @@ import { walkFiles } from '../../utils/file-walker.js';
 import { exists, readTextFile } from '../../utils/fs.js';
 import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
 import { logger } from '../../utils/logger.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 /**
  * Result of a resource match
@@ -440,14 +442,15 @@ async function findSkillByName(
  * @param errors - Array of error messages
  * @param available - Available resources (for suggestions)
  */
-export function displayFilterErrors(errors: string[]): void {
+export function displayFilterErrors(errors: string[], output?: OutputPort): void {
   if (errors.length === 0) {
     return;
   }
 
-  console.error('\n❌ The following resources were not found:');
+  const out = output ?? resolveOutput();
+  out.error('\nThe following resources were not found:');
   for (const error of errors) {
-    console.error(`  • ${error}`);
+    out.error(`  - ${error}`);
   }
 }
 

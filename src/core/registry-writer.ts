@@ -5,10 +5,12 @@ import {
 } from './directory.js';
 import { exists, remove, countFilesInDirectory } from '../utils/fs.js';
 import { writePackageFilesToDirectory } from '../utils/package-copy.js';
-import { promptPackOverwrite } from '../utils/prompts.js';
 import { formatPathForDisplay } from '../utils/formatters.js';
 import { logger } from '../utils/logger.js';
 import { isUnversionedPackage } from '../utils/validation/version.js';
+import type { OutputPort } from './ports/output.js';
+import type { PromptPort } from './ports/prompt.js';
+import { resolveOutput, resolvePrompt } from './ports/resolve.js';
 import type { PackageFile } from '../types/index.js';
 
 export interface RegistryWriteOptions {
@@ -34,9 +36,13 @@ export async function writePackageToRegistry(
   packageName: string,
   version: string,
   files: PackageFile[],
-  options: RegistryWriteOptions = {}
+  options: RegistryWriteOptions = {},
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<RegistryWriteResult> {
   const { force = false, dryRun = false, context = 'operation' } = options;
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
   
   // Get destination path
   const destination = getPackageVersionPath(packageName, version);
@@ -59,15 +65,15 @@ export async function writePackageToRegistry(
         `Updating unversioned package ${packageName}@${version}`,
         { destination, existingFileCount }
       );
-      console.log(`✓ Updated ${packageName}@${version}`);
+      out.success(`Updated ${packageName}@${version}`);
     } else if (force) {
       // Force mode: auto-approve with logging
       logger.info(
         `Force mode: Overwriting ${packageName}@${version}`,
         { destination, existingFileCount }
       );
-      console.log(
-        `⚠️  Force mode: Overwriting ${packageName}@${version} ` +
+      out.warn(
+        `Force mode: Overwriting ${packageName}@${version} ` +
         `(${existingFileCount} existing file${existingFileCount !== 1 ? 's' : ''})`
       );
     } else {
@@ -83,13 +89,17 @@ export async function writePackageToRegistry(
         );
       }
       
-      // Interactive mode - prompt user
-      shouldOverwrite = await promptPackOverwrite(
-        packageName,
-        version,
-        destination,
-        existingFileCount,
-        false // isCustomOutput
+      // Interactive mode - prompt user with inline overwrite confirmation
+      const displayPath = formatPathForDisplay(destination, process.cwd());
+      out.info('');
+      out.warn(`Package '${packageName}@${version}' already exists in registry`);
+      out.info(`   Location: ${displayPath}`);
+      out.info(`   Existing files: ${existingFileCount}`);
+      out.info('');
+      
+      shouldOverwrite = await prm.confirm(
+        `Overwrite '${packageName}@${version}'? This action cannot be undone.`,
+        false
       );
       
       if (!shouldOverwrite) {

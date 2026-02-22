@@ -2,7 +2,8 @@
  * Prompt utilities for dependency resolution.
  */
 
-import { safePrompts } from '../../utils/prompts.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolvePrompt } from '../ports/resolve.js';
 
 /**
  * Prompt user for overwrite confirmation
@@ -10,14 +11,12 @@ import { safePrompts } from '../../utils/prompts.js';
 export async function promptOverwrite(
   packageName: string, 
   existingVersion: string, 
-  newVersion: string
+  newVersion: string,
+  prompt?: PromptPort
 ): Promise<boolean> {
-  const response = await safePrompts({
-    type: 'confirm',
-    name: 'shouldOverwrite',
-    message: `Package '${packageName}' conflict: existing v${existingVersion} vs required v${newVersion}. Overwrite with v${newVersion}?`,
-    initial: true
-  });
-  
-  return response.shouldOverwrite || false;
+  const p = prompt ?? resolvePrompt();
+  return p.confirm(
+    `Package '${packageName}' conflict: existing v${existingVersion} vs required v${newVersion}. Overwrite with v${newVersion}?`,
+    true
+  );
 }

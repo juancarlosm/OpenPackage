@@ -5,9 +5,11 @@
  * allowing users to select their preferred base directory.
  */
 
-import { safePrompts } from '../../utils/prompts.js';
 import { relative } from 'path';
 import { logger } from '../../utils/logger.js';
+import type { PromptPort } from '../ports/prompt.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 
 /**
  * Base match option for user selection
@@ -37,9 +39,14 @@ export interface BaseMatch {
 export async function promptBaseSelection(
   resourcePath: string,
   matches: BaseMatch[],
-  repoRoot: string
+  repoRoot: string,
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<BaseMatch> {
-  console.log(`\n❓ Multiple installation bases detected for '${resourcePath}':\n`);
+  const out = output ?? resolveOutput();
+  const p = prompt ?? resolvePrompt();
+
+  out.info(`\n❓ Multiple installation bases detected for '${resourcePath}':\n`);
 
   // Create choices for the prompt
   const choices = matches.map((match, i) => {
@@ -62,15 +69,12 @@ export async function promptBaseSelection(
   });
 
   try {
-    const response = await safePrompts({
-      type: 'select',
-      name: 'selection',
-      message: 'Select base:',
-      choices,
-      initial: 0
-    });
+    const selection = await p.select<BaseMatch | null>(
+      'Select base:',
+      choices
+    );
 
-    if (response.selection === null) {
+    if (selection === null) {
       // Auto-select deepest match
       const deepest = selectDeepestMatch(matches);
       logger.info('User selected auto (deepest match)', { base: deepest.base, pattern: deepest.pattern });
@@ -78,10 +82,10 @@ export async function promptBaseSelection(
     }
 
     logger.info('User selected base', { 
-      base: response.selection.base, 
-      pattern: response.selection.pattern 
+      base: selection.base, 
+      pattern: selection.pattern 
     });
-    return response.selection;
+    return selection;
   } catch (error) {
     // On cancellation or error, fall back to deepest match
     logger.warn('Base selection cancelled or failed, using deepest match', { error });
@@ -129,8 +133,9 @@ export function canPrompt(): boolean {
  * @param matches - Array of ambiguous matches
  * @returns Selected base (deepest match)
  */
-export function handleAmbiguityNonInteractive(matches: BaseMatch[]): BaseMatch {
+export function handleAmbiguityNonInteractive(matches: BaseMatch[], output?: OutputPort): BaseMatch {
   const selected = selectDeepestMatch(matches);
+  const out = output ?? resolveOutput();
   
   logger.info('Non-interactive mode: using deepest match', {
     base: selected.base,
@@ -139,8 +144,8 @@ export function handleAmbiguityNonInteractive(matches: BaseMatch[]): BaseMatch {
   });
 
   // Log for debugging in CI/CD
-  console.log(`ℹ️  Multiple bases detected. Using deepest match: ${selected.base}`);
-  console.log(`   Pattern: ${selected.pattern}`);
+  out.info(`ℹ️  Multiple bases detected. Using deepest match: ${selected.base}`);
+  out.info(`   Pattern: ${selected.pattern}`);
   
   return selected;
 }

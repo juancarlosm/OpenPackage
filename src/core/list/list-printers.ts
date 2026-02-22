@@ -4,17 +4,20 @@ import { flattenResourceGroups, renderFlatResourceList, getChildPrefix, type Tre
 import { formatScopeBadge, formatPathForDisplay } from '../../utils/formatters.js';
 import type { ScopeResult, HeaderInfo } from './scope-data-collector.js';
 import type { ViewMetadataEntry } from './view-metadata.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 export type { ViewMetadataEntry } from './view-metadata.js';
 export { extractMetadataFromManifest } from './view-metadata.js';
 
-export function printMetadataSection(metadata: ViewMetadataEntry[]): void {
-  console.log(sectionHeader('Metadata', metadata.length));
+export function printMetadataSection(metadata: ViewMetadataEntry[], output?: OutputPort): void {
+  const out = output ?? resolveOutput();
+  out.info(sectionHeader('Metadata', metadata.length));
   metadata.forEach((entry) => {
     const valueStr = Array.isArray(entry.value)
       ? entry.value.join(', ')
       : String(entry.value);
-    console.log(`${dim(entry.key + ':')} ${valueStr}`);
+    out.info(`${dim(entry.key + ':')} ${valueStr}`);
   });
 }
 
@@ -71,7 +74,8 @@ function formatFilePath(file: EnhancedFileMapping): string {
 
 function printFileList(
   files: { source: string; target: string; exists: boolean }[],
-  prefix: string
+  prefix: string,
+  out: OutputPort
 ): void {
   const sortedFiles = [...files].sort((a, b) => a.target.localeCompare(b.target));
 
@@ -82,7 +86,7 @@ function printFileList(
     const label = file.exists
       ? dim(file.target)
       : `${dim(file.target)} ${red('[MISSING]')}`;
-    console.log(`${prefix}${connector}${label}`);
+    out.info(`${prefix}${connector}${label}`);
   }
 }
 
@@ -109,20 +113,22 @@ function printResourceGroups(
 export function printRemotePackageDetail(
   result: RemoteListResult,
   showFiles: boolean,
-  showDeps: boolean
+  showDeps: boolean,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   const pkg = result.package;
-  console.log(`${formatPackageLine(pkg)} ${dim(`(${result.sourceLabel})`)} ${dim('[remote]')}`);
+  out.info(`${formatPackageLine(pkg)} ${dim(`(${result.sourceLabel})`)} ${dim('[remote]')}`);
 
   // [Metadata] section (first)
   const metadata = result.metadata ?? [];
-  printMetadataSection(metadata);
+  printMetadataSection(metadata, out);
 
   // Resource count: from groups (flattened), file list, or 0
   const resourceCount = pkg.resourceGroups && pkg.resourceGroups.length > 0
     ? flattenResourceGroups(pkg.resourceGroups).length
     : (pkg.fileList?.length ?? 0);
-  console.log(sectionHeader('Resources', resourceCount));
+  out.info(sectionHeader('Resources', resourceCount));
 
   // Show resource groups if available (preferred view)
   if (pkg.resourceGroups && pkg.resourceGroups.length > 0) {
@@ -130,20 +136,20 @@ export function printRemotePackageDetail(
   }
   // Fallback to file list if no resource groups but files exist
   else if (pkg.fileList && pkg.fileList.length > 0) {
-    printFileList(pkg.fileList, '');
+    printFileList(pkg.fileList, '', out);
   }
   // If no content available at all, show a message
   else if (pkg.totalFiles === 0) {
-    console.log(dim('└── (no files)'));
+    out.info(dim('└── (no files)'));
   }
 
   if (showDeps) {
-    console.log(sectionHeader('Dependencies', result.dependencies.length));
+    out.info(sectionHeader('Dependencies', result.dependencies.length));
     result.dependencies.forEach((dep, index) => {
       const isLast = index === result.dependencies.length - 1;
       const connector = isLast ? '└── ' : '├── ';
       const versionSuffix = dep.version ? `@${dep.version}` : '';
-      console.log(`${connector}${dep.name}${versionSuffix}`);
+      out.info(`${connector}${dep.name}${versionSuffix}`);
     });
   }
 }
@@ -162,7 +168,8 @@ function printDepTreeNode(
   node: ListTreeNode,
   prefix: string,
   isLast: boolean,
-  showFiles: boolean
+  showFiles: boolean,
+  out: OutputPort
 ): void {
   const hasChildren = node.children.length > 0;
   const hasFiles = showFiles && node.report.fileList && node.report.fileList.length > 0;
@@ -173,23 +180,25 @@ function printDepTreeNode(
     : (hasBranches ? '├─┬ ' : '├── ');
   const childPrefix = getChildPrefix(prefix, isLast);
 
-  console.log(`${prefix}${connector}${formatPackageLine(node.report)}`);
+  out.info(`${prefix}${connector}${formatPackageLine(node.report)}`);
 
   if (hasFiles) {
-    printFileList(node.report.fileList!, childPrefix);
+    printFileList(node.report.fileList!, childPrefix, out);
   }
 
   node.children.forEach((child, index) => {
     const isLastChild = index === node.children.length - 1;
-    printDepTreeNode(child, childPrefix, isLastChild, showFiles);
+    printDepTreeNode(child, childPrefix, isLastChild, showFiles, out);
   });
 }
 
 export function printDepsView(
   results: Array<{ scope: ResourceScope; result: ScopeResult }>,
   showFiles: boolean,
-  headerInfo?: HeaderInfo
+  headerInfo?: HeaderInfo,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   const packageMap = new Map<string, DepsPackageEntry>();
 
   for (const { scope, result } of results) {
@@ -208,7 +217,7 @@ export function printDepsView(
   }
 
   if (packageMap.size === 0) {
-    console.log(dim('No packages installed.'));
+    out.info(dim('No packages installed.'));
     return;
   }
 
@@ -226,23 +235,23 @@ export function printDepsView(
   if (headerInfo) {
     const version = headerInfo.version ? `@${headerInfo.version}` : '';
     const typeTag = dim(`[${headerInfo.type}]`);
-    console.log(`${headerInfo.name}${version} ${dim(`(${headerInfo.path})`)} ${typeTag}`);
+    out.info(`${headerInfo.name}${version} ${dim(`(${headerInfo.path})`)} ${typeTag}`);
   } else if (results.length > 0) {
     const firstResult = results[0].result;
     const version = firstResult.headerVersion ? `@${firstResult.headerVersion}` : '';
     const typeTag = dim(`[${firstResult.headerType}]`);
-    console.log(`${firstResult.headerName}${version} ${dim(`(${firstResult.headerPath})`)} ${typeTag}`);
+    out.info(`${firstResult.headerName}${version} ${dim(`(${firstResult.headerPath})`)} ${typeTag}`);
   }
 
   const entries = Array.from(packageMap.values())
     .sort((a, b) => a.report.name.localeCompare(b.report.name));
 
-  console.log(sectionHeader('Dependencies', entries.length));
+  out.info(sectionHeader('Dependencies', entries.length));
 
   // If workspace was excluded, show its files under the header when -f is used.
   // Use empty prefix so workspace files appear as siblings of dep entries.
   if (workspaceEntry && showFiles && workspaceEntry.report.fileList && workspaceEntry.report.fileList.length > 0) {
-    printFileList(workspaceEntry.report.fileList, '');
+    printFileList(workspaceEntry.report.fileList, '', out);
   }
 
   for (let i = 0; i < entries.length; i++) {
@@ -258,17 +267,17 @@ export function printDepsView(
       : (hasBranches ? '├─┬ ' : '├── ');
     const childPrefix = getChildPrefix('', isLast);
 
-    console.log(`${connector}${formatPackageLine(entry.report)} ${scopeBadge}`);
+    out.info(`${connector}${formatPackageLine(entry.report)} ${scopeBadge}`);
 
     // Show flat file list for the package when -f is requested
     if (hasFiles) {
-      printFileList(entry.report.fileList!, childPrefix);
+      printFileList(entry.report.fileList!, childPrefix, out);
     }
 
     for (let ci = 0; ci < entry.children.length; ci++) {
       const child = entry.children[ci];
       const isLastChild = ci === entry.children.length - 1;
-      printDepTreeNode(child, childPrefix, isLastChild, showFiles);
+      printDepTreeNode(child, childPrefix, isLastChild, showFiles, out);
     }
   }
 }
@@ -285,18 +294,20 @@ export function printResourcesView(
     showScopeBadges?: boolean;
     pathBaseForDisplay?: string;
     metadata?: ViewMetadataEntry[];
-  }
+  },
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   // Print header showing workspace/package name and path if provided
   if (headerInfo) {
     const version = headerInfo.version ? `@${headerInfo.version}` : '';
     const typeTag = dim(`[${headerInfo.type}]`);
-    console.log(`${headerInfo.name}${version} ${dim(`(${headerInfo.path})`)} ${typeTag}`);
+    out.info(`${headerInfo.name}${version} ${dim(`(${headerInfo.path})`)} ${typeTag}`);
   }
 
   // [Metadata] section (first, when provided)
   if (options?.metadata !== undefined) {
-    printMetadataSection(options.metadata);
+    printMetadataSection(options.metadata, out);
   }
 
   const showScopeBadges = options?.showScopeBadges !== false;
@@ -331,6 +342,6 @@ export function printResourcesView(
   };
 
   const flatResources = flattenResourceGroups(groups);
-  console.log(sectionHeader('Installed', flatResources.length));
+  out.info(sectionHeader('Installed', flatResources.length));
   renderFlatResourceList(flatResources, '', showFiles, config);
 }

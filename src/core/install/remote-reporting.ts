@@ -1,6 +1,8 @@
 import type { RemoteBatchPullResult, RemotePullFailure } from '../remote-pull.js';
 import { createDownloadKey } from './download-keys.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 /**
  * Record the outcome of a batch pull operation
@@ -9,8 +11,10 @@ export function recordBatchOutcome(
   label: string,
   result: RemoteBatchPullResult,
   warnings: string[],
-  dryRun: boolean
+  dryRun: boolean,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   if (result.warnings) {
     warnings.push(...result.warnings);
   }
@@ -23,14 +27,14 @@ export function recordBatchOutcome(
 
   if (dryRun) {
     if (successful.length > 0) {
-      console.log(`↪ Would ${label}: ${successful.join(', ')}`);
+      out.info(`Would ${label}: ${successful.join(', ')}`);
     }
 
     if (failed.length > 0) {
       for (const failure of failed) {
         const reason = extractRemoteErrorReason(failure.error);
         const message = `Dry run: remote pull would fail for \`${failure.key}\` (reason: ${reason})`;
-        console.log(`⚠️  ${message}`);
+        out.warn(message);
         warnings.push(message);
       }
     }
@@ -39,9 +43,9 @@ export function recordBatchOutcome(
   }
 
   if (successful.length > 0) {
-    console.log(`✓ ${label}: ${successful.length}`);
+    out.success(`${label}: ${successful.length}`);
       for (const key of successful) {
-        console.log(`   ├── ${key}`);
+        out.info(`   ├── ${key}`);
       }
   }
 
@@ -49,7 +53,7 @@ export function recordBatchOutcome(
     for (const failure of failed) {
       const reason = extractRemoteErrorReason(failure.error);
       const message = `Remote pull failed for \`${failure.key}\` (reason: ${reason})`;
-      console.log(`⚠️  ${message}`);
+      out.warn(message);
       warnings.push(message);
     }
   }

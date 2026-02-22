@@ -1,5 +1,7 @@
 import type { PackageRemoteResolutionOutcome } from './types.js';
 import type { RelocatedFile } from './conflicts/file-conflict-resolver.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';
 import { formatPathForDisplay, getTreeConnector } from '../../utils/formatters.js';
 
@@ -34,10 +36,10 @@ export interface InstallReportData {
 // Helper: render a list of items with correct tree connectors
 // ============================================================================
 
-function renderTreeList(items: string[], indent: string = '  '): void {
+function renderTreeList(items: string[], output: OutputPort, indent: string = '  '): void {
   for (let i = 0; i < items.length; i++) {
     const connector = getTreeConnector(i === items.length - 1);
-    console.log(`${indent}${connector}${items[i]}`);
+    output.info(`${indent}${connector}${items[i]}`);
   }
 }
 
@@ -45,7 +47,7 @@ function renderTreeList(items: string[], indent: string = '  '): void {
 // Main display function
 // ============================================================================
 
-export function displayInstallationResults(data: InstallReportData): void {
+export function displayInstallationResults(data: InstallReportData, output: OutputPort = resolveOutput()): void {
   const {
     packageName,
     resolvedPackages,
@@ -71,11 +73,11 @@ export function displayInstallationResults(data: InstallReportData): void {
 
   if (hadErrors && !installedAnyFiles) {
     // Complete failure - nothing was installed
-    console.log(`❌ Failed to install ${packageName}${mainPackage ? `@${mainPackage.version}` : ''}`);
+    output.error(`Failed to install ${packageName}${mainPackage ? `@${mainPackage.version}` : ''}`);
     if (errors && errors.length > 0) {
-      console.log(`\n❌ Installation errors:`);
+      output.error(`Installation errors:`);
       for (const error of errors) {
-        console.log(`   • ${error}`);
+        output.info(`   • ${error}`);
       }
     }
     return;
@@ -83,30 +85,30 @@ export function displayInstallationResults(data: InstallReportData): void {
 
   // Handle empty directory/filtered installs (0 files but still success)
   if (!installedAnyFiles && !hadErrors) {
-    let summaryText = `✓ Succeeded ${packageName}`;
+    let summaryText = `Succeeded ${packageName}`;
     if (mainPackage) {
       summaryText += `@${mainPackage.version}`;
     }
     summaryText += ' with 0 installs';
-    console.log(`${summaryText}`);
-    console.log(`💡 No files matched. The package directory may be empty or filters excluded all content.`);
+    output.success(`${summaryText}`);
+    output.info(`💡 No files matched. The package directory may be empty or filters excluded all content.`);
     if (isDependencyInstall) {
-      console.log(`   The dependency has been recorded in your manifest.`);
+      output.info(`   The dependency has been recorded in your manifest.`);
     }
     return;
   }
 
   // ── Main success header ───────────────────────────────────────────────
-  let summaryText = `✓ Installed ${packageName}`;
+  let summaryText = `Installed ${packageName}`;
   if (mainPackage) {
     summaryText += `@${mainPackage.version}`;
   }
-  console.log(`${summaryText}`);
+  output.success(`${summaryText}`);
 
   // ── Dependency packages ───────────────────────────────────────────────
   const dependencyPackages = resolvedPackages.filter(f => !f.isRoot);
   if (dependencyPackages.length > 0) {
-    console.log(`✓ Installed dependencies: ${dependencyPackages.length}`);
+    output.success(`Installed dependencies: ${dependencyPackages.length}`);
     const depLines = dependencyPackages.map(dep => {
       const packageSpecifier =
         typeof dep.name === 'string' && (dep.name.startsWith('@') || dep.name.startsWith('gh@'))
@@ -114,44 +116,44 @@ export function displayInstallationResults(data: InstallReportData): void {
           : `@${dep.name}`;
       return `${packageSpecifier}@${dep.version}`;
     });
-    renderTreeList(depLines);
+    renderTreeList(depLines, output);
   }
-  console.log(`✓ Total packages processed: ${resolvedPackages.length}`);
+  output.success(`Total packages processed: ${resolvedPackages.length}`);
 
   // ── Installed files ───────────────────────────────────────────────────
   if (installedFiles && installedFiles.length > 0) {
     const header = namespaced
-      ? `✓ Installed files: ${installedFiles.length} (namespaced)`
-      : `✓ Installed files: ${installedFiles.length}`;
-    console.log(header);
+      ? `Installed files: ${installedFiles.length} (namespaced)`
+      : `Installed files: ${installedFiles.length}`;
+    output.success(header);
     const sortedFiles = [...installedFiles].sort((a, b) => a.localeCompare(b));
-    renderTreeList(sortedFiles.map(f => formatPathForDisplay(f)));
+    renderTreeList(sortedFiles.map(f => formatPathForDisplay(f)), output);
   }
 
   // ── Updated files ─────────────────────────────────────────────────────
   if (updatedFiles && updatedFiles.length > 0) {
     const header = namespaced
-      ? `✓ Updated files: ${updatedFiles.length} (namespaced)`
-      : `✓ Updated files: ${updatedFiles.length}`;
-    console.log(header);
+      ? `Updated files: ${updatedFiles.length} (namespaced)`
+      : `Updated files: ${updatedFiles.length}`;
+    output.success(header);
     const sortedFiles = [...updatedFiles].sort((a, b) => a.localeCompare(b));
-    renderTreeList(sortedFiles.map(f => formatPathForDisplay(f)));
+    renderTreeList(sortedFiles.map(f => formatPathForDisplay(f)), output);
   }
 
   // ── Relocated files (namespace-triggered moves) ───────────────────────
   if (relocatedFiles && relocatedFiles.length > 0) {
-    console.log(`✓ Relocated files: ${relocatedFiles.length}`);
+    output.success(`Relocated files: ${relocatedFiles.length}`);
     const lines = relocatedFiles.map(
       r => `${formatPathForDisplay(r.from)} → ${formatPathForDisplay(r.to)}`
     );
-    renderTreeList(lines);
+    renderTreeList(lines, output);
   }
 
   // ── Root files ────────────────────────────────────────────────────────
   if (rootFileResults) {
     const totalRootFiles = rootFileResults.installed.length + rootFileResults.updated.length;
     if (totalRootFiles > 0) {
-      console.log(`✓ Root files: ${totalRootFiles} file(s)`);
+      output.success(`Root files: ${totalRootFiles} file(s)`);
 
       const rootLines: string[] = [];
       if (rootFileResults.installed.length > 0) {
@@ -166,33 +168,33 @@ export function displayInstallationResults(data: InstallReportData): void {
           rootLines.push(`${formatPathForDisplay(file)} (updated)`);
         }
       }
-      renderTreeList(rootLines);
+      renderTreeList(rootLines, output);
     }
   }
 
   // ── Platform directories ──────────────────────────────────────────────
   if (platformResult.created.length > 0) {
-    console.log(`✓ Created platform directories: ${platformResult.created.join(', ')}`);
+    output.success(`Created platform directories: ${platformResult.created.join(', ')}`);
   }
 
   // ── Partial failure: errors during an otherwise-successful install ────
   if (hadErrors && errors && errors.length > 0) {
-    console.log(`⚠ Errors during installation: ${errors.length}`);
-    renderTreeList(errors);
+    output.warn(`Errors during installation: ${errors.length}`);
+    renderTreeList(errors, output);
   }
 
   // ── Missing dependencies ──────────────────────────────────────────────
   if (missingPackages && missingPackages.length > 0) {
-    console.log(`\n⚠️  Missing dependencies detected:`);
+    output.warn(`Missing dependencies detected:`);
     for (const missing of missingPackages) {
       const reasonLabel = formatMissingDependencyReason(missingPackageOutcomes?.[missing]);
-      console.log(`   • ${missing} (${reasonLabel})`);
+      output.info(`   • ${missing} (${reasonLabel})`);
     }
-    console.log(`\n💡 To resolve missing dependencies:`);
-    console.log(`   • Create locally: opkg new <package-name>`);
-    console.log(`   • Install from registry/git: opkg install ${missingPackages.join(' ')}`);
-    console.log(`   • Remove from openpackage.yml`);
-    console.log('');
+    output.info(`💡 To resolve missing dependencies:`);
+    output.info(`   • Create locally: opkg new <package-name>`);
+    output.info(`   • Install from registry/git: opkg install ${missingPackages.join(' ')}`);
+    output.info(`   • Remove from openpackage.yml`);
+    output.info('');
   }
 }
 

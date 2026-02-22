@@ -1,5 +1,7 @@
 import type { ListResourceGroup, ListResourceInfo, ListFileMapping } from './list-pipeline.js';
 import type { ResourceScope } from '../resources/scope-traversal.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 export type { ResourceScope } from '../resources/scope-traversal.js';
 
@@ -113,14 +115,16 @@ export function collectGroupFiles<TFile>(
 export function renderFlatFileList<TFile>(
   files: TFile[],
   prefix: string,
-  config: TreeRenderConfig<TFile>
+  config: TreeRenderConfig<TFile>,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   for (let fi = 0; fi < files.length; fi++) {
     const file = files[fi];
     const isLastFile = fi === files.length - 1;
     const fileConnector = getTreeConnector(isLastFile, false);
     const label = formatFileLabel(file, config);
-    console.log(`${prefix}${fileConnector}${label}`);
+    out.message(`${prefix}${fileConnector}${label}`);
   }
 }
 
@@ -132,8 +136,10 @@ export function renderResource<TFile>(
   prefix: string,
   isLast: boolean,
   showFiles: boolean,
-  config: TreeRenderConfig<TFile>
+  config: TreeRenderConfig<TFile>,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   const enhanced = resource as EnhancedResourceInfo;
   const packageLabels = config.getResourcePackageLabels?.(enhanced.packages) ?? [];
 
@@ -147,19 +153,19 @@ export function renderResource<TFile>(
 
   // Resource name with optional badge
   const badge = config.getResourceBadge?.(enhanced.scopes) ?? '';
-  console.log(`${prefix}${connector}${resource.name}${badge ? ' ' + badge : ''}`);
+  out.message(`${prefix}${connector}${resource.name}${badge ? ' ' + badge : ''}`);
 
   // Package labels: dimmed (package) under resource name, one per package.
   // With -f: align (package) with resource name (no extra spacing); without -f: 2 spaces.
   const packageSpacing = hasFileBranches ? '' : '  ';
   for (const label of packageLabels) {
-    console.log(`${packagePrefix}${packageSpacing}${label}`);
+    out.message(`${packagePrefix}${packageSpacing}${label}`);
   }
 
   // Render files if requested
   if (hasFileBranches) {
     const sortedFiles = [...(resource.files as TFile[])].sort(config.sortFiles);
-    renderFlatFileList(sortedFiles, childPrefix, config);
+    renderFlatFileList(sortedFiles, childPrefix, config, output);
   }
 }
 
@@ -187,13 +193,14 @@ export function renderFlatResourceList<TFile>(
   prefix: string,
   showFiles: boolean,
   config: TreeRenderConfig<TFile>,
-  hasMoreSiblings?: boolean
+  hasMoreSiblings?: boolean,
+  output?: OutputPort
 ): void {
   for (let ri = 0; ri < resources.length; ri++) {
     const resource = resources[ri];
     const isNaturalLast = ri === resources.length - 1;
     const isLast = hasMoreSiblings ? false : isNaturalLast;
-    renderResource(resource, prefix, isLast, showFiles, config);
+    renderResource(resource, prefix, isLast, showFiles, config, output);
   }
 }
 
@@ -209,8 +216,10 @@ export function renderResourceGroup<TFile>(
   prefix: string,
   isLast: boolean,
   showFiles: boolean,
-  config: TreeRenderConfig<TFile>
+  config: TreeRenderConfig<TFile>,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   const isOtherGroup = group.resourceType === 'other';
   
   if (isOtherGroup) {
@@ -220,11 +229,11 @@ export function renderResourceGroup<TFile>(
     const hasFiles = showFiles && allFiles.length > 0;
     
     const connector = getTreeConnector(isLast, hasFiles);
-    console.log(`${prefix}${connector}${group.resourceType}${dim(` (${totalFileCount})`)}`);
+    out.message(`${prefix}${connector}${group.resourceType}${dim(` (${totalFileCount})`)}`);
     
     if (hasFiles) {
       const childPrefix = getChildPrefix(prefix, isLast);
-      renderFlatFileList(allFiles, childPrefix, config);
+      renderFlatFileList(allFiles, childPrefix, config, output);
     }
   } else {
     // Normal: show resources as subcategories, then files
@@ -232,12 +241,12 @@ export function renderResourceGroup<TFile>(
     const connector = getTreeConnector(isLast, hasResources);
     const childPrefix = getChildPrefix(prefix, isLast);
     
-    console.log(`${prefix}${connector}${group.resourceType}${dim(` (${group.resources.length})`)}`);
+    out.message(`${prefix}${connector}${group.resourceType}${dim(` (${group.resources.length})`)}`);
     
     for (let ri = 0; ri < group.resources.length; ri++) {
       const resource = group.resources[ri];
       const isLastResource = ri === group.resources.length - 1;
-      renderResource(resource, childPrefix, isLastResource, showFiles, config);
+      renderResource(resource, childPrefix, isLastResource, showFiles, config, output);
     }
   }
 }

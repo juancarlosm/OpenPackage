@@ -1,12 +1,14 @@
 import { UserCancellationError } from '../../utils/errors.js';
 import type { RemovalEntry } from './removal-collector.js';
 import { PromptTier } from '../../core/interaction-policy.js';
-import { output } from '../../utils/output.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 export interface RemovalConfirmationOptions {
   force?: boolean;
   dryRun?: boolean;
   execContext?: { interactionPolicy?: { canPrompt(tier: PromptTier): boolean } };
+  output?: OutputPort;
 }
 
 /**
@@ -34,7 +36,8 @@ export async function confirmRemoval(
     throw new Error('Removal requires confirmation. Use --force in non-interactive mode.');
   }
 
-  const confirmed = await output.confirm('Confirm removal?', { initial: false });
+  const out = resolveOutput(options);
+  const confirmed = await out.confirm('Confirm removal?', { initial: false });
   if (!confirmed) {
     throw new UserCancellationError();
   }

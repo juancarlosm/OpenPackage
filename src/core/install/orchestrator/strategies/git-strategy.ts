@@ -12,6 +12,7 @@ import { normalizePlatforms } from '../../../../utils/platform-mapper.js';
 import { logger } from '../../../../utils/logger.js';
 import { applyBaseDetection, computePathScoping } from '../../preprocessing/base-resolver.js';
 import { resolveConvenienceResources } from '../../preprocessing/convenience-preprocessor.js';
+import { resolveOutput } from '../../../ports/resolve.js';
 
 export class GitInstallStrategy extends BaseInstallStrategy {
   readonly name = 'git';
@@ -114,7 +115,8 @@ export class GitInstallStrategy extends BaseInstallStrategy {
     
     // Warn about unused --plugins flag
     if (options.plugins?.length && !options.agents && !options.skills) {
-      console.log('Warning: --plugins flag is only used with marketplace sources. Ignoring.');
+      const out = resolveOutput(execContext);
+      out.warn('--plugins flag is only used with marketplace sources. Ignoring.');
     }
     
     return this.createNormalResult(context);

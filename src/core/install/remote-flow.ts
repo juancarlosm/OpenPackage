@@ -11,7 +11,8 @@ import {
 import { packageManager } from '../package.js';
 import { getVersionInfoFromDependencyTree } from '../../utils/install-helpers.js';
 
-import { Spinner } from '../../utils/spinner.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 import { computeMissingDownloadKeys, createDownloadKey } from './download-keys.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';
 import { recordBatchOutcome } from './remote-reporting.js';
@@ -44,14 +45,16 @@ export async function fetchMissingDependencyMetadata(
     apiKey?: string;
     alreadyWarnedPackages?: Set<string>;
     onFailure?: (name: string, failure: RemotePullFailure) => void;
-  }
+  },
+  output?: OutputPort
 ): Promise<RemotePackageMetadataSuccess[]> {
+  const out = output ?? resolveOutput();
   const { dryRun, alreadyWarnedPackages } = opts;
   const uniqueMissing = Array.from(new Set(missing));
   const metadataResults: RemotePackageMetadataSuccess[] = [];
 
-  const metadataSpinner = dryRun ? null : new Spinner(`Fetching metadata for ${uniqueMissing.length} missing package(s)...`);
-  if (metadataSpinner) metadataSpinner.start();
+  const metadataSpinner = dryRun ? null : out.spinner();
+  if (metadataSpinner) metadataSpinner.start(`Fetching metadata for ${uniqueMissing.length} missing package(s)...`);
 
   try {
     for (const missingName of uniqueMissing) {
@@ -69,12 +72,12 @@ export async function fetchMissingDependencyMetadata(
         if (!alreadyWarnedPackages?.has(missingName)) {
           const packageLabel = requiredVersion ? `${missingName}@${requiredVersion}` : missingName;
           const reason = extractReasonFromFailure(metadataResult);
-          // Avoid garbled output by clearing the spinner line before printing
+          // Avoid garbled output by stopping the spinner before printing
           // warning messages, since the spinner writes to the same stdout line.
           if (metadataSpinner) {
             metadataSpinner.stop();
           }
-          console.log(`⚠️  Remote pull failed for \`${packageLabel}\` (reason: ${reason})`);
+          out.warn(`Remote pull failed for \`${packageLabel}\` (reason: ${reason})`);
         }
         opts.onFailure?.(missingName, metadataResult);
         continue;
@@ -95,15 +98,17 @@ export async function fetchMissingDependencyMetadata(
 export async function pullMissingDependencies(
   metadata: RemotePackageMetadataSuccess[],
   keysToDownload: Set<string>,
-  opts: { dryRun: boolean; profile?: string; apiKey?: string }
+  opts: { dryRun: boolean; profile?: string; apiKey?: string },
+  output?: OutputPort
 ): Promise<RemoteBatchPullResult[]> {
+  const out = output ?? resolveOutput();
   const { dryRun } = opts;
   const batchResults: RemoteBatchPullResult[] = [];
   const warnings: string[] = [];
 
   if (keysToDownload.size > 0 || dryRun) {
-    const spinner = dryRun ? null : new Spinner(`Pulling ${keysToDownload.size} missing dependency package(s) from remote...`);
-    if (spinner) spinner.start();
+    const spinner = dryRun ? null : out.spinner();
+    if (spinner) spinner.start(`Pulling ${keysToDownload.size} missing dependency package(s) from remote...`);
 
     try {
       const remainingKeys = new Set(keysToDownload);

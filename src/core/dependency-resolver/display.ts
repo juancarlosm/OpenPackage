@@ -3,19 +3,22 @@
  */
 
 import type { ResolvedPackage } from './types.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 /**
  * Display dependency tree to user
  */
-export function displayDependencyTree(resolvedPackages: ResolvedPackage[], silent: boolean = false): void {
+export function displayDependencyTree(resolvedPackages: ResolvedPackage[], silent: boolean = false, output?: OutputPort): void {
   if (silent) return;
+  const out = output ?? resolveOutput();
   const root = resolvedPackages.find(f => f.isRoot);
   if (!root) return;
   
-  console.log(`\n✓ Installing ${root.name}@${root.version} with dependencies:\n`);
+  out.info(`\nInstalling ${root.name}@${root.version} with dependencies:\n`);
   
   // Show root
-  console.log(`${root.name}@${root.version} (root)`);
+  out.info(`${root.name}@${root.version} (root)`);
   
   // Show transitive dependencies
   const transitive = resolvedPackages.filter(f => !f.isRoot);
@@ -29,8 +32,8 @@ export function displayDependencyTree(resolvedPackages: ResolvedPackage[], silen
       ? ` [from ${dep.requiredRange}]`
       : '';
     
-    console.log(`├── ${dep.name}@${dep.version}${rangeInfo}${status}`);
+    out.info(`├── ${dep.name}@${dep.version}${rangeInfo}${status}`);
   }
   
-  console.log(`\n🔍 Total: ${resolvedPackages.length} packages\n`);
+  out.info(`\nTotal: ${resolvedPackages.length} packages\n`);
 }

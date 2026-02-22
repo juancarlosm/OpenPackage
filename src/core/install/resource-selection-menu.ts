@@ -4,11 +4,11 @@
  * Interactive menu for selecting specific resources to install
  */
 
-import { output } from '../../utils/output.js';
+import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { logger } from '../../utils/logger.js';
 import { UserCancellationError } from '../../utils/errors.js';
-import { clackGroupMultiselect } from '../../utils/clack-multiselect.js';
-import { smartMultiselect } from '../../utils/smart-multiselect.js';
 import { getInstallableTypes, toLabelPlural, RESOURCE_TYPE_ORDER } from '../resources/resource-registry.js';
 import type { ResourceCatalog, ResourceEntry } from '../resources/resource-catalog.js';
 import type { 
@@ -29,8 +29,13 @@ import type {
 export async function promptResourceSelection(
   discovery: ResourceDiscoveryResult,
   packageName: string,
-  packageVersion?: string
+  packageVersion?: string,
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<SelectedResource[]> {
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
+  
   logger.debug('Prompting resource selection', {
     package: packageName,
     version: packageVersion,
@@ -39,7 +44,7 @@ export async function promptResourceSelection(
   
   // No resources found
   if (discovery.total === 0) {
-    output.warn('No resources found in this package');
+    out.warn('No resources found in this package');
     return [];
   }
   
@@ -47,18 +52,25 @@ export async function promptResourceSelection(
   const groupedOptions = buildGroupedOptions(discovery);
   
   if (Object.keys(groupedOptions).length === 0) {
-    output.warn('No installable resources found');
+    out.warn('No installable resources found');
     return [];
   }
   
   try {
-    const selectedResources = await clackGroupMultiselect<DiscoveredResource>(
+    // Original: clackGroupMultiselect(message, groupedOptions, { selectableGroups, groupSpacing })
+    // PromptPort.groupMultiselect does not support selectableGroups/groupSpacing options;
+    // adapters should implement selectable groups and spacing as appropriate for their backend.
+    const groups: Record<string, Array<{ label: string; value: DiscoveredResource }>> = {};
+    for (const [groupName, options] of Object.entries(groupedOptions)) {
+      groups[groupName] = options.map(opt => ({
+        label: opt.label,
+        value: opt.value
+      }));
+    }
+    
+    const selectedResources = await prm.groupMultiselect<DiscoveredResource>(
       'Select resources to install:',
-      groupedOptions,
-      {
-        selectableGroups: true,
-        groupSpacing: 0
-      }
+      groups
     );
     
     if (!selectedResources || selectedResources.length === 0) {
@@ -172,10 +184,12 @@ function truncateToLines(text: string, maxLines: number): string {
 /**
  * Display summary of selected resources
  */
-export function displaySelectionSummary(selected: SelectedResource[]): void {
+export function displaySelectionSummary(selected: SelectedResource[], output?: OutputPort): void {
   if (selected.length === 0) {
     return;
   }
+  
+  const out = output ?? resolveOutput();
   
   // Group by type
   const byType = new Map<ResourceType, number>();
@@ -191,7 +205,7 @@ export function displaySelectionSummary(selected: SelectedResource[]): void {
     summary.push(`  • ${count} ${label.toLowerCase()}`);
   }
   
-  output.info(summary.join('\n'));
+  out.info(summary.join('\n'));
 }
 
 /**
@@ -203,30 +217,38 @@ function getTypeLabel(type: ResourceType): string {
 
 export async function promptCatalogSelection(
   catalog: ResourceCatalog,
-  header: { name: string; version?: string; action: string }
+  header: { name: string; version?: string; action: string },
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<ResourceEntry[]> {
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
+  
   logger.debug('Prompting catalog selection', {
     action: header.action,
     total: catalog.total
   });
   
   if (catalog.total === 0) {
-    output.warn('No resources found');
+    out.warn('No resources found');
     return [];
   }
   
-  const { choices, categoryMap, indexToEntry } = buildCatalogMenuChoices(catalog);
+  const { choices, indexToEntry } = buildCatalogMenuChoices(catalog);
   
   if (choices.length === 0) {
-    output.warn('No selectable resources found');
+    out.warn('No selectable resources found');
     return [];
   }
   
   try {
-    const selectedIndices = await smartMultiselect(
+    // Original: smartMultiselect(message, choices, categoryMap, { hint, min })
+    // smartMultiselect used a categoryMap to expand category selections into child indices.
+    // PromptPort.multiselect returns selected values directly; category expansion
+    // is the responsibility of the adapter implementation.
+    const selectedIndices = await prm.multiselect<number>(
       `Select resources to ${header.action}:`,
       choices,
-      categoryMap,
       {
         hint: '- Space: select/deselect • Enter: confirm • Categories expand to all items',
         min: 1
@@ -260,9 +282,8 @@ export async function promptCatalogSelection(
 
 function buildCatalogMenuChoices(
   catalog: ResourceCatalog
-): { choices: any[]; categoryMap: Map<number, number[]>; indexToEntry: Map<number, ResourceEntry> } {
-  const choices: any[] = [];
-  const categoryMap = new Map<number, number[]>();
+): { choices: Array<{ title: string; value: number; description?: string }>; indexToEntry: Map<number, ResourceEntry> } {
+  const choices: Array<{ title: string; value: number; description?: string }> = [];
   const indexToEntry = new Map<number, ResourceEntry>();
   
   const typeOrder = RESOURCE_TYPE_ORDER;
@@ -276,7 +297,6 @@ function buildCatalogMenuChoices(
     
     const label = toLabelPlural(typeId);
     const currentCategoryIndex = categoryIndex;
-    const categoryResourceIndices: number[] = [];
     
     const boldLabel = `\x1b[1m${label} (${entries.length}):\x1b[0m`;
     choices.push({
@@ -296,7 +316,6 @@ function buildCatalogMenuChoices(
         ? fullDescription.substring(0, 157) + '...'
         : fullDescription;
       
-      categoryResourceIndices.push(globalIndex);
       indexToEntry.set(globalIndex, entry);
       
       choices.push({
@@ -306,11 +325,10 @@ function buildCatalogMenuChoices(
       });
     }
     
-    categoryMap.set(currentCategoryIndex, categoryResourceIndices);
     categoryIndex--;
   }
   
-  return { choices, categoryMap, indexToEntry };
+  return { choices, indexToEntry };
 }
 
 function getCatalogPathHint(entry: ResourceEntry): string {
@@ -328,20 +346,24 @@ function getCatalogPathHint(entry: ResourceEntry): string {
   return '';
 }
 
-export function displayCatalogSelectionSummary(selected: ResourceEntry[], action: string): void {
+export function displayCatalogSelectionSummary(selected: ResourceEntry[], action: string, output?: OutputPort): void {
   if (selected.length === 0) return;
+  
+  const out = output ?? resolveOutput();
   
   const byType = new Map<string, number>();
   for (const entry of selected) {
     byType.set(entry.resourceType, (byType.get(entry.resourceType) || 0) + 1);
   }
   
-  console.log(`\n✓ Selected ${selected.length} resource${selected.length === 1 ? '' : 's'} to ${action}:`);
+  const lines: string[] = [];
+  lines.push(`\n✓ Selected ${selected.length} resource${selected.length === 1 ? '' : 's'} to ${action}:`);
   
   for (const [type, count] of byType.entries()) {
     const label = toLabelPlural(type as any);
-    console.log(`  • ${count} ${label.toLowerCase()}`);
+    lines.push(`  • ${count} ${label.toLowerCase()}`);
   }
   
-  console.log('');
+  lines.push('');
+  out.info(lines.join('\n'));
 }

@@ -14,7 +14,8 @@ import {
 } from '../ambiguity-prompts.js';
 import { createInteractionPolicy, PromptTier } from '../../interaction-policy.js';
 import type { InteractionPolicy } from '../../interaction-policy.js';
-import { setOutputMode, output } from '../../../utils/output.js';
+import type { OutputPort } from '../../ports/output.js';
+import { resolveOutput } from '../../ports/resolve.js';
 import {
   parseMarketplace,
   promptPluginSelection,
@@ -25,7 +26,6 @@ import {
   type MarketplaceManifest
 } from '../marketplace-handler.js';
 import { resolvePlatforms } from '../platform-resolution.js';
-import { Spinner } from '../../../utils/spinner.js';
 import { classifyInput } from '../preprocessing/input-classifier.js';
 import { assertTargetDirOutsideMetadata, validateResolutionFlags } from '../validators/index.js';
 import { runUnifiedInstallPipeline } from '../unified/pipeline.js';
@@ -37,7 +37,6 @@ import { handleListSelection } from '../list-handler.js';
 import { discoverResources } from '../resource-discoverer.js';
 import { promptResourceSelection, displaySelectionSummary } from '../resource-selection-menu.js';
 import { buildResourceInstallContexts } from '../unified/context-builders.js';
-import { cancel } from '@clack/prompts';
 import { logger } from '../../../utils/logger.js';
 import type { ResourceInstallationSpec } from '../convenience-matchers.js';
 import type { SelectedResource, ResourceDiscoveryResult, DiscoveredResource, ResourceType } from '../resource-types.js';
@@ -90,12 +89,7 @@ export class InstallOrchestrator {
     });
     execContext.interactionPolicy = policy;
     
-    // Set output mode based on policy (clack UI vs plain console)
-    const hasConvenienceFilters = Boolean(
-      options.plugins || options.agents || options.skills || 
-      options.rules || options.commands
-    );
-    setOutputMode(policy.isTTY && (policy.mode === 'always' || !hasConvenienceFilters));
+    const out = resolveOutput(execContext);
     
     // Step 2: Classify input (use sourceCwd for resolving input paths)
     const classification = await classifyInput(input, options, execContext);
@@ -117,7 +111,7 @@ export class InstallOrchestrator {
     const preprocessResult = await strategy.preprocess(context, options, execContext);
     
     // Step 6: Route based on result
-    return this.routeToHandler(preprocessResult, options, execContext, policy);
+    return this.routeToHandler(preprocessResult, options, execContext, policy, out);
   }
   
   /**
@@ -139,13 +133,14 @@ export class InstallOrchestrator {
     result: PreprocessResult,
     options: NormalizedInstallOptions,
     execContext: ExecutionContext,
-    policy: InteractionPolicy
+    policy: InteractionPolicy,
+    out: OutputPort
   ): Promise<CommandResult> {
     const { context, specialHandling } = result;
 
     switch (specialHandling) {
       case 'marketplace':
-        return this.handleMarketplace(result, options, execContext, policy);
+        return this.handleMarketplace(result, options, execContext, policy, out);
       
       case 'ambiguous':
         return this.handleAmbiguous(result, options, execContext, policy);
@@ -160,7 +155,7 @@ export class InstallOrchestrator {
         }
         
         // Check for subsumption (resource/package overlap)
-        const subsumptionResult = await this.checkAndResolveSubsumption(context, options);
+        const subsumptionResult = await this.checkAndResolveSubsumption(context, options, out);
         if (subsumptionResult) {
           return subsumptionResult;
         }
@@ -197,7 +192,8 @@ export class InstallOrchestrator {
    */
   private async checkAndResolveSubsumption(
     context: InstallationContext,
-    options: NormalizedInstallOptions
+    options: NormalizedInstallOptions,
+    out: OutputPort
   ): Promise<CommandResult | null> {
     // --force bypasses subsumption checks entirely
     if (options.force) {
@@ -211,7 +207,7 @@ export class InstallOrchestrator {
         case 'upgrade': {
           // Resource entries exist that will be subsumed by the full package
           const names = result.entriesToRemove.map(e => e.packageName).join(', ');
-          console.log(`Upgrading to full package ${context.source.packageName} (replacing: ${names})`);
+          out.info(`Upgrading to full package ${context.source.packageName} (replacing: ${names})`);
           await resolveSubsumption(result, context.targetDir);
           return null; // Proceed with install
         }
@@ -220,7 +216,7 @@ export class InstallOrchestrator {
           // Full package already installed; skip resource install
           const resourcePath = context.source.resourcePath || 
             context.source.packageName.replace(/^.*?\/[^/]+\/[^/]+\//, '');
-          console.log(`Skipped: ${resourcePath} is already installed via ${result.coveringPackage}`);
+          out.info(`Skipped: ${resourcePath} is already installed via ${result.coveringPackage}`);
           return {
             success: true,
             data: {
@@ -313,7 +309,8 @@ export class InstallOrchestrator {
    result: PreprocessResult,
    options: NormalizedInstallOptions,
    execContext: ExecutionContext,
-   policy: InteractionPolicy
+   policy: InteractionPolicy,
+   out: OutputPort
   ): Promise<CommandResult> {
    const { context } = result;
    
@@ -321,8 +318,8 @@ export class InstallOrchestrator {
      throw new Error('Marketplace manifest not found');
    }
    
-   const spinner = new Spinner('Loading marketplace');
-   spinner.start();
+    const spinner = out.spinner();
+    spinner.start('Loading marketplace');
    
    const marketplace = await parseMarketplace(
      context.source.pluginMetadata.manifestPath, 
@@ -349,69 +346,69 @@ export class InstallOrchestrator {
          ...invalid.map(name => `  - ${name}`),
          `\nAvailable plugins: ${marketplace.plugins.map(p => p.name).join(', ')}`
        ].join('\n');
-       output.error(errorMsg);
-       return {
-         success: false,
-         error: `Plugins not found: ${invalid.join(', ')}`
-       };
-     }
-     
-     if (valid.length === 0) {
-       output.info('No valid plugins specified. Installation cancelled.');
-       return { success: true, data: { installed: 0, skipped: 0 } };
-     }
-     
-     output.info(`Marketplace: ${marketplace.name}`);
-     output.message(`Installing ${valid.length} plugin${valid.length === 1 ? '' : 's'}: ${valid.join(', ')}`);
-     
-     // Install each plugin in full mode (non-interactive)
-     const results: CommandResult[] = [];
-     for (const pluginName of valid) {
-       const commitSha = (context.source as any)._commitSha || '';
-       if (!commitSha) {
-         throw new Error('Marketplace commit SHA not available');
+        out.error(errorMsg);
+        return {
+          success: false,
+          error: `Plugins not found: ${invalid.join(', ')}`
+        };
+      }
+      
+      if (valid.length === 0) {
+        out.info('No valid plugins specified. Installation cancelled.');
+        return { success: true, data: { installed: 0, skipped: 0 } };
+      }
+      
+      out.info(`Marketplace: ${marketplace.name}`);
+      out.message(`Installing ${valid.length} plugin${valid.length === 1 ? '' : 's'}: ${valid.join(', ')}`);
+      
+      // Install each plugin in full mode (non-interactive)
+      const results: CommandResult[] = [];
+      for (const pluginName of valid) {
+        const commitSha = (context.source as any)._commitSha || '';
+        if (!commitSha) {
+          throw new Error('Marketplace commit SHA not available');
+        }
+        
+        const result = await installMarketplacePlugins(
+          context.source.contentRoot!,
+          marketplace,
+          pluginName,
+          'full',
+          context.source.gitUrl!,
+          context.source.gitRef,
+          commitSha,
+          options,
+          execContext,
+          { agents: options.agents, skills: options.skills, rules: options.rules, commands: options.commands }
+        );
+        
+        results.push(result);
+      }
+      
+      // Return combined result
+      const allSuccess = results.every(r => r.success);
+      const anySuccess = results.some(r => r.success);
+      
+      return {
+        success: anySuccess,
+        error: allSuccess ? undefined : 'Some plugins failed to install'
+      };
+    } else if (policy.canPrompt(PromptTier.Required)) {
+      // Interactive: prompt user for single plugin selection
+      selectedPlugin = await promptPluginSelection(marketplace);
+      
+       if (!selectedPlugin) {
+         out.warn('No plugin selected. Installation cancelled.');
+         return { success: true, data: { installed: 0, skipped: 0 } };
        }
        
-       const result = await installMarketplacePlugins(
-         context.source.contentRoot!,
-         marketplace,
-         pluginName,
-         'full',
-         context.source.gitUrl!,
-         context.source.gitRef,
-         commitSha,
-         options,
-         execContext,
-         { agents: options.agents, skills: options.skills, rules: options.rules, commands: options.commands }
-       );
+       // Prompt for install mode
+       const mode = await promptInstallMode(selectedPlugin);
        
-       results.push(result);
-     }
-     
-     // Return combined result
-     const allSuccess = results.every(r => r.success);
-     const anySuccess = results.some(r => r.success);
-     
-     return {
-       success: anySuccess,
-       error: allSuccess ? undefined : 'Some plugins failed to install'
-     };
-   } else if (policy.canPrompt(PromptTier.Required)) {
-     // Interactive: prompt user for single plugin selection
-     selectedPlugin = await promptPluginSelection(marketplace);
-     
-      if (!selectedPlugin) {
-        cancel('No plugin selected. Installation cancelled.');
-        return { success: true, data: { installed: 0, skipped: 0 } };
-      }
-      
-      // Prompt for install mode
-      const mode = await promptInstallMode(selectedPlugin);
-      
-      if (!mode) {
-        cancel('Installation cancelled.');
-        return { success: true, data: { installed: 0, skipped: 0 } };
-      }
+       if (!mode) {
+         out.warn('Installation cancelled.');
+         return { success: true, data: { installed: 0, skipped: 0 } };
+       }
      
      installMode = mode;
    } else {
@@ -460,69 +457,70 @@ export class InstallOrchestrator {
   * If --plugins is specified, only those plugins are included.
   * Otherwise, all marketplace plugins are included.
   */
-  private async handleMarketplaceList(
-   context: InstallationContext,
-   marketplace: MarketplaceManifest,
-   options: NormalizedInstallOptions,
-   execContext: ExecutionContext
-  ): Promise<CommandResult> {
-   // Determine which plugins to list
-   let pluginNames: string[];
-   
-   if (options.plugins && options.plugins.length > 0) {
-     const { valid, invalid } = validatePluginNames(marketplace, options.plugins);
-     
-     if (invalid.length > 0) {
-       const errorMsg = [
-         `Error: The following plugins were not found in marketplace '${marketplace.name}':`,
-         ...invalid.map(name => `  - ${name}`),
-         `\nAvailable plugins: ${marketplace.plugins.map(p => p.name).join(', ')}`
-       ].join('\n');
-       output.error(errorMsg);
-       return {
-         success: false,
-         error: `Plugins not found: ${invalid.join(', ')}`
-       };
-     }
-     
-     pluginNames = valid;
-   } else {
-     // No --plugins: list all marketplace plugins
-     pluginNames = marketplace.plugins.map(p => p.name);
-   }
-   
-   if (pluginNames.length === 0) {
-     output.info('No plugins to list.');
-     return { success: true, data: { installed: 0, skipped: 0 } };
-   }
-   
-   output.info(`Marketplace: ${marketplace.name}`);
-   
-   const commitSha = (context.source as any)._commitSha || '';
-   if (!commitSha) {
-     throw new Error('Marketplace commit SHA not available');
-   }
-   
-   // Resolve content roots for all plugins
-   const s = output.spinner();
-   s.start(`Discovering resources across ${pluginNames.length} plugin${pluginNames.length === 1 ? '' : 's'}`);
-   
-   const resolvedPlugins = await resolvePluginContentRoots(
-     context.source.contentRoot!,
-     marketplace,
-     pluginNames,
-     context.source.gitUrl!,
-     context.source.gitRef,
-     commitSha,
-     options,
-     execContext
-   );
-   
-   if (resolvedPlugins.length === 0) {
-     s.stop('No plugins resolved');
-     output.warn('Could not resolve any plugins for resource discovery');
-     return { success: true, data: { installed: 0, skipped: 0 } };
-   }
+   private async handleMarketplaceList(
+    context: InstallationContext,
+    marketplace: MarketplaceManifest,
+    options: NormalizedInstallOptions,
+    execContext: ExecutionContext
+   ): Promise<CommandResult> {
+    const out = resolveOutput(execContext);
+    // Determine which plugins to list
+    let pluginNames: string[];
+    
+    if (options.plugins && options.plugins.length > 0) {
+      const { valid, invalid } = validatePluginNames(marketplace, options.plugins);
+      
+      if (invalid.length > 0) {
+        const errorMsg = [
+          `Error: The following plugins were not found in marketplace '${marketplace.name}':`,
+          ...invalid.map(name => `  - ${name}`),
+          `\nAvailable plugins: ${marketplace.plugins.map(p => p.name).join(', ')}`
+        ].join('\n');
+        out.error(errorMsg);
+        return {
+          success: false,
+          error: `Plugins not found: ${invalid.join(', ')}`
+        };
+      }
+      
+      pluginNames = valid;
+    } else {
+      // No --plugins: list all marketplace plugins
+      pluginNames = marketplace.plugins.map(p => p.name);
+    }
+    
+    if (pluginNames.length === 0) {
+      out.info('No plugins to list.');
+      return { success: true, data: { installed: 0, skipped: 0 } };
+    }
+    
+    out.info(`Marketplace: ${marketplace.name}`);
+    
+    const commitSha = (context.source as any)._commitSha || '';
+    if (!commitSha) {
+      throw new Error('Marketplace commit SHA not available');
+    }
+    
+    // Resolve content roots for all plugins
+    const s = out.spinner();
+    s.start(`Discovering resources across ${pluginNames.length} plugin${pluginNames.length === 1 ? '' : 's'}`);
+    
+    const resolvedPlugins = await resolvePluginContentRoots(
+      context.source.contentRoot!,
+      marketplace,
+      pluginNames,
+      context.source.gitUrl!,
+      context.source.gitRef,
+      commitSha,
+      options,
+      execContext
+    );
+    
+    if (resolvedPlugins.length === 0) {
+      s.stop('No plugins resolved');
+      out.warn('Could not resolve any plugins for resource discovery');
+      return { success: true, data: { installed: 0, skipped: 0 } };
+    }
    
    // Discover resources in each plugin and merge
    const allResources: DiscoveredResource[] = [];
@@ -558,7 +556,7 @@ export class InstallOrchestrator {
    
    if (mergedDiscovery.total === 0) {
      s.stop('No resources found');
-     output.warn('No installable resources found across the specified plugins');
+      out.warn('No installable resources found across the specified plugins');
      return { success: true, data: { installed: 0, skipped: 0 } };
    }
    
@@ -572,7 +570,7 @@ export class InstallOrchestrator {
    );
 
    if (selected.length === 0) {
-     cancel('No resources selected. Installation cancelled.');
+      out.warn('No resources selected. Installation cancelled.');
      return { success: true, data: { installed: 0, skipped: 0 } };
    }
    
@@ -708,6 +706,7 @@ export class InstallOrchestrator {
     execContext: ExecutionContext,
     policy: InteractionPolicy
   ): Promise<CommandResult> {
+    const out = resolveOutput(execContext);
     const { context, resourceContexts, workspaceContext } = result;
     const dependencyContexts = resourceContexts ?? [];
 
@@ -727,11 +726,11 @@ export class InstallOrchestrator {
 
     if (dependencyContexts.length === 0 && !workspaceContext) {
       if (context.source.packageName === '__bulk__') {
-        console.log('⚠️  No packages found in openpackage.yml');
-        console.log('\n💡 Tips:');
-        console.log('  • Add packages to the "dependencies" array in openpackage.yml');
-        console.log('  • Add development packages to the "dev-dependencies" array');
-        console.log('  • Use "opkg install <package-name>" to install a specific package');
+        out.warn('No packages found in openpackage.yml');
+        out.info('\nTips:');
+        out.info('  - Add packages to the "dependencies" array in openpackage.yml');
+        out.info('  - Add development packages to the "dev-dependencies" array');
+        out.info('  - Use "opkg install <package-name>" to install a specific package');
         return { success: true, data: { installed: 0, skipped: 0 } };
       }
       return {
@@ -755,7 +754,7 @@ export class InstallOrchestrator {
         if (subsumptionResult.type === 'already-covered') {
           const resourcePath = ctx.source.resourcePath ||
             ctx.source.packageName.replace(/^.*?\/[^/]+\/[^/]+\//, '');
-          console.log(`Skipped: ${resourcePath} is already installed via ${subsumptionResult.coveringPackage}`);
+          out.info(`Skipped: ${resourcePath} is already installed via ${subsumptionResult.coveringPackage}`);
           skippedCount++;
         } else {
           filteredContexts.push(ctx);
@@ -782,7 +781,7 @@ export class InstallOrchestrator {
     }
 
     if (dependencyContexts.length > 0) {
-      console.log(`✓ Installing ${dependencyContexts.length} package${dependencyContexts.length === 1 ? '' : 's'} from openpackage.yml`);
+      out.success(`Installing ${dependencyContexts.length} package${dependencyContexts.length === 1 ? '' : 's'} from openpackage.yml`);
     }
 
     if (workspaceContext) {
@@ -808,6 +807,7 @@ export class InstallOrchestrator {
     execContext: ExecutionContext,
     workspaceContext?: InstallationContext | null
   ): Promise<CommandResult> {
+    const out = resolveOutput(execContext);
     if (workspaceContext) {
       try {
         await runUnifiedInstallPipeline(workspaceContext);
@@ -851,7 +851,7 @@ export class InstallOrchestrator {
 
     const summary = execResult.summary;
     if (summary) {
-      console.log(`✓ Installation complete: ${summary.installed} installed${summary.failed > 0 ? `, ${summary.failed} failed` : ''}${summary.skipped > 0 ? `, ${summary.skipped} skipped` : ''}`);
+      out.success(`Installation complete: ${summary.installed} installed${summary.failed > 0 ? `, ${summary.failed} failed` : ''}${summary.skipped > 0 ? `, ${summary.skipped} skipped` : ''}`);
     }
 
     return {
@@ -868,6 +868,7 @@ export class InstallOrchestrator {
    * Run bulk installation for multiple packages.
    */
   private async runBulkInstall(contexts: InstallationContext[]): Promise<CommandResult> {
+    const out = resolveOutput(contexts[0]?.execution);
     let totalInstalled = 0;
     let totalSkipped = 0;
     const results: Array<{ name: string; success: boolean; error?: string }> = [];
@@ -882,17 +883,17 @@ export class InstallOrchestrator {
         } else {
           totalSkipped++;
           results.push({ name: ctx.source.packageName, success: false, error: result.error });
-          console.log(`❌ ${ctx.source.packageName}: ${result.error}`);
+          out.error(`${ctx.source.packageName}: ${result.error}`);
         }
       } catch (error) {
         totalSkipped++;
         results.push({ name: ctx.source.packageName, success: false, error: String(error) });
-        console.log(`❌ ${ctx.source.packageName}: ${error}`);
+        out.error(`${ctx.source.packageName}: ${error}`);
       }
     }
     
     // Display summary
-    console.log(`✓ Installation complete: ${totalInstalled} installed${totalSkipped > 0 ? `, ${totalSkipped} failed` : ''}`);
+    out.success(`Installation complete: ${totalInstalled} installed${totalSkipped > 0 ? `, ${totalSkipped} failed` : ''}`);
     
     const allSuccessful = totalSkipped === 0;
     return {

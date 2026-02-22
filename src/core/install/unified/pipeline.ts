@@ -11,6 +11,7 @@ import { shouldResolveDependencies, shouldUpdateManifest } from './context-helpe
 import { logger } from '../../../utils/logger.js';
 import { createWorkspacePackageYml } from '../../../utils/package-management.js';
 import { cleanupTempDirectory } from '../strategies/helpers/temp-directory.js';
+import { resolveOutput } from '../../ports/resolve.js';
 
 function assertPipelineContextComplete(ctx: InstallationContext): void {
   if (!ctx.source.type) {
@@ -116,7 +117,8 @@ export async function runUnifiedInstallPipeline(
  * Create result for user cancellation
  */
 function createCancellationResult(ctx: InstallationContext): CommandResult {
-  console.log(`Installation cancelled by user`);
+  const out = resolveOutput(ctx.execution);
+  out.info('Installation cancelled by user');
   
   return {
     success: true,

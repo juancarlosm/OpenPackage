@@ -6,7 +6,8 @@ import { logger } from '../../../../utils/logger.js';
 import { resolveDependencies } from '../../../dependency-resolver/resolver.js';
 import { gatherGlobalVersionConstraints, gatherRootVersionConstraints } from '../../../openpackage.js';
 import { VersionConflictError } from '../../../../utils/errors.js';
-import { promptVersionSelection } from '../../../../utils/prompts.js';
+import type { PromptPort } from '../../../ports/prompt.js';
+import { resolvePrompt } from '../../../ports/resolve.js';
 import type { InteractionPolicy } from '../../../../core/interaction-policy.js';
 import { PromptTier } from '../../../../core/interaction-policy.js';
 import type { PackageRemoteResolutionOutcome } from '../../types.js';
@@ -30,7 +31,8 @@ async function resolveDependenciesForInstall(
   cwd: string,
   version: string | undefined,
   options: InstallationContext['options'],
-  policy?: InteractionPolicy
+  policy?: InteractionPolicy,
+  prompt?: PromptPort
 ): Promise<DependencyResolutionResult> {
   const globalConstraints = await gatherGlobalVersionConstraints(cwd);
   const rootConstraints = await gatherRootVersionConstraints(cwd);
@@ -84,7 +86,13 @@ async function resolveDependenciesForInstall(
       } else if (policy && !policy.canPrompt(PromptTier.ConflictResolution)) {
         throw new Error(`Version conflict for '${conflictName}'. Available versions: ${available.join(', ')}. Use --force to auto-select latest, or run interactively to choose.`);
       } else {
-        chosenVersion = await promptVersionSelection(conflictName, available, 'to install');
+        const p = prompt ?? resolvePrompt();
+        const versionChoices = available.map(v => ({ title: v, value: v }));
+        chosenVersion = await p.select<string>(
+          `Select version of '${conflictName}' to install:`,
+          versionChoices,
+          'Use arrow keys to navigate, Enter to select'
+        );
       }
 
       if (!chosenVersion) {
@@ -116,7 +124,8 @@ export async function resolveDependenciesPhase(ctx: InstallationContext): Promis
       ctx.targetDir,
       ctx.source.version,
       ctx.options,
-      ctx.execution?.interactionPolicy
+      ctx.execution?.interactionPolicy,
+      ctx.execution?.prompt
     );
     
     // Add warnings
@@ -147,7 +156,8 @@ export async function resolveDependenciesPhase(ctx: InstallationContext): Promis
           ctx.targetDir,
           ctx.source.version,
           ctx.options,
-          ctx.execution?.interactionPolicy
+          ctx.execution?.interactionPolicy,
+          ctx.execution?.prompt
         );
         
         ctx.resolvedPackages = refreshed.resolvedPackages;

@@ -18,6 +18,8 @@ import { displayPackageConfig } from '../utils/formatters.js';
 import { exists, ensureDir } from '../utils/fs.js';
 import { normalizePackageName, validatePackageName } from '../utils/package-name.js';
 import type { PackageContext } from './package-context.js';
+import type { OutputPort } from './ports/output.js';
+import { resolveOutput } from './ports/resolve.js';
 
 /**
  * Options for creating a new package
@@ -69,8 +71,10 @@ export interface CreatePackageResult {
  * @returns Result containing success status and package context
  */
 export async function createPackage(
-  options: CreatePackageOptions
+  options: CreatePackageOptions,
+  output?: OutputPort
 ): Promise<CreatePackageResult> {
+  const out = output ?? resolveOutput();
   const {
     cwd,
     scope,
@@ -198,9 +202,9 @@ export async function createPackage(
 
     // Step 8: Show scope info
     if (isCustomPath) {
-      console.log(`\n📍 Location: Custom path (${displayPath})`);
+      out.info(`\nLocation: Custom path (${displayPath})`);
     } else if (scope) {
-      console.log(`\n📍 Scope: ${getScopeDescription(scope)}`);
+      out.info(`\nScope: ${getScopeDescription(scope)}`);
     }
 
     // Step 9: Return success with context

@@ -18,7 +18,8 @@ import { sortMapping, isDirKey, ensureTrailingSlash } from '../../../utils/packa
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
 import { getRegistryDirectories } from '../../directory.js';
 import { sep } from 'path';
-import { safePrompts } from '../../../utils/prompts.js';
+import type { PromptPort } from '../../ports/prompt.js';
+import { resolvePrompt } from '../../ports/resolve.js';
 import { logger } from '../../../utils/logger.js';
 import { deriveNamespaceSlug } from '../../../utils/plugin-naming.js';
 import type { InstallOptions } from '../../../types/index.js';
@@ -184,22 +185,20 @@ async function expandIndexToFilePaths(
 // Private: prompt helpers
 // ============================================================================
 
-async function promptConflictResolution(message: string): Promise<ConflictResolution> {
-  const response = await safePrompts({
-    type: 'select',
-    name: 'choice',
+async function promptConflictResolution(message: string, prompt: PromptPort): Promise<ConflictResolution> {
+  return prompt.select<ConflictResolution>(
     message,
-    choices: [
+    [
       { title: 'Namespace (organise by package name)', value: 'namespace' },
       { title: 'Skip (keeps existing)',                value: 'skip'      },
       { title: 'Overwrite (replaces existing)',        value: 'overwrite' }
     ]
-  });
-  return ((response as any).choice as ConflictResolution | undefined) ?? 'namespace';
+  );
 }
 
 async function promptContentDifferenceResolution(
   workspacePath: string,
+  prompt: PromptPort,
   sourcePath?: string
 ): Promise<'overwrite' | 'skip'> {
   const formattedSource = sourcePath
@@ -209,16 +208,13 @@ async function promptContentDifferenceResolution(
     ? `Package file ${formattedSource} differs from workspace file ${workspacePath}`
     : `File ${workspacePath} differs from package version`;
 
-  const response = await safePrompts({
-    type: 'select',
-    name: 'choice',
+  return prompt.select<'overwrite' | 'skip'>(
     message,
-    choices: [
+    [
       { title: 'Overwrite (use package version)',  value: 'overwrite' },
       { title: 'Skip (keep workspace version)',    value: 'skip'      }
     ]
-  });
-  return ((response as any).choice as 'overwrite' | 'skip' | undefined) ?? 'skip';
+  );
 }
 
 // ============================================================================
@@ -500,7 +496,8 @@ export async function resolveFileConflict(
   sourcePath: string | undefined,
   options: InstallOptions,
   interactive: boolean,
-  forceOverwrite: boolean
+  forceOverwrite: boolean,
+  prompt?: PromptPort
 ): Promise<{ decision: ConflictResolution; warning?: string }> {
   const perPathDecisions = options.conflictDecisions ?? {};
   const normalized = normalizePathForProcessing(relPath);
@@ -546,7 +543,8 @@ export async function resolveFileConflict(
 
   // 4b. exists-unowned: prompt in interactive mode
   if (interactive) {
-    const decision = await promptContentDifferenceResolution(normalized, sourcePath);
+    const p = prompt ?? resolvePrompt();
+    const decision = await promptContentDifferenceResolution(normalized, p, sourcePath);
     return { decision };
   }
 
@@ -652,7 +650,8 @@ export async function resolveConflictsForTargets(
   ownershipContext: OwnershipContext,
   options: InstallOptions,
   installingPackageName: string,
-  forceOverwrite: boolean = false
+  forceOverwrite: boolean = false,
+  prompt?: PromptPort
 ): Promise<ConflictResolutionResult> {
   const warnings: string[] = [];
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
@@ -713,7 +712,8 @@ export async function resolveConflictsForTargets(
         undefined,
         options,
         interactive,
-        forceOverwrite
+        forceOverwrite,
+        prompt
       );
 
       if (decision === 'namespace') {
@@ -749,7 +749,8 @@ export async function resolveConflictsForTargets(
       undefined,
       options,
       interactive,
-      forceOverwrite
+      forceOverwrite,
+      prompt
     );
 
     if (decision === 'namespace') {
@@ -794,7 +795,8 @@ export async function resolveConflictsForTargets(
         undefined,
         options,
         interactive,
-        forceOverwrite
+        forceOverwrite,
+        prompt
       );
       if (warning) warnings.push(warning);
 
@@ -854,7 +856,8 @@ export async function resolveConflictsForTargets(
         undefined,
         options,
         interactive,
-        forceOverwrite
+        forceOverwrite,
+        prompt
       );
       if (warning) warnings.push(warning);
 

@@ -7,20 +7,22 @@ import type { InstallationContext } from '../context.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
 import { addError, getSourceDisplayName } from '../context-helpers.js';
 import { logger } from '../../../../utils/logger.js';
-import { Spinner } from '../../../../utils/spinner.js';
+import type { OutputPort } from '../../../ports/output.js';
+import { resolveOutput } from '../../../ports/resolve.js';
 import { applyBaseDetection, computePathScoping } from '../../preprocessing/base-resolver.js';
 
 /**
  * Load package from source
  */
-export async function loadPackagePhase(ctx: InstallationContext): Promise<void> {
+export async function loadPackagePhase(ctx: InstallationContext, output?: OutputPort): Promise<void> {
   // Skip if context already has loaded data (preprocessed by strategy)
   // NOTE: We require resolvedPackages to be populated too; otherwise later phases break.
   if (ctx.source.contentRoot && ctx.source.packageName && ctx.resolvedPackages.length > 0) {
     return;
   }
   
-  const spinner = new Spinner('Loading package from source');
+  const out = output ?? resolveOutput();
+  const spinner = out.spinner();
   
   try {
     // Get appropriate loader
@@ -28,8 +30,7 @@ export async function loadPackagePhase(ctx: InstallationContext): Promise<void> 
     
     // Display loading message with spinner
     const displayName = getSourceDisplayName(ctx);
-    spinner.update(`Loading ${displayName}`);
-    spinner.start();
+    spinner.start(`Loading ${displayName}`);
     
     // Load package
     const loaded = await loader.load(ctx.source, ctx.options, ctx.execution);

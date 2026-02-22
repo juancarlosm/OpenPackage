@@ -1,4 +1,5 @@
 import type { InstallationContext } from './context.js';
+import { resolveOutput } from '../../ports/resolve.js';
 
 /**
  * Check if context should resolve dependencies
@@ -42,7 +43,8 @@ export function shouldUpdateManifest(ctx: InstallationContext): boolean {
 export function addWarning(ctx: InstallationContext, message: string): void {
   if (!ctx.warnings.includes(message)) {
     ctx.warnings.push(message);
-    console.log(`⚠️  ${message}`);
+    const out = resolveOutput(ctx.execution);
+    out.warn(message);
   }
 }
 

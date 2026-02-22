@@ -1,11 +1,13 @@
 import { join } from 'path';
-import { safePrompts } from '../../utils/prompts.js';
 import { sortCandidatesByMtime } from './save-conflict-analyzer.js';
 import { convertSourceToWorkspace, ensureComparableHash } from './save-conversion-helper.js';
 import { logger } from '../../utils/logger.js';
 import { exists, readTextFile } from '../../utils/fs.js';
 import { calculateFileHash } from '../../utils/hash-utils.js';
 import { createPlatformSpecificRegistryPath } from '../../utils/platform-specific-paths.js';
+import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import type { SaveCandidate, SaveCandidateGroup } from './save-types.js';
 
 /**
@@ -98,15 +100,19 @@ interface ParityCheck {
  * @returns Resolution output with selected universal and platform-specific candidates
  */
 export async function resolveInteractively(
-  input: InteractiveResolutionInput
+  input: InteractiveResolutionInput,
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<InteractiveResolutionOutput> {
   const { registryPath, workspaceCandidates, group, packageRoot, workspaceRoot } = input;
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
   
   // Sort by mtime descending (newest first), with alphabetical tie-breaker
   const sortedCandidates = sortCandidatesByMtime(workspaceCandidates);
   
   // Display header
-  displayConflictHeader(registryPath, sortedCandidates);
+  displayConflictHeader(registryPath, sortedCandidates, out);
   
   // Track selections
   let universalSelected: SaveCandidate | null = null;
@@ -118,8 +124,8 @@ export async function resolveInteractively(
     // Check if candidate is already at parity with source (conversion-aware)
     const parityCheck = await isAtParity(candidate, group, packageRoot, workspaceRoot);
     if (parityCheck.atParity) {
-      console.log(`\n  ✓ ${candidate.displayPath}`);
-      console.log(`    ${parityCheck.reason} - auto-skipping\n`);
+      out.info(`\n  ✓ ${candidate.displayPath}`);
+      out.info(`    ${parityCheck.reason} - auto-skipping\n`);
       skippedCandidates.push(candidate);
       continue;
     }
@@ -130,8 +136,8 @@ export async function resolveInteractively(
       const candidateHash = await ensureComparableHash(candidate, workspaceRoot);
 
       if (candidateHash === universalHash) {
-        console.log(`\n  ✓ ${candidate.displayPath}`);
-        console.log(`    Identical to universal - auto-skipping\n`);
+        out.info(`\n  ✓ ${candidate.displayPath}`);
+        out.info(`    Identical to universal - auto-skipping\n`);
         skippedCandidates.push(candidate);
         continue;
       }
@@ -141,30 +147,31 @@ export async function resolveInteractively(
     const action = await promptCandidateAction(
       candidate,
       registryPath,
-      universalSelected !== null
+      universalSelected !== null,
+      prm
     );
     
     // Handle action
     switch (action) {
       case 'universal':
         universalSelected = candidate;
-        console.log(`\n  ✓ Selected as universal: ${candidate.displayPath}\n`);
+        out.success(`\n  ✓ Selected as universal: ${candidate.displayPath}\n`);
         break;
       
       case 'platform-specific':
         platformSpecificCandidates.push(candidate);
-        console.log(`\n  ✓ Marked as platform-specific: ${candidate.displayPath}\n`);
+        out.success(`\n  ✓ Marked as platform-specific: ${candidate.displayPath}\n`);
         break;
       
       case 'skip':
         skippedCandidates.push(candidate);
-        console.log(`\n  ✓ Skipped: ${candidate.displayPath}\n`);
+        out.info(`\n  ✓ Skipped: ${candidate.displayPath}\n`);
         break;
     }
   }
   
   // Display summary
-  displayResolutionSummary(universalSelected, platformSpecificCandidates, skippedCandidates);
+  displayResolutionSummary(universalSelected, platformSpecificCandidates, skippedCandidates, out);
   
   return {
     selectedCandidate: universalSelected,
@@ -333,7 +340,8 @@ async function isAtParity(
 async function promptCandidateAction(
   candidate: SaveCandidate,
   registryPath: string,
-  universalAlreadySelected: boolean
+  universalAlreadySelected: boolean,
+  prm: PromptPort
 ): Promise<CandidateAction> {
   const candidateLabel = formatCandidateLabel(candidate, true);
   
@@ -349,15 +357,11 @@ async function promptCandidateAction(
         { title: 'Skip', value: 'skip' as const }
       ];
   
-  const response = await safePrompts({
-    type: 'select',
-    name: 'action',
-    message: `  ${candidateLabel}\n  What should we do with this file?`,
+  return await prm.select<CandidateAction>(
+    `  ${candidateLabel}\n  What should we do with this file?`,
     choices,
-    hint: 'Arrow keys to navigate, Enter to select'
-  });
-  
-  return response.action as CandidateAction;
+    'Arrow keys to navigate, Enter to select'
+  );
 }
 
 /**
@@ -370,10 +374,11 @@ async function promptCandidateAction(
  */
 function displayConflictHeader(
   registryPath: string,
-  candidates: SaveCandidate[]
+  candidates: SaveCandidate[],
+  out: OutputPort
 ): void {
-  console.log(`\n⚠️  Multiple workspace versions found for ${registryPath}`);
-  console.log(`   Resolving conflicts for ${candidates.length} file(s)...\n`);
+  out.warn(`Multiple workspace versions found for ${registryPath}`);
+  out.info(`   Resolving conflicts for ${candidates.length} file(s)...\n`);
 }
 
 /**
@@ -389,30 +394,31 @@ function displayConflictHeader(
 function displayResolutionSummary(
   universal: SaveCandidate | null,
   platformSpecific: SaveCandidate[],
-  skipped: SaveCandidate[]
+  skipped: SaveCandidate[],
+  out: OutputPort
 ): void {
-  console.log('─'.repeat(60));
-  console.log('Resolution summary:');
+  out.info('─'.repeat(60));
+  out.info('Resolution summary:');
   
   if (universal) {
-    console.log(`  ✓ Universal: ${universal.displayPath}`);
+    out.success(`  ✓ Universal: ${universal.displayPath}`);
   } else {
-    console.log('  ℹ No universal content selected');
+    out.info('  ℹ No universal content selected');
   }
   
   if (platformSpecific.length > 0) {
-    console.log(`  ✓ Platform-specific: ${platformSpecific.length} file(s)`);
+    out.success(`  ✓ Platform-specific: ${platformSpecific.length} file(s)`);
     platformSpecific.forEach(c => {
       const platform = c.platform ? `(${c.platform})` : '';
-      console.log(`    • ${c.displayPath} ${platform}`);
+      out.info(`    • ${c.displayPath} ${platform}`);
     });
   }
   
   if (skipped.length > 0) {
-    console.log(`  • Skipped: ${skipped.length} file(s)`);
+    out.info(`  • Skipped: ${skipped.length} file(s)`);
   }
   
-  console.log('─'.repeat(60) + '\n');
+  out.info('─'.repeat(60) + '\n');
 }
 
 /**

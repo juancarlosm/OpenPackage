@@ -3,32 +3,37 @@ import type { TarballInfo } from '../../utils/tarball.js';
 import { formatFileSize, formatPathForDisplay } from '../../utils/formatters.js';
 import { formatVersionLabel } from '../../utils/package-versioning.js';
 import type { PackageYml } from '../../types/index.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 export function printPublishSuccess(
   response: PushPackageResponse,
   tarballInfo: TarballInfo,
-  registryUrl: string
+  registryUrl: string,
+  output?: OutputPort
 ): void {
-  console.log('\n✓ Package published successfully!\n');
-  console.log(`Package: ${response.package.name}`);
+  const out = output ?? resolveOutput();
+  out.success('Package published successfully!');
+  out.info(`Package: ${response.package.name}`);
   
   if (response.version.version) {
-    console.log(`Version: ${response.version.version}`);
+    out.info(`Version: ${response.version.version}`);
   }
   
-  console.log(`Size: ${formatFileSize(tarballInfo.size)}`);
-  console.log(`Checksum: ${tarballInfo.checksum.substring(0, 12)}...`);
-  console.log(`Registry: ${registryUrl}`);
+  out.info(`Size: ${formatFileSize(tarballInfo.size)}`);
+  out.info(`Checksum: ${tarballInfo.checksum.substring(0, 12)}...`);
+  out.info(`Registry: ${registryUrl}`);
   
   if (response.message) {
-    console.log(`\n${response.message}`);
+    out.info(`\n${response.message}`);
   }
 }
 
-export function logPublishSummary(packageName: string, profile: string, registryUrl: string): void {
-  console.log(`\nPublishing package '${packageName}'...`);
-  console.log(`Profile: ${profile}`);
-  console.log(`Registry: ${registryUrl}`);
+export function logPublishSummary(packageName: string, profile: string, registryUrl: string, output?: OutputPort): void {
+  const out = output ?? resolveOutput();
+  out.info(`\nPublishing package '${packageName}'...`);
+  out.info(`Profile: ${profile}`);
+  out.info(`Registry: ${registryUrl}`);
 }
 
 /**
@@ -51,29 +56,31 @@ export interface PublishResultInfo {
  */
 export function displayPublishSuccess(
   info: PublishResultInfo,
-  cwd: string
+  cwd: string,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   const { packageName, version, description, sourcePath, destinationPath, fileCount, isCustomOutput } = info;
   
   // Success header
-  console.log(`✓ Published ${packageName}@${formatVersionLabel(version)}`);
+  out.success(`Published ${packageName}@${formatVersionLabel(version)}`);
   
   // Package details
   if (description) {
-    console.log(`✓ Description: ${description}`);
+    out.success(`Description: ${description}`);
   }
   
   // Source information
   const displaySource = formatPathForDisplay(sourcePath, cwd);
-  console.log(`✓ Source: ${displaySource}`);
+  out.success(`Source: ${displaySource}`);
   
   // Destination information
   const displayDestination = formatPathForDisplay(destinationPath, cwd);
   const destinationType = isCustomOutput ? 'Custom output' : 'Registry';
-  console.log(`✓ ${destinationType}: ${displayDestination}`);
+  out.success(`${destinationType}: ${displayDestination}`);
   
   // File count
-  console.log(`✓ Files: ${fileCount}`);
+  out.success(`Files: ${fileCount}`);
 }
 
 /**

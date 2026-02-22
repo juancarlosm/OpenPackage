@@ -14,6 +14,8 @@ import { createPublishResultInfo, displayPublishSuccess } from './publish-output
 import { FILE_PATTERNS } from '../../constants/index.js';
 import type { PublishOptions, PublishResult } from './publish-types.js';
 import type { PackageYml } from '../../types/index.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 export interface LocalPublishData {
   packageName: string;
@@ -33,7 +35,8 @@ interface ResolvedSource {
 
 async function resolveSource(
   cwd: string,
-  packageInput?: string
+  packageInput?: string,
+  output?: OutputPort
 ): Promise<ResolvedSource> {
   // No package input provided - publish from CWD
   if (!packageInput) {
@@ -110,7 +113,8 @@ async function resolveSource(
       const sourceLabel = selected.type === 'cwd' ? 'current directory' :
                          selected.type === 'workspace' ? 'workspace packages' :
                          selected.type === 'global' ? 'global packages' : selected.type;
-      console.log(`✓ Found ${packageInput} in ${sourceLabel}`);
+      const out = output ?? resolveOutput();
+      out.success(`Found ${packageInput} in ${sourceLabel}`);
     }
   }
 
@@ -136,13 +140,15 @@ async function resolveSource(
  */
 export async function runLocalPublishPipeline(
   packageInput: string | undefined,
-  options: PublishOptions
+  options: PublishOptions,
+  output?: OutputPort
 ): Promise<PublishResult<LocalPublishData>> {
+  const out = output ?? resolveOutput();
   const cwd = process.cwd();
   
   try {
     // Resolve package source (CWD, path, or package name)
-    const source = await resolveSource(cwd, packageInput);
+    const source = await resolveSource(cwd, packageInput, output);
     
     const packageName = source.name;
     const version = source.version;
@@ -152,7 +158,7 @@ export async function runLocalPublishPipeline(
     
     if (!version || version.trim() === '') {
       publishVersion = '0.0.0';
-      console.log(`✓ No version specified, using 0.0.0 for local publish`);
+      out.info(`No version specified, using 0.0.0 for local publish`);
       logger.info('Auto-assigned version 0.0.0 for unversioned package', { packageName });
     } else {
       // Validate provided version (reject prereleases)

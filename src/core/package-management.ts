@@ -12,7 +12,9 @@ import { isUnversionedVersion } from '../utils/package-versioning.js';
 import { normalizePackageName, arePackageNamesEquivalent, normalizePackageNameForLookup } from '../utils/package-name.js';
 import { extractGitHubInfo } from '../utils/git-url-parser.js';
 import { packageManager } from './package.js';
-import { promptPackageDetailsForNamed } from '../utils/prompts.js';
+import type { OutputPort } from './ports/output.js';
+import type { PromptPort } from './ports/prompt.js';
+import { resolveOutput, resolvePrompt } from './ports/resolve.js';
 import { writePackageFilesToDirectory } from '../utils/package-copy.js';
 import { getPackageFilesDir, getPackageYmlPath } from './package-context.js';
 import { isManifestPath, normalizePackagePath } from '../utils/manifest-paths.js';
@@ -37,7 +39,8 @@ export async function ensureLocalOpenPackageStructure(targetDir: string): Promis
  * @param force - If true, overwrite existing openpackage.yml
  * @returns the openpackage.yml if it was created, null if it already existed and force=false
  */
-export async function createWorkspacePackageYml(targetDir: string, force: boolean = false): Promise<PackageYml | null> {
+export async function createWorkspacePackageYml(targetDir: string, force: boolean = false, output?: OutputPort): Promise<PackageYml | null> {
+  const out = output ?? resolveOutput();
   await ensureLocalOpenPackageStructure(targetDir);
 
   const packageYmlPath = getLocalPackageYmlPath(targetDir);
@@ -54,13 +57,13 @@ export async function createWorkspacePackageYml(targetDir: string, force: boolea
     }
     await writePackageYml(packageYmlPath, basicPackageYml);
     logger.info(`Overwrote basic openpackage.yml with name: ${projectName}`);
-    console.log(`✓ Overwrote basic openpackage.yml in .openpackage/ with name: ${projectName}`);
+    out.success(`Overwrote basic openpackage.yml in .openpackage/ with name: ${projectName}`);
     return basicPackageYml;
   }
 
   await writePackageYml(packageYmlPath, basicPackageYml);
   logger.info(`Initialized workspace openpackage.yml`);
-  console.log(`✓ Initialized workspace openpackage.yml in .openpackage/`);
+  out.success(`Initialized workspace openpackage.yml in .openpackage/`);
   return basicPackageYml;
 }
 
@@ -84,8 +87,12 @@ export interface EnsurePackageWithYmlResult {
 export async function ensurePackageWithYml(
   targetDir: string,
   packageName: string,
-  options: EnsurePackageWithYmlOptions = {}
+  options: EnsurePackageWithYmlOptions = {},
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<EnsurePackageWithYmlResult> {
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
   await ensureLocalOpenPackageStructure(targetDir);
 
   const normalizedName = normalizePackageName(packageName);
@@ -112,7 +119,7 @@ export async function ensurePackageWithYml(
           partial: true
         };
         logger.info(`Loaded openpackage.yml for '${normalizedName}' from local registry copy`);
-        console.log(`✓ Loaded openpackage.yml from local registry for ${normalizedName}`);
+        out.success(`Loaded openpackage.yml from local registry for ${normalizedName}`);
       }
     } catch (error) {
       logger.debug('Unable to seed openpackage.yml from registry; falling back to prompts', { normalizedName, error });
@@ -120,8 +127,22 @@ export async function ensurePackageWithYml(
 
     if (!packageConfig) {
       if (options.interactive) {
-        console.log(`Create new package "${normalizedName}"`);
-        packageConfig = await promptPackageDetailsForNamed(normalizedName);
+        out.info(`Create new package "${normalizedName}"`);
+        
+        const description = await prm.text('Description:');
+        const keywordsInput = await prm.text('Keywords (space-separated):');
+        const isPrivate = await prm.confirm('Private package?', false);
+        
+        const keywordsArray = keywordsInput
+          ? keywordsInput.trim().split(/\s+/).filter((k: string) => k.length > 0)
+          : [];
+        
+        packageConfig = {
+          name: normalizePackageName(normalizedName),
+          ...(description && { description }),
+          ...(keywordsArray.length > 0 && { keywords: keywordsArray }),
+          ...(isPrivate && { private: isPrivate })
+        };
       } else {
         packageConfig = {
           name: normalizedName,
@@ -171,8 +192,10 @@ export async function addPackageToYml(
   git?: string,   // Git source url (DEPRECATED: use url) (mutually exclusive with path/version)
   ref?: string,   // Git ref (DEPRECATED: embed in url as #ref)
   gitPath?: string,  // Git subdirectory path (for plugins in marketplaces)
-  base?: string  // Phase 4: Base field for resource model
+  base?: string,  // Phase 4: Base field for resource model
+  output?: OutputPort
 ): Promise<void> {
+  const out = output ?? resolveOutput();
   const packageYmlPath = getLocalPackageYmlPath(targetDir);
   
   if (!(await exists(packageYmlPath))) {
@@ -300,14 +323,14 @@ export async function addPackageToYml(
       targetArrayRef[existingTargetIndex] = dependency;
       if (!silent) {
         logger.info(`Updated existing package dependency: ${nameWithVersion}`);
-        console.log(`✓ Updated ${nameWithVersion} in main openpackage.yml`);
+        out.success(`Updated ${nameWithVersion} in main openpackage.yml`);
       }
     }
   } else {
     targetArrayRef.push(dependency);
     if (!silent) {
       logger.info(`Added new package dependency: ${nameWithVersion}`);
-      console.log(`✓ Added ${nameWithVersion} to main openpackage.yml`);
+      out.success(`Added ${nameWithVersion} to main openpackage.yml`);
     }
   }
   

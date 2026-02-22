@@ -18,6 +18,8 @@ import { removeWorkspaceIndexEntry } from '../../../utils/workspace-index-owners
 import { normalizePackageName } from '../../../utils/package-name.js';
 import { normalizeGitUrl } from '../../../utils/git-url-parser.js';
 import { logger } from '../../../utils/logger.js';
+import type { OutputPort } from '../../ports/output.js';
+import { resolveOutput } from '../../ports/resolve.js';
 
 // ============================================================================
 // Types
@@ -252,8 +254,10 @@ export async function checkSubsumption(
  */
 export async function resolveSubsumption(
   result: SubsumptionUpgrade,
-  targetDir: string
+  targetDir: string,
+  output?: OutputPort
 ): Promise<void> {
+  const out = output ?? resolveOutput();
   const wsRecord = await readWorkspaceIndex(targetDir);
 
   for (const entry of result.entriesToRemove) {
@@ -267,7 +271,7 @@ export async function resolveSubsumption(
     removeWorkspaceIndexEntry(wsRecord.index, entry.packageName);
     logger.info(`Removed subsumed index entry: ${entry.packageName}`);
 
-    console.log(`  Replacing ${entry.packageName} (subsumed by full package)`);
+    out.info(`  Replacing ${entry.packageName} (subsumed by full package)`);
   }
 
   // Write updated workspace index

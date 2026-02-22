@@ -10,7 +10,8 @@ import { logger } from '../../../utils/logger.js';
 import { getLocalPackageDir } from '../../../utils/paths.js';
 import { FILE_PATTERNS } from '../../../constants/index.js';
 import { getVersionInfoFromDependencyTree } from '../../../utils/install-helpers.js';
-import { promptPackageOverwrite } from '../../../utils/prompts.js';
+import type { PromptPort } from '../../ports/prompt.js';
+import { resolvePrompt, resolveOutput } from '../../ports/resolve.js';
 
 /**
  * Get currently installed version from .openpackage/packages/<package>/openpackage.yml
@@ -35,11 +36,13 @@ async function getInstalledPackageVersion(cwd: string, packageName: string): Pro
 export async function checkAndHandleAllPackageConflicts(
   resolvedPackages: ResolvedPackage[],
   options: InstallOptions,
-  policy?: InteractionPolicy
+  policy?: InteractionPolicy,
+  prompt?: PromptPort
 ): Promise<{ shouldProceed: boolean; skippedPackages: string[]; forceOverwritePackages: Set<string> }> {
   const cwd = process.cwd();
   const skippedPackages: string[] = [];
   const forceOverwritePackages = new Set<string>();
+  const p = prompt ?? resolvePrompt();
   
   // Check each package in the dependency tree for conflicts
   for (const resolved of resolvedPackages) {
@@ -65,10 +68,13 @@ export async function checkAndHandleAllPackageConflicts(
       
       // Prompt per package overwrite confirmation when existing detected
       if (policy && !policy.canPrompt(PromptTier.Confirmation)) {
-        console.log(`⚠️  Skipping '${resolved.name}' (already exists). Use --force to overwrite.`);
+        resolveOutput().warn(`Skipping '${resolved.name}' (already exists). Use --force to overwrite.`);
         skippedPackages.push(resolved.name);
       } else {
-        const confirmed = await promptPackageOverwrite(resolved.name, existingVersion);
+        const versionSuffix = existingVersion ? ` (${existingVersion})` : '';
+        const confirmed = await p.confirm(
+          `Package '${resolved.name}' already exists${versionSuffix}. Overwrite all files?`
+        );
         if (confirmed) {
           forceOverwritePackages.add(resolved.name);
         } else {

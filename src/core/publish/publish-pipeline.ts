@@ -20,6 +20,8 @@ import { classifyPackageInput } from '../../utils/package-input.js';
 import { resolvePackageByName } from '../../utils/package-name-resolution.js';
 import { ValidationError } from '../../utils/errors.js';
 import { formatPathForDisplay } from '../../utils/formatters.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 /**
  * Main publish pipeline - routes to local or remote based on options
@@ -50,7 +52,8 @@ interface ResolvedSource {
  */
 async function resolveSource(
   cwd: string,
-  packageInput?: string
+  packageInput?: string,
+  output?: OutputPort
 ): Promise<ResolvedSource> {
   // No package input provided - publish CWD as package
   if (!packageInput) {
@@ -127,7 +130,8 @@ async function resolveSource(
       const sourceLabel = selected.type === 'cwd' ? 'current directory' :
                          selected.type === 'workspace' ? 'workspace packages' :
                          selected.type === 'global' ? 'global packages' : selected.type;
-      console.log(`✓ Found ${packageInput} in ${sourceLabel}`);
+      const out = output ?? resolveOutput();
+      out.success(`Found ${packageInput} in ${sourceLabel}`);
     }
   }
 
@@ -184,15 +188,17 @@ function validateVersion(version?: string): void {
 
 async function runRemotePublishPipeline(
   packageInput: string | undefined,
-  options: PublishOptions
+  options: PublishOptions,
+  output?: OutputPort
 ): Promise<PublishResult> {
+  const out = output ?? resolveOutput();
   const cwd = process.cwd();
   let uploadPackageName: string | undefined;
   let version: string | undefined;
 
   try {
     // Resolve source package (supports CWD, package names, and directory paths)
-    const source = await resolveSource(cwd, packageInput);
+    const source = await resolveSource(cwd, packageInput, output);
 
     if (!source.name) {
       throw new PublishError(
@@ -253,7 +259,8 @@ async function runRemotePublishPipeline(
       profile,
       source,
       files.length,
-      cwd
+      cwd,
+      out
     );
 
     return {
@@ -283,25 +290,26 @@ function printPublishSuccessEnhanced(
   profile: string,
   source: ResolvedSource,
   fileCount: number,
-  cwd: string
+  cwd: string,
+  out: OutputPort
 ): void {
-  console.log(`\n✓ Published ${source.name}@${source.version} to remote registry\n`);
+  out.success(`Published ${source.name}@${source.version} to remote registry`);
   
   // Package description if available
   if (source.manifest.description) {
-    console.log(`✓ Description: ${source.manifest.description}`);
+    out.info(`Description: ${source.manifest.description}`);
   }
   
   // Source path
   const displaySource = formatPathForDisplay(source.packageRoot, cwd);
-  console.log(`✓ Source: ${displaySource}`);
+  out.info(`Source: ${displaySource}`);
   
   // Registry destination
-  console.log(`✓ Registry: ${registryUrl}`);
-  console.log(`✓ Profile: ${profile}`);
+  out.info(`Registry: ${registryUrl}`);
+  out.info(`Profile: ${profile}`);
   
   // File count
-  console.log(`✓ Files: ${fileCount}`);
+  out.info(`Files: ${fileCount}`);
   
   // Size and checksum (remote-specific)
   const formatFileSize = (bytes: number): string => {
@@ -311,11 +319,11 @@ function printPublishSuccessEnhanced(
     return `${mb.toFixed(1)} MB`;
   };
   
-  console.log(`✓ Size: ${formatFileSize(tarballInfo.size)}`);
-  console.log(`✓ Checksum: ${tarballInfo.checksum.substring(0, 12)}...`);
+  out.info(`Size: ${formatFileSize(tarballInfo.size)}`);
+  out.info(`Checksum: ${tarballInfo.checksum.substring(0, 12)}...`);
   
   // Success message from server
   if (response.message) {
-    console.log(`\n${response.message}`);
+    out.info(`\n${response.message}`);
   }
 }

@@ -4,7 +4,8 @@ import type { Package } from '../../types/index.js';
 import { formatFileSize } from '../../utils/formatters.js';
 import type { HttpClient } from '../../utils/http-client.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
-import { Spinner } from '../../utils/spinner.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 import { createFormDataForUpload, createTarballFromPackage } from '../../utils/tarball.js';
 import { serializePackageYml } from '../../utils/package-yml.js';
 
@@ -36,10 +37,11 @@ export function preparePackageForUpload(pkg: Package, uploadName: string): Packa
   };
 }
 
-export async function createPublishTarball(pkg: Package) {
-  console.log('✓ Creating tarball...');
+export async function createPublishTarball(pkg: Package, output?: OutputPort) {
+  const out = output ?? resolveOutput();
+  out.info('Creating tarball...');
   const tarballInfo = await createTarballFromPackage(pkg);
-  console.log(`✓ Created tarball (${pkg.files.length} files, ${formatFileSize(tarballInfo.size)})`);
+  out.success(`Created tarball (${pkg.files.length} files, ${formatFileSize(tarballInfo.size)})`);
   return tarballInfo;
 }
 
@@ -47,17 +49,19 @@ export async function uploadPackage(
   httpClient: HttpClient,
   packageName: string,
   uploadVersion: string | undefined,
-  tarballInfo: Awaited<ReturnType<typeof createTarballFromPackage>>
+  tarballInfo: Awaited<ReturnType<typeof createTarballFromPackage>>,
+  output?: OutputPort
 ): Promise<PushPackageResponse> {
+  const out = output ?? resolveOutput();
   const formData = createFormDataForUpload(packageName, uploadVersion, tarballInfo);
-  const uploadSpinner = new Spinner('Uploading to registry...');
-  return withSpinner(uploadSpinner, () =>
+  const uploadSpinner = out.spinner();
+  return withSpinner(uploadSpinner, 'Uploading to registry...', () =>
     httpClient.uploadFormData<PushPackageResponse>('/packages/push', formData)
   );
 }
 
-async function withSpinner<T>(spinner: Spinner, fn: () => Promise<T>): Promise<T> {
-  spinner.start();
+async function withSpinner<T>(spinner: ReturnType<OutputPort['spinner']>, message: string, fn: () => Promise<T>): Promise<T> {
+  spinner.start(message);
   try {
     return await fn();
   } finally {

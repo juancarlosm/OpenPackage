@@ -7,7 +7,9 @@
  * - N candidates → shows multiselect prompt for user to choose
  */
 
-import { promptMultiselect, promptSelect } from '../../utils/prompts.js';
+import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { ValidationError } from '../../utils/errors.js';
 
 export interface DisambiguationChoice<T> {
@@ -34,13 +36,17 @@ export interface DisambiguationOptions {
  * @param candidates - Array of candidate items
  * @param formatChoice - Function to format each candidate as a prompt choice
  * @param options - Configuration options
+ * @param output - Optional OutputPort
+ * @param prompt - Optional PromptPort
  * @returns Array of selected candidates (single-element for 1 match or multi=false)
  */
 export async function disambiguate<T>(
   name: string,
   candidates: T[],
   formatChoice: (candidate: T, index: number) => DisambiguationChoice<T>,
-  options: DisambiguationOptions = {}
+  options: DisambiguationOptions = {},
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<T[]> {
   const {
     notFoundMessage = `"${name}" not found.\nRun \`opkg ls\` to see installed resources.`,
@@ -48,6 +54,9 @@ export async function disambiguate<T>(
     promptMessage = 'Select which to act on:',
     multi = true,
   } = options;
+
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
 
   // 0 candidates → error
   if (candidates.length === 0) {
@@ -71,12 +80,12 @@ export async function disambiguate<T>(
     };
   });
 
-  console.log(ambiguousHeader.replace(/\$\{name\}/g, name).trim());
+  out.info(ambiguousHeader.replace(/\$\{name\}/g, name).trim());
 
   if (multi) {
-    const selectedIndices = await promptMultiselect(
+    const selectedIndices = await prm.multiselect<number>(
       promptMessage,
-      choices.map(c => ({ value: c.value, title: c.title, description: c.description }))
+      choices
     );
 
     if (!selectedIndices || selectedIndices.length === 0) {
@@ -85,9 +94,9 @@ export async function disambiguate<T>(
     return selectedIndices.map(i => candidates[i]);
   } else {
     // Single select mode
-    const selectedIndex = await promptSelect(
+    const selectedIndex = await prm.select<number>(
       promptMessage,
-      choices.map(c => ({ value: c.value, title: c.title, description: c.description }))
+      choices
     );
 
     if (selectedIndex === null || selectedIndex === undefined) {

@@ -9,7 +9,8 @@ import { DependencyGraphBuilder } from './graph-builder.js';
 import { PackageLoader } from './package-loader.js';
 import { InstallationPlanner } from './installation-planner.js';
 import { solveVersions, createInteractiveConflictHandler, type VersionSolution, type SolverOptions } from './version-solver.js';
-import { promptVersionSelection } from '../../../utils/prompts.js';
+import type { PromptPort } from '../../ports/prompt.js';
+import { resolvePrompt } from '../../ports/resolve.js';
 import { PromptTier } from '../../../core/interaction-policy.js';
 import type {
   DependencyGraph,
@@ -59,7 +60,16 @@ export class DependencyResolutionExecutor {
       
       const solverOptions: SolverOptions = { force };
       if (!force && this.execContext.interactionPolicy?.canPrompt(PromptTier.ConflictResolution)) {
-        solverOptions.onConflict = createInteractiveConflictHandler(promptVersionSelection);
+        const p = this.execContext.prompt ?? resolvePrompt();
+        const versionSelector = async (packageName: string, versions: string[], action?: string): Promise<string | null> => {
+          const choices = versions.map(v => ({ title: v, value: v }));
+          return p.select<string>(
+            `Select version of '${packageName}' ${action ?? ''}:`,
+            choices,
+            'Use arrow keys to navigate, Enter to select'
+          );
+        };
+        solverOptions.onConflict = createInteractiveConflictHandler(versionSelector);
       }
       
       versionSolution = await solveVersions(graph, solverOptions);

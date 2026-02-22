@@ -6,17 +6,16 @@ import { buildGitInstallContext, buildPathInstallContext, buildResourceInstallCo
 import type { InstallationContext } from './unified/context.js';
 import { runUnifiedInstallPipeline } from './unified/pipeline.js';
 import { detectPluginType, detectPluginWithMarketplace, validatePluginManifest } from './plugin-detector.js';
-import { Spinner } from '../../utils/spinner.js';
 import type { CommandResult, InstallOptions, ExecutionContext } from '../../types/index.js';
-import { CLAUDE_PLUGIN_PATHS } from '../../constants/index.js';
+import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { runMultiContextPipeline } from './unified/multi-context-pipeline.js';
 import { getLoaderForSource } from './sources/loader-factory.js';
 import { applyBaseDetection } from './preprocessing/base-resolver.js';
 import { resolveConvenienceResources } from './preprocessing/convenience-preprocessor.js';
 import { discoverResources } from './resource-discoverer.js';
 import { promptResourceSelection, displaySelectionSummary } from './resource-selection-menu.js';
-import { select, isCancel, note, cancel } from '@clack/prompts';
-import { output } from '../../utils/output.js';
 import type { ResourceInstallationSpec } from './convenience-matchers.js';
 import type { SelectedResource } from './resource-types.js';
 import {
@@ -154,32 +153,30 @@ export async function parseMarketplace(
  * @returns Selected plugin name (empty string if user cancelled)
  */
 export async function promptPluginSelection(
-  marketplace: MarketplaceManifest
+  marketplace: MarketplaceManifest,
+  execContext?: ExecutionContext
 ): Promise<string> {
-  // Display marketplace info using clack log
-  output.info(`Marketplace: ${marketplace.name}`);
+  const out = resolveOutput(execContext);
+  const prompt = resolvePrompt(execContext);
+  // Display marketplace info
+  out.info(`Marketplace: ${marketplace.name}`);
   if (marketplace.description) {
-    output.message(marketplace.description);
+    out.message(marketplace.description);
   }
 
-  const options = marketplace.plugins
+  const choices = marketplace.plugins
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(plugin => ({
+      title: plugin.name,
       value: plugin.name,
-      label: plugin.name,
-      hint: plugin.description || ''
+      description: plugin.description || ''
     }));
   
   try {
-    const selectedPlugin = await select({
-      message: 'Select a plugin to install:',
-      options
-    });
-    
-    if (isCancel(selectedPlugin)) {
-      logger.info('User cancelled plugin selection');
-      return '';
-    }
+    const selectedPlugin = await prompt.select(
+      'Select a plugin to install:',
+      choices
+    );
     
     logger.info('User selected plugin', { selected: selectedPlugin });
     return selectedPlugin as string;
@@ -203,28 +200,24 @@ export type InstallMode = 'full' | 'partial';
  * @param pluginName - Name of the plugin being installed
  * @returns Install mode ('full' or 'partial'), or empty string if cancelled
  */
-export async function promptInstallMode(pluginName: string): Promise<InstallMode | ''> {
+export async function promptInstallMode(pluginName: string, execContext?: ExecutionContext): Promise<InstallMode | ''> {
+  const prompt = resolvePrompt(execContext);
   try {
-    const mode = await select({
-      message: `How would you like to install ${pluginName}?`,
-      options: [
+    const mode = await prompt.select(
+      `How would you like to install ${pluginName}?`,
+      [
         { 
-          value: 'full', 
-          label: 'Install full plugin', 
-          hint: 'Install all resources from this plugin' 
+          title: 'Install full plugin', 
+          value: 'full' as const,
+          description: 'Install all resources from this plugin' 
         },
         { 
-          value: 'partial', 
-          label: 'Select individual resources', 
-          hint: 'Choose specific agents, skills, commands, etc.' 
+          title: 'Select individual resources', 
+          value: 'partial' as const,
+          description: 'Choose specific agents, skills, commands, etc.' 
         }
       ]
-    });
-    
-    if (isCancel(mode)) {
-      logger.info('User cancelled install mode selection');
-      return '';
-    }
+    );
     
     logger.info('User selected install mode', { mode });
     return mode as InstallMode;
@@ -253,13 +246,14 @@ async function installPluginPartial(
   context: any,
   repoRoot: string
 ): Promise<CommandResult> {
+  const out = resolveOutput(context.execution);
   logger.info('Starting partial plugin installation', {
     plugin: pluginEntry.name,
     path: pluginDir
   });
   
   // Discover all resources with spinner
-  const s = output.spinner();
+  const s = out.spinner();
   s.start('Discovering resources');
   
   const discovery = await discoverResources(pluginDir, repoRoot);
@@ -273,7 +267,7 @@ async function installPluginPartial(
   
   // Check if any resources found
   if (discovery.total === 0) {
-    output.warn('No installable resources found in this plugin');
+    out.warn('No installable resources found in this plugin');
     return {
       success: true,
       data: { installed: 0, skipped: 0 }
@@ -288,7 +282,7 @@ async function installPluginPartial(
   );
   
   if (selected.length === 0) {
-    cancel('No resources selected. Installation cancelled.');
+    out.warn('No resources selected. Installation cancelled.');
     return {
       success: true,
       data: { installed: 0, skipped: 0 }
@@ -366,11 +360,13 @@ export async function installMarketplacePlugins(
     mode: installMode
   });
   
+  const out = resolveOutput(execContext);
+  
   const pluginEntry = marketplace.plugins.find(p => p.name === selectedName);
   if (!pluginEntry) {
     const error = `Plugin '${selectedName}' not found in marketplace`;
     logger.error(error, { marketplace: marketplace.name });
-    output.error(`${selectedName}: ${error}`);
+    out.error(`${selectedName}: ${error}`);
     return { success: false, error };
   }
   
@@ -381,7 +377,7 @@ export async function installMarketplacePlugins(
   } catch (error) {
     logger.error('Failed to normalize plugin source', { plugin: selectedName, error });
     const errorMsg = error instanceof Error ? error.message : 'Invalid source configuration';
-    output.error(`${selectedName}: ${errorMsg}`);
+    out.error(`${selectedName}: ${errorMsg}`);
     return { success: false, error: errorMsg };
   }
   
@@ -422,7 +418,7 @@ export async function installMarketplacePlugins(
   } catch (error) {
     logger.error('Failed to install plugin', { plugin: selectedName, error });
     const errorMsg = error instanceof Error ? error.message : String(error);
-    output.error(`${selectedName}: ${errorMsg}`);
+    out.error(`${selectedName}: ${errorMsg}`);
     return { success: false, error: errorMsg };
   }
 }
@@ -443,6 +439,7 @@ async function installRelativePathPlugin(
   execContext: ExecutionContext,
   convenienceOptions?: { agents?: string[]; skills?: string[]; rules?: string[]; commands?: string[] }
 ): Promise<CommandResult> {
+  const out = resolveOutput(execContext);
   const pluginSubdir = normalizedSource.relativePath!;
   const pluginDir = join(marketplaceDir, pluginSubdir);
   
@@ -454,7 +451,7 @@ async function installRelativePathPlugin(
       path: pluginSubdir,
       fullPath: pluginDir
     });
-    output.error(`${pluginEntry.name}: ${error}`);
+    out.error(`${pluginEntry.name}: ${error}`);
     return { success: false, error };
   }
   
@@ -559,7 +556,7 @@ async function installRelativePathPlugin(
   });
 
   // Show validation/install spinner for full mode only
-  const installSpinner = output.spinner();
+  const installSpinner = out.spinner();
   installSpinner.start(`Installing ${pluginEntry.name}`);
 
   // Validate plugin structure with marketplace context
@@ -576,7 +573,7 @@ async function installRelativePathPlugin(
       strict: pluginEntry.strict
     });
     installSpinner.stop();
-    output.error(`${pluginEntry.name}: ${error}`);
+    out.error(`${pluginEntry.name}: ${error}`);
     return { success: false, error };
   }
   
@@ -586,7 +583,7 @@ async function installRelativePathPlugin(
       const error = `Invalid plugin manifest in '${pluginSubdir}' (cannot parse JSON)`;
       logger.error('Invalid plugin manifest', { plugin: pluginEntry.name });
       installSpinner.stop();
-      output.error(`${pluginEntry.name}: ${error}`);
+      out.error(`${pluginEntry.name}: ${error}`);
       return { success: false, error };
     }
   }
@@ -605,10 +602,10 @@ async function installRelativePathPlugin(
   
   if (pipelineResult.success) {
     installSpinner.stop();
-    output.success(installedName);
+    out.success(installedName);
   } else {
     installSpinner.stop();
-    output.error(`${installedName}: ${pipelineResult.error || 'Unknown error'}`);
+    out.error(`${installedName}: ${pipelineResult.error || 'Unknown error'}`);
   }
   
   return {
@@ -629,6 +626,7 @@ async function installGitPlugin(
   execContext: ExecutionContext,
   convenienceOptions?: { agents?: string[]; skills?: string[]; rules?: string[]; commands?: string[] }
 ): Promise<CommandResult> {
+  const out = resolveOutput(execContext);
   const gitUrl = normalizedSource.gitUrl!;
   const gitRef = normalizedSource.gitRef;
   const gitPath = normalizedSource.gitPath;
@@ -729,7 +727,7 @@ async function installGitPlugin(
     plugin: pluginEntry.name
   });
 
-  const installSpinner = output.spinner();
+  const installSpinner = out.spinner();
   installSpinner.start(`Installing ${pluginEntry.name}`);
 
   const pipelineResult = await runUnifiedInstallPipeline(ctx);
@@ -740,9 +738,9 @@ async function installGitPlugin(
   installSpinner.stop();
   
   if (pipelineResult.success) {
-    output.success(installedName);
+    out.success(installedName);
   } else {
-    output.error(`${installedName}: ${pipelineResult.error || 'Unknown error'}`);
+    out.error(`${installedName}: ${pipelineResult.error || 'Unknown error'}`);
   }
   
   return {

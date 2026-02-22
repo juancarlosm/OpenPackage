@@ -5,22 +5,26 @@
 import { formatPathForDisplay } from '../../utils/formatters.js';
 import type { PackageYml } from '../../types/index.js';
 import type { ConfigChange, SetPipelineResult } from './set-types.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 /**
  * Display changes that will be applied to the manifest
  */
-export function displayConfigChanges(changes: ConfigChange[]): void {
+export function displayConfigChanges(changes: ConfigChange[], output?: OutputPort): void {
+  const out = output ?? resolveOutput();
+
   if (changes.length === 0) {
-    console.log('\nNo changes detected.');
+    out.info('\nNo changes detected.');
     return;
   }
 
-  console.log('\n📝 Changes to apply:');
+  out.info('\n📝 Changes to apply:');
   
   for (const change of changes) {
     const oldDisplay = formatValue(change.oldValue);
     const newDisplay = formatValue(change.newValue);
-    console.log(`  ${change.field}: ${oldDisplay} → ${newDisplay}`);
+    out.info(`  ${change.field}: ${oldDisplay} → ${newDisplay}`);
   }
 }
 
@@ -55,38 +59,44 @@ function formatValue(value: any): string {
  */
 export function displaySetSuccess(
   result: SetPipelineResult,
-  cwd: string
+  cwd: string,
+  output?: OutputPort
 ): void {
+  const out = output ?? resolveOutput();
   const displayPath = formatPathForDisplay(result.packagePath, cwd);
   
-  console.log(`\n✓ Updated ${result.packageName} manifest`);
-  console.log(`  Path: ${displayPath}`);
-  console.log(`  Type: ${result.sourceType} package`);
+  out.success(`Updated ${result.packageName} manifest`);
+  out.info(`  Path: ${displayPath}`);
+  out.info(`  Type: ${result.sourceType} package`);
   
   if (result.updatedFields.length > 0) {
     const fieldList = result.updatedFields.join(', ');
-    console.log(`  Updated: ${fieldList}`);
+    out.info(`  Updated: ${fieldList}`);
   }
 }
 
 /**
  * Display current package configuration for interactive mode
  */
-export function displayCurrentConfig(config: PackageYml, packagePath: string): void {
-  console.log(`\nCurrent package: ${config.name}`);
+export function displayCurrentConfig(config: PackageYml, packagePath: string, output?: OutputPort): void {
+  const out = output ?? resolveOutput();
+
+  out.info(`\nCurrent package: ${config.name}`);
   
   if (config.version) {
-    console.log(`Version: ${config.version}`);
+    out.info(`Version: ${config.version}`);
   }
   
-  console.log(`Path: ${packagePath}`);
-  console.log('\nLeave blank to keep current value, or enter new value:\n');
+  out.info(`Path: ${packagePath}`);
+  out.info('\nLeave blank to keep current value, or enter new value:\n');
 }
 
 /**
  * Display no-changes message
  */
-export function displayNoChanges(packageName: string): void {
-  console.log(`\n✓ No changes made to ${packageName}`);
-  console.log('  Manifest unchanged');
+export function displayNoChanges(packageName: string, output?: OutputPort): void {
+  const out = output ?? resolveOutput();
+
+  out.success(`No changes made to ${packageName}`);
+  out.info('  Manifest unchanged');
 }

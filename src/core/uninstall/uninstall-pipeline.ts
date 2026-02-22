@@ -17,6 +17,8 @@ import { getTargetPath } from '../../utils/workspace-index-helpers.js';
 import { buildPreservedDirectoriesSet } from '../../utils/directory-preservation.js';
 import { cleanupEmptyParents } from '../../utils/cleanup-empty-parents.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 
 interface ProcessFileMappingsOptions {
   dryRun?: boolean;
@@ -126,6 +128,7 @@ export async function runUninstallPipeline(
   const rootNames = getPlatformRootFileNames(getAllPlatforms(undefined, targetDir), targetDir);
 
   if (options.dryRun) {
+    const out = resolveOutput(execContext);
     const plannedRemovals = await processFileMappings(
       pkgEntry.files || {},
       targetDir,
@@ -134,13 +137,13 @@ export async function runUninstallPipeline(
       { dryRun: true }
     );
     const rootPlan = await processRootFileRemovals(targetDir, [packageName], { dryRun: true });
-    console.log(`(dry-run) Would remove ${plannedRemovals.removed.length} files for ${packageName}`);
+    out.info(`(dry-run) Would remove ${plannedRemovals.removed.length} files for ${packageName}`);
     for (const filePath of plannedRemovals.removed) {
-      console.log(` - ${filePath}`);
+      out.info(` - ${filePath}`);
     }
     if (rootPlan.updated.length > 0) {
-      console.log(`Root files to update:`);
-      rootPlan.updated.forEach(f => console.log(` - ${f}`));
+      out.info(`Root files to update:`);
+      rootPlan.updated.forEach(f => out.info(` - ${f}`));
     }
     return {
       success: true,
@@ -221,6 +224,7 @@ export async function runSelectiveUninstallPipeline(
   const rootNames = getPlatformRootFileNames(getAllPlatforms(undefined, targetDir), targetDir);
 
   if (options.dryRun) {
+    const out = resolveOutput(execContext);
     const plannedRemovals = await processFileMappings(
       filteredFiles,
       targetDir,
@@ -228,9 +232,9 @@ export async function runSelectiveUninstallPipeline(
       rootNames,
       { dryRun: true }
     );
-    console.log(`(dry-run) Would remove ${plannedRemovals.removed.length} files for ${packageName}`);
+    out.info(`(dry-run) Would remove ${plannedRemovals.removed.length} files for ${packageName}`);
     for (const filePath of plannedRemovals.removed) {
-      console.log(` - ${filePath}`);
+      out.info(` - ${filePath}`);
     }
     return {
       success: true,

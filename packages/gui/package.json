@@ -1,0 +1,24 @@
+{
+  "name": "@opkg/gui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenPackage Desktop GUI - Tauri-based desktop application for managing AI coding packages.",
+  "license": "Apache-2.0",
+  "author": "Eric Lee",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@opkg/core": "workspace:*",
+    "@tauri-apps/api": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "typescript": "^5.9.2",
+    "vite": "^6.0.0"
+  }
+}

@@ -8,13 +8,11 @@ import {
   cleanupEmptyPackageDirectory
 } from '../directory.js';
 import { exists, remove, countFilesInDirectory } from '../../utils/fs.js';
-import { 
-  promptPackageDelete, 
-  promptUnpublishConfirmation 
-} from '../../utils/prompts.js';
 import { formatPathForDisplay, formatFileCount } from '../../utils/formatters.js';
 import { logger } from '../../utils/logger.js';
-import { Spinner } from '../../utils/spinner.js';
+import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { ValidationError, PackageNotFoundError } from '../../utils/errors.js';
 import { displayUnpublishSuccess } from './unpublish-output.js';
 import type { UnpublishOptions, UnpublishResult, UnpublishData } from './unpublish-types.js';
@@ -24,8 +22,12 @@ import type { UnpublishOptions, UnpublishResult, UnpublishData } from './unpubli
  */
 export async function runLocalUnpublishPipeline(
   packageSpec: string,
-  options: UnpublishOptions
+  options: UnpublishOptions,
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<UnpublishResult> {
+  const out = output ?? resolveOutput();
+  const prm = prompt ?? resolvePrompt();
   try {
     // Parse package spec (e.g., "my-package@1.0.0" or "my-package")
     const { name, version } = parsePackageInput(packageSpec);
@@ -58,7 +60,7 @@ export async function runLocalUnpublishPipeline(
       if (availableVersions.length === 1) {
         // Only one version exists - auto-select it
         targetVersion = availableVersions[0];
-        console.log(`Only one version exists: ${targetVersion}`);
+        out.info(`Only one version exists: ${targetVersion}`);
       } else {
         // Multiple versions - unpublish all (with confirmation)
         unpublishAll = true;
@@ -75,9 +77,9 @@ export async function runLocalUnpublishPipeline(
     
     // Execute unpublish
     if (unpublishAll) {
-      return await unpublishAllVersions(normalizedName, availableVersions, options);
+      return await unpublishAllVersions(normalizedName, availableVersions, options, out, prm);
     } else {
-      return await unpublishSpecificVersion(normalizedName, targetVersion!, options);
+      return await unpublishSpecificVersion(normalizedName, targetVersion!, options, out, prm);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -96,7 +98,9 @@ export async function runLocalUnpublishPipeline(
 async function unpublishSpecificVersion(
   packageName: string,
   version: string,
-  options: UnpublishOptions
+  options: UnpublishOptions,
+  out: OutputPort,
+  prm: PromptPort
 ): Promise<UnpublishResult<UnpublishData>> {
   const versionPath = getPackageVersionPath(packageName, version);
   const displayPath = formatPathForDisplay(versionPath);
@@ -106,13 +110,16 @@ async function unpublishSpecificVersion(
   
   // Confirmation (unless --force)
   if (!options.force) {
-    console.log('');
-    console.log(`⚠️ About to unpublish (delete) ${packageName}@${version} from local registry`);
-    console.log(`   Location: ${displayPath}`);
-    console.log(`   Files: ${formatFileCount(fileCount)}`);
-    console.log('');
+    out.info('');
+    out.warn(`About to unpublish (delete) ${packageName}@${version} from local registry`);
+    out.info(`   Location: ${displayPath}`);
+    out.info(`   Files: ${formatFileCount(fileCount)}`);
+    out.info('');
     
-    const confirmed = await promptPackageDelete(packageName);
+    const confirmed = await prm.confirm(
+      `Are you sure you want to delete package '${packageName}'? This action cannot be undone.`,
+      false
+    );
     if (!confirmed) {
       return {
         success: false,
@@ -122,8 +129,8 @@ async function unpublishSpecificVersion(
   }
   
   // Remove version directory
-  const spinner = new Spinner(`Removing ${packageName}@${version}...`);
-  spinner.start();
+  const spinner = out.spinner();
+  spinner.start(`Removing ${packageName}@${version}...`);
   
   await remove(versionPath);
   
@@ -167,7 +174,9 @@ async function unpublishSpecificVersion(
 async function unpublishAllVersions(
   packageName: string,
   versions: string[],
-  options: UnpublishOptions
+  options: UnpublishOptions,
+  out: OutputPort,
+  prm: PromptPort
 ): Promise<UnpublishResult<UnpublishData>> {
   const packagePath = getPackagePath(packageName);
   const displayPath = formatPathForDisplay(packagePath);
@@ -181,13 +190,16 @@ async function unpublishAllVersions(
   
   // Confirmation (unless --force)
   if (!options.force) {
-    console.log('');
-    console.log(`⚠️ About to unpublish (delete) ALL ${versions.length} versions of ${packageName}`);
-    console.log(`   Location: ${displayPath}`);
-    console.log(`   Total files: ${formatFileCount(totalFileCount)}`);
-    console.log('');
+    out.info('');
+    out.warn(`About to unpublish (delete) ALL ${versions.length} versions of ${packageName}`);
+    out.info(`   Location: ${displayPath}`);
+    out.info(`   Total files: ${formatFileCount(totalFileCount)}`);
+    out.info('');
     
-    const confirmed = await promptUnpublishConfirmation(packageName, versions);
+    const confirmed = await prm.confirm(
+      `Unpublish ALL ${versions.length} versions of '${packageName}'? This action cannot be undone.`,
+      false
+    );
     if (!confirmed) {
       return {
         success: false,
@@ -197,8 +209,8 @@ async function unpublishAllVersions(
   }
   
   // Remove entire package directory
-  const spinner = new Spinner(`Removing ${packageName} (${versions.length} versions)...`);
-  spinner.start();
+  const spinner = out.spinner();
+  spinner.start(`Removing ${packageName} (${versions.length} versions)...`);
   
   await remove(packagePath);
   

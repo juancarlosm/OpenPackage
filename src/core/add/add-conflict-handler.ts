@@ -2,12 +2,13 @@ import { basename, dirname, extname, join, relative as pathRelative } from 'path
 
 import type { PackageFile } from '../../types/index.js';
 import { ensureDir, exists, readTextFile, writeTextFile } from '../../utils/fs.js';
-import { safePrompts } from '../../utils/prompts.js';
 import { UserCancellationError } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import type { SourceEntry } from './source-collector.js';
 import type { PackageContext } from '../package-context.js';
 import { PromptTier } from '../../core/interaction-policy.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolvePrompt, resolveOutput } from '../ports/resolve.js';
 import { applyMapPipeline, createMapContext, splitMapPipeline } from '../flows/map-pipeline/index.js';
 import { defaultTransformRegistry } from '../flows/flow-transforms.js';
 import { parseMarkdownDocument, serializeMarkdownDocument } from '../flows/markdown.js';
@@ -69,6 +70,7 @@ function transformMarkdownWithFlowMap(
 export interface CopyFilesWithConflictResolutionOptions {
   force?: boolean;
   execContext?: { interactionPolicy?: { canPrompt(tier: PromptTier): boolean } };
+  prompt?: PromptPort;
 }
 
 export async function copyFilesWithConflictResolution(
@@ -102,9 +104,9 @@ export async function copyFilesWithConflictResolution(
       if (forceOverwrite) {
         decision = 'overwrite';
       } else if (policy?.canPrompt(PromptTier.Confirmation)) {
-        decision = await promptConflictDecision(name, entry.registryPath);
+        decision = await promptConflictDecision(name, entry.registryPath, options.prompt);
       } else {
-        console.log(`⚠️  Skipping '${entry.registryPath}' (already exists). Use --force to overwrite.`);
+        resolveOutput().warn(`Skipping '${entry.registryPath}' (already exists). Use --force to overwrite.`);
         continue;
       }
 
@@ -127,22 +129,21 @@ export async function copyFilesWithConflictResolution(
   return changedFiles;
 }
 
-async function promptConflictDecision(packageName: string, registryPath: string): Promise<ConflictDecision> {
-  const response = await safePrompts({
-    type: 'select',
-    name: 'decision',
-    message: `File '${registryPath}' already exists in package '${packageName}'. Choose how to proceed:`,
-    choices: [
+async function promptConflictDecision(packageName: string, registryPath: string, prompt?: PromptPort): Promise<ConflictDecision> {
+  const p = prompt ?? resolvePrompt();
+  const decision = await p.select<ConflictDecision | 'cancel'>(
+    `File '${registryPath}' already exists in package '${packageName}'. Choose how to proceed:`,
+    [
       { title: 'Keep existing file (skip)', value: 'keep-existing' },
       { title: 'Replace with workspace file', value: 'overwrite' },
       { title: 'Cancel operation', value: 'cancel' }
     ]
-  });
+  );
 
-  if (response.decision === 'cancel') {
+  if (decision === 'cancel') {
     throw new UserCancellationError();
   }
 
-  return response.decision as ConflictDecision;
+  return decision as ConflictDecision;
 }
 

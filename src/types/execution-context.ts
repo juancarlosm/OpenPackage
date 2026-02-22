@@ -7,6 +7,8 @@
 
 import type { TelemetryCollector } from '../utils/telemetry.js';
 import type { InteractionPolicy } from '../core/interaction-policy.js';
+import type { OutputPort } from '../core/ports/output.js';
+import type { PromptPort } from '../core/ports/prompt.js';
 
 /**
  * ExecutionContext - Single source of truth for directory resolution
@@ -14,6 +16,9 @@ import type { InteractionPolicy } from '../core/interaction-policy.js';
  * Strictly separates:
  * - sourceCwd: Where we resolve input arguments (local paths, relative paths)
  * - targetDir: Where we write output files (installation destination)
+ * 
+ * Also carries port interfaces for decoupled output and prompting,
+ * enabling the same core logic to be driven by CLI, GUI, or CI.
  */
 export interface ExecutionContext {
   /**
@@ -53,6 +58,20 @@ export interface ExecutionContext {
    * Created once at command entry and threaded through all handlers.
    */
   interactionPolicy?: InteractionPolicy;
+
+  /**
+   * Output port for all user-facing messages (info, success, error, warn, etc.).
+   * When not provided, defaults to consoleOutput (plain console.log).
+   * CLI provides ClackOutputAdapter; GUI provides its own adapter.
+   */
+  output?: OutputPort;
+
+  /**
+   * Prompt port for all interactive user prompts (confirm, select, text, etc.).
+   * When not provided, defaults to nonInteractivePrompt (throws on prompt).
+   * CLI provides ClackPromptAdapter; GUI provides its own adapter.
+   */
+  prompt?: PromptPort;
 }
 
 /**

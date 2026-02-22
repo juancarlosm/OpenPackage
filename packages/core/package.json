@@ -1,0 +1,58 @@
+{
+  "name": "@opkg/core",
+  "version": "0.9.0",
+  "description": "Core business logic for OpenPackage - the package manager for AI coding.",
+  "license": "Apache-2.0",
+  "author": "Eric Lee",
+  "homepage": "https://openpackage.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enulus/openpackage.git",
+    "directory": "packages/core"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ports": {
+      "types": "./dist/core/ports/index.d.ts",
+      "import": "./dist/core/ports/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "fast-fuzzy": "^1.12.0",
+    "fast-glob": "^3.3.3",
+    "gray-matter": "^4.0.3",
+    "hash-wasm": "^4.12.0",
+    "js-yaml": "^4.1.0",
+    "jsonc-parser": "^3.3.1",
+    "jsonpath-plus": "^10.3.0",
+    "junk": "^4.0.1",
+    "minimatch": "^10.1.1",
+    "nanoid": "^5.0.7",
+    "semver": "^7.7.2",
+    "smol-toml": "^1.6.0",
+    "tar": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/jsonpath-plus": "^5.0.5",
+    "@types/minimatch": "^5.1.2",
+    "@types/node": "^24.3.1",
+    "@types/semver": "^7.7.1",
+    "@types/tar": "^6.1.0",
+    "typescript": "^5.9.2"
+  }
+}

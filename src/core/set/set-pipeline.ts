@@ -15,7 +15,8 @@ import { logger } from '../../utils/logger.js';
 import { normalizePackageName, validatePackageName } from '../../utils/package-name.js';
 import { ValidationError, UserCancellationError } from '../../utils/errors.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
-import { promptConfirmation, safePrompts } from '../../utils/prompts.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolvePrompt } from '../ports/resolve.js';
 import { 
   displayConfigChanges, 
   displaySetSuccess, 
@@ -160,127 +161,107 @@ function extractUpdatesFromOptions(options: SetCommandOptions): PackageManifestU
  * Prompt user for updates interactively
  */
 async function promptPackageUpdates(
-  currentConfig: PackageYml
+  currentConfig: PackageYml,
+  prm: PromptPort
 ): Promise<PackageManifestUpdates> {
   displayCurrentConfig(currentConfig, '');
   
-  const response = await safePrompts([
-    {
-      type: 'text',
-      name: 'name',
-      message: 'Package name:',
-      initial: currentConfig.name,
-      validate: (value: string) => {
-        if (!value) return 'Name is required';
-        try {
-          validatePackageName(value);
-        } catch (error) {
-          const message = (error as Error).message;
-          return message.replace(/^Validation error:\s*/, '');
-        }
-        return true;
+  const name = await prm.text('Package name:', {
+    initial: currentConfig.name,
+    validate: (value: string) => {
+      if (!value) return 'Name is required';
+      try {
+        validatePackageName(value);
+      } catch (error) {
+        const message = (error as Error).message;
+        return message.replace(/^Validation error:\s*/, '');
       }
-    },
-    {
-      type: 'text',
-      name: 'version',
-      message: 'Version:',
-      initial: currentConfig.version || '',
-      validate: (value: string) => {
-        if (!value) return true; // Allow empty (will keep current)
-        if (!semver.valid(value)) {
-          return 'Version must be valid semver (e.g., 1.0.0)';
-        }
-        return true;
-      }
-    },
-    {
-      type: 'text',
-      name: 'description',
-      message: 'Description:',
-      initial: currentConfig.description || ''
-    },
-    {
-      type: 'text',
-      name: 'keywords',
-      message: 'Keywords (space-separated):',
-      initial: currentConfig.keywords ? currentConfig.keywords.join(' ') : ''
-    },
-    {
-      type: 'text',
-      name: 'author',
-      message: 'Author:',
-      initial: currentConfig.author || ''
-    },
-    {
-      type: 'text',
-      name: 'license',
-      message: 'License:',
-      initial: currentConfig.license || ''
-    },
-    {
-      type: 'text',
-      name: 'homepage',
-      message: 'Homepage:',
-      initial: currentConfig.homepage || '',
-      validate: (value: string) => {
-        if (!value || value.trim().length === 0) return true;
-        try {
-          new URL(value);
-          return true;
-        } catch {
-          return 'Must be a valid URL';
-        }
-      }
-    },
-    {
-      type: 'confirm',
-      name: 'private',
-      message: 'Private package?',
-      initial: currentConfig.private || false
+      return true;
     }
-  ]);
+  });
+  
+  const version = await prm.text('Version:', {
+    initial: currentConfig.version || '',
+    validate: (value: string) => {
+      if (!value) return true; // Allow empty (will keep current)
+      if (!semver.valid(value)) {
+        return 'Version must be valid semver (e.g., 1.0.0)';
+      }
+      return true;
+    }
+  });
+  
+  const description = await prm.text('Description:', {
+    initial: currentConfig.description || ''
+  });
+  
+  const keywords = await prm.text('Keywords (space-separated):', {
+    initial: currentConfig.keywords ? currentConfig.keywords.join(' ') : ''
+  });
+  
+  const author = await prm.text('Author:', {
+    initial: currentConfig.author || ''
+  });
+  
+  const license = await prm.text('License:', {
+    initial: currentConfig.license || ''
+  });
+  
+  const homepage = await prm.text('Homepage:', {
+    initial: currentConfig.homepage || '',
+    validate: (value: string) => {
+      if (!value || value.trim().length === 0) return true;
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return 'Must be a valid URL';
+      }
+    }
+  });
+  
+  const isPrivate = await prm.confirm('Private package?', currentConfig.private || false);
   
   // Build updates object only for changed fields
   const updates: PackageManifestUpdates = {};
   
   // Normalize name for comparison
-  const normalizedName = normalizePackageName(response.name);
+  const normalizedName = normalizePackageName(name);
   if (normalizedName !== currentConfig.name) {
     updates.name = normalizedName;
   }
   
-  if (response.version && response.version !== currentConfig.version) {
-    updates.version = response.version;
+  if (version && version !== currentConfig.version) {
+    updates.version = version;
   }
   
-  if (response.description !== (currentConfig.description || '')) {
-    updates.description = response.description || undefined;
+  if (description !== (currentConfig.description || '')) {
+    updates.description = description || undefined;
   }
   
   // Parse and compare keywords
-  const newKeywords = response.keywords
-    ? response.keywords.trim().split(/\s+/).filter((k: string) => k.length > 0)
+  const newKeywords = keywords
+    ? keywords.trim().split(/\s+/).filter((k: string) => k.length > 0)
     : [];
   const currentKeywords = currentConfig.keywords || [];
   if (JSON.stringify(newKeywords) !== JSON.stringify(currentKeywords)) {
     updates.keywords = newKeywords.length > 0 ? newKeywords : undefined;
   }
   
-  if (response.author !== (currentConfig.author || '')) {
-    updates.author = response.author || undefined;
+  if (author !== (currentConfig.author || '')) {
+    updates.author = author || undefined;
   }
   
-  if (response.license !== (currentConfig.license || '')) {
-    updates.license = response.license || undefined;
+  if (license !== (currentConfig.license || '')) {
+    updates.license = license || undefined;
   }
   
-  if (response.homepage !== (currentConfig.homepage || '')) {
-    updates.homepage = response.homepage || undefined;
+  if (homepage !== (currentConfig.homepage || '')) {
+    updates.homepage = homepage || undefined;
   }
   
-  if (response.private !== (currentConfig.private || false)) {
-    updates.private = response.private;
+  if (isPrivate !== (currentConfig.private || false)) {
+    updates.private = isPrivate;
   }
   
   return updates;
@@ -329,9 +310,11 @@ function applyUpdates(
  */
 export async function runSetPipeline(
   packageInput: string | undefined,
-  options: SetCommandOptions = {}
+  options: SetCommandOptions = {},
+  prompt?: PromptPort
 ): Promise<CommandResult<SetPipelineResult>> {
   const cwd = process.cwd();
+  const prm = prompt ?? resolvePrompt();
   
   try {
     // Step 1: Validate inputs
@@ -375,7 +358,7 @@ export async function runSetPipeline(
     let updates: PackageManifestUpdates;
     
     if (isInteractive) {
-      updates = await promptPackageUpdates(currentConfig);
+      updates = await promptPackageUpdates(currentConfig, prm);
     } else {
       updates = extractUpdatesFromOptions(options);
     }
@@ -404,7 +387,7 @@ export async function runSetPipeline(
     displayConfigChanges(changes);
     
     if (!options.force && isInteractive) {
-      const confirmed = await promptConfirmation('Apply these changes?', true);
+      const confirmed = await prm.confirm('Apply these changes?', true);
       if (!confirmed) {
         throw new UserCancellationError();
       }

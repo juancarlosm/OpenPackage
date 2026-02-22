@@ -2,7 +2,8 @@ import { SCOPED_PACKAGE_REGEX, GITHUB_PACKAGE_REGEX, normalizePackageName, valid
 import { listAllPackages, getPackagePath } from '../directory.js';
 import { exists } from '../../utils/fs.js';
 import { configManager } from '../config.js';
-import { safePrompts } from '../../utils/prompts.js';
+import type { PromptPort } from '../ports/prompt.js';
+import { resolvePrompt } from '../ports/resolve.js';
 import { UserCancellationError } from '../../utils/errors.js';
 
 /**
@@ -117,27 +118,28 @@ export async function suggestScopedNameFromConfig(
 export async function promptForNewScopedName(
   baseName: string,
   profileName?: string,
-  message?: string
+  message?: string,
+  prompt?: PromptPort
 ): Promise<string> {
+  const prm = prompt ?? resolvePrompt();
   const initial = await suggestScopedNameFromConfig(baseName, profileName);
 
-  const response = await safePrompts({
-    type: 'text',
-    name: 'name',
-    message: message ?? `Enter a scoped name for '${baseName}' (format @scope/${baseName}):`,
-    initial,
-    validate: async (value: string) => {
-      if (!value) return 'Name is required';
-      try {
-        await ensureScopedNameAvailable(value);
-        return true;
-      } catch (error) {
-        return (error as Error).message;
+  const scopedName = await prm.text(
+    message ?? `Enter a scoped name for '${baseName}' (format @scope/${baseName}):`,
+    {
+      initial,
+      validate: async (value: string) => {
+        if (!value) return 'Name is required';
+        try {
+          await ensureScopedNameAvailable(value);
+          return true;
+        } catch (error) {
+          return (error as Error).message;
+        }
       }
     }
-  });
+  );
 
-  const scopedName = (response as any).name as string | undefined;
   if (!scopedName) {
     throw new UserCancellationError('Operation cancelled by user');
   }
@@ -150,7 +152,8 @@ export async function promptForNewScopedName(
  */
 export async function resolveScopedNameForPush(
   unscopedName: string,
-  profileName?: string
+  profileName?: string,
+  prompt?: PromptPort
 ): Promise<string> {
   if (isScopedName(unscopedName)) {
     throw new Error(`Expected unscoped name, received '${unscopedName}'`);
@@ -159,14 +162,16 @@ export async function resolveScopedNameForPush(
   return await promptForNewScopedName(
     unscopedName,
     profileName,
-    `Remote registry requires a scope. Enter a scoped name for '${unscopedName}' (format @scope/${unscopedName}):`
+    `Remote registry requires a scope. Enter a scoped name for '${unscopedName}' (format @scope/${unscopedName}):`,
+    prompt
   );
 }
 
 export async function resolveScopedNameForPushWithUserScope(
   unscopedName: string,
   username: string,
-  profileName?: string
+  profileName?: string,
+  prompt?: PromptPort
 ): Promise<string> {
   if (isScopedName(unscopedName)) {
     throw new Error(`Expected unscoped name, received '${unscopedName}'`);
@@ -176,28 +181,26 @@ export async function resolveScopedNameForPushWithUserScope(
     throw new Error('Username is required to apply default scope.');
   }
 
+  const prm = prompt ?? resolvePrompt();
   const normalizedName = normalizePackageName(unscopedName);
 
-  const selection = await safePrompts({
-    type: 'select',
-    name: 'choice',
-    message: `Package '${normalizedName}' must be scoped before pushing. Choose a scope:`,
-    choices: [
+  const choice = await prm.select<'default' | 'custom'>(
+    `Package '${normalizedName}' must be scoped before pushing. Choose a scope:`,
+    [
       {
         title: `Use default scope @${username}`,
-        value: 'default',
+        value: 'default' as const,
         description: `Renames to @${username}/${normalizedName}`
       },
       {
         title: 'Enter scope...',
-        value: 'custom',
+        value: 'custom' as const,
         description: `Enter a custom scope for ${normalizedName}`
       }
     ],
-    hint: 'Use arrow keys to select, Enter to confirm'
-  });
+    'Use arrow keys to select, Enter to confirm'
+  );
 
-  const choice = (selection as any).choice as 'default' | 'custom' | undefined;
   if (!choice) {
     throw new UserCancellationError('Operation cancelled by user');
   }
@@ -207,25 +210,24 @@ export async function resolveScopedNameForPushWithUserScope(
     const profileScope = await getDefaultScopeForProfile(profileName);
     const initialScope = profileScope?.replace(/^@/, '') || username;
 
-    const scopeResponse = await safePrompts({
-      type: 'text',
-      name: 'scope',
-      message: `Enter a scope (without @) for '${normalizedName}':`,
-      initial: initialScope,
-      validate: async (value: string) => {
-        if (!value) return 'Scope is required';
+    const enteredScope = await prm.text(
+      `Enter a scope (without @) for '${normalizedName}':`,
+      {
+        initial: initialScope,
+        validate: async (value: string) => {
+          if (!value) return 'Scope is required';
 
-        const candidate = buildScopedNameFromScope(normalizedName, value);
-        try {
-          await ensureScopedNameAvailable(candidate);
-          return true;
-        } catch (error) {
-          return (error as Error).message;
+          const candidate = buildScopedNameFromScope(normalizedName, value);
+          try {
+            await ensureScopedNameAvailable(candidate);
+            return true;
+          } catch (error) {
+            return (error as Error).message;
+          }
         }
       }
-    });
+    );
 
-    const enteredScope = (scopeResponse as any).scope as string | undefined;
     if (!enteredScope) {
       throw new UserCancellationError('Operation cancelled by user');
     }
@@ -250,8 +252,10 @@ export interface SaveNameResolution {
  */
 export async function resolveEffectiveNameForSave(
   inputName: string,
-  profileName?: string
+  profileName?: string,
+  prompt?: PromptPort
 ): Promise<SaveNameResolution> {
+  const prm = prompt ?? resolvePrompt();
   const normalizedInput = normalizePackageName(inputName);
 
   if (isScopedName(normalizedInput)) {
@@ -269,11 +273,9 @@ export async function resolveEffectiveNameForSave(
     };
   }
 
-  const selection = await safePrompts({
-    type: 'select',
-    name: 'choice',
-    message: `Found scoped packages matching '${normalizedInput}'. How should this save proceed?`,
-    choices: [
+  const choice = await prm.select<string>(
+    `Found scoped packages matching '${normalizedInput}'. How should this save proceed?`,
+    [
       ...scopedVariants.map(variant => ({
         title: `Use existing scoped package ${variant}`,
         value: variant,
@@ -290,10 +292,9 @@ export async function resolveEffectiveNameForSave(
         description: 'Continue saving as unscoped (push will still require scoping later)'
       }
     ],
-    hint: 'Use arrow keys to select, Enter to confirm'
-  });
+    'Use arrow keys to select, Enter to confirm'
+  );
 
-  const choice = (selection as any).choice as string | undefined;
   if (!choice) {
     throw new UserCancellationError('Operation cancelled by user');
   }
@@ -306,7 +307,7 @@ export async function resolveEffectiveNameForSave(
   }
 
   if (choice === '__create_new_scoped__') {
-    const newScopedName = await promptForNewScopedName(normalizedInput, profileName);
+    const newScopedName = await promptForNewScopedName(normalizedInput, profileName, undefined, prm);
     return {
       effectiveName: newScopedName,
       newScopedName,

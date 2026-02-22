@@ -13,7 +13,8 @@ import {
   type VersionSelectionResult
 } from '../../utils/version-ranges.js';
 import { isScopedName } from '../scoping/package-scoping.js';
-import { Spinner } from '../../utils/spinner.js';
+import type { OutputPort } from '../ports/output.js';
+import { resolveOutput } from '../ports/resolve.js';
 import { extractRemoteErrorReason } from '../../utils/error-reasons.js';
 import { UNVERSIONED } from '../../constants/index.js';
 import { createCacheManager } from '../cache-manager.js';
@@ -279,8 +280,10 @@ export async function selectInstallVersionUnified(
 
 async function fetchRemoteVersions(
   packageName: string,
-  options: RemoteVersionLookupOptions
+  options: RemoteVersionLookupOptions,
+  output?: OutputPort
 ): Promise<RemoteVersionLookupResult> {
+  const out = output ?? resolveOutput();
   const cacheManager = createCacheManager();
   
   // Check cached metadata first (skip if --remote flag is set)
@@ -291,14 +294,8 @@ async function fetchRemoteVersions(
     }
   }
   
-  const spinner =
-    process.stdout.isTTY && process.stderr.isTTY
-      ? new Spinner(`Checking remote versions for ${packageName}...`)
-      : null;
-
-  if (spinner) {
-    spinner.start();
-  }
+  const spinner = out.spinner();
+  spinner.start(`Checking remote versions for ${packageName}...`);
 
   try {
     const metadataResult = await fetchRemotePackageMetadata(packageName, undefined, {
@@ -320,9 +317,7 @@ async function fetchRemoteVersions(
     
     return { success: true, versions };
   } finally {
-    if (spinner) {
-      spinner.stop();
-    }
+    spinner.stop();
   }
 }
 
