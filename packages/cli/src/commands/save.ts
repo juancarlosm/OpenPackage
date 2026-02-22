@@ -6,7 +6,7 @@ export async function setupSaveCommand(args: any[]): Promise<void> {
   const [packageName, options] = args as [string, SaveToSourceOptions];
   const ctx = await createCliExecutionContext();
   const out = resolveOutput(ctx);
-  const result = await runSaveToSourcePipeline(packageName, options);
+  const result = await runSaveToSourcePipeline(packageName, options, ctx);
   if (!result.success) {
     throw new Error(result.error || 'Save operation failed');
   }

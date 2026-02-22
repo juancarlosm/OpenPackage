@@ -162,7 +162,7 @@ export class InstallOrchestrator {
         
         // Normal pipeline flow: resolve platforms once if not set
         if (context.platforms.length === 0) {
-          context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
+          context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
         }
         // For path/git sources with manifests, install root first (updates manifest),
         // then run executor for dependencies only (with skipManifestUpdate)
@@ -254,7 +254,7 @@ export class InstallOrchestrator {
     const platforms =
       context.platforms.length > 0
         ? context.platforms
-        : await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false });
+        : await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false, output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
 
     const skipCache = options.resolutionMode === 'remote-primary';
     
@@ -644,7 +644,7 @@ export class InstallOrchestrator {
     
     if (!ambiguousMatches || ambiguousMatches.length === 0) {
       if (context.platforms.length === 0) {
-        context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
+        context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
       }
       return runUnifiedInstallPipeline(context);
     }
@@ -662,10 +662,10 @@ export class InstallOrchestrator {
     let selectedMatch: BaseMatch;
     
     if (options.force || !policy.canPrompt(PromptTier.Disambiguation)) {
-      selectedMatch = handleAmbiguityNonInteractive(matches);
+      selectedMatch = handleAmbiguityNonInteractive(matches, resolveOutput(execContext));
     } else {
       const resourcePath = context.source.resourcePath || context.source.gitPath || '';
-      selectedMatch = await promptBaseSelection(resourcePath, matches, repoRoot);
+      selectedMatch = await promptBaseSelection(resourcePath, matches, repoRoot, resolveOutput(execContext), resolvePrompt(execContext));
     }
     
     // Update context with selection
@@ -680,7 +680,7 @@ export class InstallOrchestrator {
     });
 
     if (context.platforms.length === 0) {
-      context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
+      context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
     }
     return runUnifiedInstallPipeline(context);
   }
@@ -716,7 +716,7 @@ export class InstallOrchestrator {
       (workspaceContext?.platforms.length === 0);
 
     if (needsPlatforms) {
-      const resolvedPlatforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required) });
+      const resolvedPlatforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
       for (const ctx of dependencyContexts) {
         if (ctx.platforms.length === 0) ctx.platforms = resolvedPlatforms;
       }
@@ -821,7 +821,7 @@ export class InstallOrchestrator {
     const policy = execContext.interactionPolicy;
     let platforms = workspaceContext?.platforms?.length
       ? workspaceContext.platforms
-      : await resolvePlatforms(execContext.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false });
+      : await resolvePlatforms(execContext.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false, output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
 
     const skipCache = options.resolutionMode === 'remote-primary';
     

@@ -96,7 +96,8 @@ export async function installPackageByIndexWithFlows(
   matchedPattern?: string,  // Phase 4: Pattern from base detection
   resourceVersion?: string,  // Resource-specific version (for agents/skills)
   originalContentRoot?: string,  // Original source path before conversion (for index)
-  forceOverwrite?: boolean  // Phase 5: Package was confirmed for overwrite at package-level conflict phase
+  forceOverwrite?: boolean,  // Phase 5: Package was confirmed for overwrite at package-level conflict phase
+  prompt?: import('../ports/prompt.js').PromptPort
 ): Promise<IndexInstallResult> {
   logger.debug(`Installing ${packageName}@${version} with flows for platforms: ${platforms.join(', ')}`);
 
@@ -206,7 +207,8 @@ export async function installPackageByIndexWithFlows(
       packageFormat: format,
       conversionContext,
       // Phase 4: Pass resource filtering info
-      matchedPattern
+      matchedPattern,
+      prompt
     };
 
     try {

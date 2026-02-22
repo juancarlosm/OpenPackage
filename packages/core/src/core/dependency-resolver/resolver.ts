@@ -32,6 +32,7 @@ import {
 } from '../install/local-source-resolution.js';
 import type { ResolvedPackage } from './types.js';
 import { promptOverwrite } from './prompts.js';
+import type { PromptPort } from '../ports/prompt.js';
 
 interface DependencyResolverOptions {
   mode?: InstallResolutionMode;
@@ -39,6 +40,7 @@ interface DependencyResolverOptions {
   apiKey?: string;
   onWarning?: (message: string) => void;
   skipCache?: boolean;  // Force fresh git clones (for --remote flag)
+  prompt?: PromptPort;
 }
 
 export interface ResolveDependenciesResult {
@@ -593,7 +595,7 @@ export async function resolveDependencies(
     
     if (comparison > 0) {
       // Current version is newer - prompt to overwrite
-      const shouldOverwrite = await promptOverwrite(packageName, existing.version, currentVersion);
+      const shouldOverwrite = await promptOverwrite(packageName, existing.version, currentVersion, resolverOptions.prompt);
       if (shouldOverwrite) {
         existing.version = currentVersion;
         existing.pkg = pkg;

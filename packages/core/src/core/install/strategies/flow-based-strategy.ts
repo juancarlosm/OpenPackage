@@ -116,7 +116,8 @@ export class FlowBasedInstallStrategy extends BaseStrategy {
           ownershipContext,
           effectiveOptions,
           packageName,
-          forceOverwrite
+          forceOverwrite,
+          context.prompt
         );
         conflictWarnings.push(...warnings);
         wasNamespaced = packageWasNamespaced;

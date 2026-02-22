@@ -19,6 +19,7 @@ import { dirname, join } from 'path';
 import { checkAndHandleAllPackageConflicts } from './conflict-handler.js';
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
 import { PACKAGE_ROOT_DIRS } from '../../../constants/index.js';
+import type { PromptPort } from '../../ports/prompt.js';
 
 export type ConflictSummary = Awaited<ReturnType<typeof checkAndHandleAllPackageConflicts>>;
 
@@ -30,6 +31,7 @@ export interface InstallationPhasesParams {
   options: InstallOptions;
   targetDir: string;
   matchedPattern?: string;
+  prompt?: PromptPort;
 }
 
 export interface InstallationPhasesResult {
@@ -53,7 +55,7 @@ export interface InstallationPhasesResult {
  * Installs each package using the index-based installer and handles root files.
  */
 export async function performIndexBasedInstallationPhases(params: InstallationPhasesParams): Promise<InstallationPhasesResult> {
-  const { cwd, packages, platforms, conflictResult, options, targetDir, matchedPattern } = params;
+  const { cwd, packages, platforms, conflictResult, options, targetDir, matchedPattern, prompt } = params;
 
   let totalInstalled = 0;
   let totalUpdated = 0;
@@ -87,7 +89,8 @@ export async function performIndexBasedInstallationPhases(params: InstallationPh
         matchedPattern,
         resolved.resourceVersion,
         originalContentRoot,  // Pass original path for index writing
-        forceOverwrite        // Phase 5: propagate package-level overwrite decision
+        forceOverwrite,        // Phase 5: propagate package-level overwrite decision
+        prompt
       );
 
       totalInstalled += installResult.installed;

@@ -1,6 +1,8 @@
 import { resolvePlatformName, type Platform } from '../platforms.js';
 import { normalizePlatforms } from '../platform/platform-mapper.js';
 import { detectPlatforms, promptForPlatformSelection } from './package-installation.js';
+import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
 
 /**
  * Resolve platforms for an operation.
@@ -11,7 +13,7 @@ import { detectPlatforms, promptForPlatformSelection } from './package-installat
 export async function resolvePlatforms(
   cwd: string,
   specified: string[] | undefined,
-  options: { interactive?: boolean } = {}
+  options: { interactive?: boolean; output?: OutputPort; prompt?: PromptPort } = {}
 ): Promise<Platform[]> {
   const interactive = options.interactive === true;
 
@@ -29,7 +31,7 @@ export async function resolvePlatforms(
   if (auto.length > 0) return auto;
 
   if (interactive) {
-    const selected = await promptForPlatformSelection();
+    const selected = await promptForPlatformSelection(options.output, options.prompt);
     return selected;
   }
 

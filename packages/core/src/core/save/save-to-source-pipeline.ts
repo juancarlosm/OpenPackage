@@ -15,11 +15,13 @@
  */
 
 import type { CommandResult } from '../../types/index.js';
+import type { ExecutionContext } from '../../types/execution-context.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';
 import { assertMutableSourceOrThrow } from '../source-mutability.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { resolvePackageSource } from '../source-resolution/resolve-package-source.js';
 import { logger } from '../../utils/logger.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { buildCandidates, materializeLocalCandidate } from './save-candidate-builder.js';
 import { buildCandidateGroups, filterGroupsWithWorkspace } from './save-group-builder.js';
 import { analyzeGroup } from './save-conflict-analyzer.js';
@@ -76,7 +78,8 @@ interface ValidationResult {
  */
 export async function runSaveToSourcePipeline(
   packageName: string | undefined,
-  options: SaveToSourceOptions = {}
+  options: SaveToSourceOptions = {},
+  ctx?: ExecutionContext
 ): Promise<CommandResult> {
   try {
     await initSharedTempDir();
@@ -180,7 +183,7 @@ export async function runSaveToSourcePipeline(
       logger.debug(`Processing ${autoResolvable.length} auto-resolvable group(s) in parallel`);
       const autoResults = await Promise.all(
         autoResolvable.map(async ({ group, analysis }) => {
-          const resolution = await executeResolution(group, analysis, packageRoot!, cwd!);
+          const resolution = await executeResolution(group, analysis, packageRoot!, cwd!, resolveOutput(ctx), resolvePrompt(ctx));
           if (!resolution) return null;
           return writeResolution(packageRoot!, group.registryPath, resolution, group.local, cwd!);
         })
@@ -192,7 +195,7 @@ export async function runSaveToSourcePipeline(
     
     // Process interactive groups serially (require user input)
     for (const { group, analysis } of interactive) {
-      const resolution = await executeResolution(group, analysis, packageRoot!, cwd!);
+      const resolution = await executeResolution(group, analysis, packageRoot!, cwd!, resolveOutput(ctx), resolvePrompt(ctx));
       if (!resolution) {
         logger.debug(`No resolution returned for ${group.registryPath}`);
         continue;

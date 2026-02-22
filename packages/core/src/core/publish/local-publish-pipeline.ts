@@ -15,6 +15,7 @@ import { FILE_PATTERNS } from '../../constants/index.js';
 import type { PublishOptions, PublishResult } from './publish-types.js';
 import type { PackageYml } from '../../types/index.js';
 import type { OutputPort } from '../ports/output.js';
+import type { PromptPort } from '../ports/prompt.js';
 import { resolveOutput } from '../ports/resolve.js';
 
 export interface LocalPublishData {
@@ -141,7 +142,8 @@ async function resolveSource(
 export async function runLocalPublishPipeline(
   packageInput: string | undefined,
   options: PublishOptions,
-  output?: OutputPort
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<PublishResult<LocalPublishData>> {
   const out = output ?? resolveOutput();
   const cwd = process.cwd();
@@ -186,7 +188,9 @@ export async function runLocalPublishPipeline(
       {
         force: options.force,
         context: 'publish'
-      }
+      },
+      output,
+      prompt
     );
     
     // Create result info for output display

@@ -4,6 +4,7 @@ import { displayDependencyTree } from '../../../dependency-resolver/display.js';
 import { resolvePlatforms } from '../../platform-resolution.js';
 import { logger } from '../../../../utils/logger.js';
 import { splitPackageNameForTelemetry } from '../../../../utils/plugin-naming.js';
+import { resolveOutput, resolvePrompt } from '../../../ports/resolve.js';
 
 import type { RelocatedFile } from '../../conflicts/file-conflict-resolver.js';
 
@@ -38,7 +39,7 @@ export async function executeInstallationPhase(
     ctx.platforms = await resolvePlatforms(
       ctx.targetDir,
       ctx.options.platforms,
-      { interactive: canPrompt }
+      { interactive: canPrompt, output: resolveOutput(ctx.execution), prompt: resolvePrompt(ctx.execution) }
     );
   }
 
@@ -53,7 +54,8 @@ export async function executeInstallationPhase(
     conflictResult,
     options: ctx.options,
     targetDir: ctx.targetDir,
-    matchedPattern: ctx.matchedPattern  // Phase 4: Pass matched pattern
+    matchedPattern: ctx.matchedPattern,  // Phase 4: Pass matched pattern
+    prompt: ctx.execution?.prompt
   });
   
   // Track errors in context

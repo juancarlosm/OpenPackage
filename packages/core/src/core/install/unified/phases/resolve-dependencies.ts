@@ -44,6 +44,7 @@ async function resolveDependenciesForInstall(
     profile: options.profile,
     apiKey: options.apiKey,
     skipCache: options.resolutionMode === 'remote-primary',
+    prompt,
     onWarning: (message: string) => {
       if (!resolverWarnings.has(message)) {
         resolverWarnings.add(message);

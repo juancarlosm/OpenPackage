@@ -69,7 +69,7 @@ function transformMarkdownWithFlowMap(
 
 export interface CopyFilesWithConflictResolutionOptions {
   force?: boolean;
-  execContext?: { interactionPolicy?: { canPrompt(tier: PromptTier): boolean } };
+  execContext?: { interactionPolicy?: { canPrompt(tier: PromptTier): boolean }; prompt?: PromptPort };
   prompt?: PromptPort;
 }
 
@@ -104,7 +104,8 @@ export async function copyFilesWithConflictResolution(
       if (forceOverwrite) {
         decision = 'overwrite';
       } else if (policy?.canPrompt(PromptTier.Confirmation)) {
-        decision = await promptConflictDecision(name, entry.registryPath, options.prompt);
+        const effectivePrompt = options.prompt ?? options.execContext?.prompt;
+        decision = await promptConflictDecision(name, entry.registryPath, effectivePrompt);
       } else {
         resolveOutput().warn(`Skipping '${entry.registryPath}' (already exists). Use --force to overwrite.`);
         continue;

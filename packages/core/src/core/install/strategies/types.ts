@@ -39,6 +39,12 @@ export interface FlowInstallContext {
    * Pattern that matched for base detection (for pattern-based filtering)
    */
   matchedPattern?: string;
+
+  /**
+   * Optional prompt port for interactive conflict resolution.
+   * Threaded from ExecutionContext to avoid falling back to nonInteractivePrompt.
+   */
+  prompt?: import('../../ports/prompt.js').PromptPort;
 }
 
 /**

@@ -13,7 +13,7 @@ import { traverseScopesFlat, type ResourceScope } from '../resources/scope-trave
 import { disambiguate } from '../resources/disambiguation-prompt.js';
 import { formatScopeTag } from '../../utils/formatters.js';
 import { executeUninstallCandidate } from './uninstall-executor.js';
-import { resolveOutput } from '../ports/resolve.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +94,13 @@ export async function runDirectUninstallFlow(
     }
   );
 
+  // Create a temporary context for prompt/output port access during disambiguation
+  const disambiguationCtx = await createContext({
+    global: traverseOpts.globalOnly ?? false,
+    cwd: traverseOpts.programOpts?.cwd,
+    interactive: true,
+  });
+
   const selected = await disambiguate(
     name,
     candidates,
@@ -105,7 +112,9 @@ export async function runDirectUninstallFlow(
     {
       notFoundMessage: `"${name}" not found as a resource or package.\nRun \`opkg ls\` to see installed resources.`,
       promptMessage: 'Select which to uninstall:',
-    }
+    },
+    resolveOutput(disambiguationCtx),
+    resolvePrompt(disambiguationCtx)
   );
 
   if (selected.length === 0) {

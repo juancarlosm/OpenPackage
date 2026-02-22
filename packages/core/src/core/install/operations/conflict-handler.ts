@@ -43,6 +43,7 @@ export async function checkAndHandleAllPackageConflicts(
   const skippedPackages: string[] = [];
   const forceOverwritePackages = new Set<string>();
   const p = prompt ?? resolvePrompt();
+  const out = resolveOutput();
   
   // Check each package in the dependency tree for conflicts
   for (const resolved of resolvedPackages) {
@@ -68,7 +69,7 @@ export async function checkAndHandleAllPackageConflicts(
       
       // Prompt per package overwrite confirmation when existing detected
       if (policy && !policy.canPrompt(PromptTier.Confirmation)) {
-        resolveOutput().warn(`Skipping '${resolved.name}' (already exists). Use --force to overwrite.`);
+        out.warn(`Skipping '${resolved.name}' (already exists). Use --force to overwrite.`);
         skippedPackages.push(resolved.name);
       } else {
         const versionSuffix = existingVersion ? ` (${existingVersion})` : '';

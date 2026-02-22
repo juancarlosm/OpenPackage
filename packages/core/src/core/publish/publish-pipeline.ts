@@ -21,7 +21,9 @@ import { resolvePackageByName } from '../package-name-resolution.js';
 import { ValidationError } from '../../utils/errors.js';
 import { formatPathForDisplay } from '../../utils/formatters.js';
 import type { OutputPort } from '../ports/output.js';
-import { resolveOutput } from '../ports/resolve.js';
+import type { PromptPort } from '../ports/prompt.js';
+import type { ExecutionContext } from '../../types/execution-context.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 
 /**
  * Main publish pipeline - routes to local or remote based on options
@@ -29,13 +31,15 @@ import { resolveOutput } from '../ports/resolve.js';
 export async function runPublishPipeline(
   packageInput: string | undefined,
   options: PublishOptions,
-  output?: OutputPort
+  ctx?: ExecutionContext
 ): Promise<PublishResult<any>> {
+  const output = resolveOutput(ctx);
+  const prompt = resolvePrompt(ctx);
   // Route to appropriate pipeline
   if (options.local) {
-    return await runLocalPublishPipeline(packageInput, options);
+    return await runLocalPublishPipeline(packageInput, options, output, prompt);
   } else {
-    return await runRemotePublishPipeline(packageInput, options, output);
+    return await runRemotePublishPipeline(packageInput, options, output, prompt);
   }
 }
 
@@ -154,14 +158,15 @@ async function resolveSource(
 
 async function resolveUploadName(
   packageName: string,
-  authOptions: PublishOptions
+  authOptions: PublishOptions,
+  prompt?: PromptPort
 ): Promise<string> {
   if (isScopedName(packageName)) {
     return packageName;
   }
 
   const username = await getCurrentUsername(authOptions);
-  return await resolveScopedNameForPushWithUserScope(packageName, username, authOptions.profile);
+  return await resolveScopedNameForPushWithUserScope(packageName, username, authOptions.profile, prompt);
 }
 
 function validateVersionIfPresent(version?: string): void {
@@ -187,7 +192,8 @@ function validateVersionIfPresent(version?: string): void {
 async function runRemotePublishPipeline(
   packageInput: string | undefined,
   options: PublishOptions,
-  output?: OutputPort
+  output?: OutputPort,
+  prompt?: PromptPort
 ): Promise<PublishResult> {
   const out = output ?? resolveOutput();
   const cwd = process.cwd();
@@ -218,7 +224,7 @@ async function runRemotePublishPipeline(
     await authManager.validateAuth(options);
 
     // Resolve upload name (add scope if needed)
-    uploadPackageName = await resolveUploadName(source.name, options);
+    uploadPackageName = await resolveUploadName(source.name, options, prompt);
 
     // Collect package files from resolved package root
     const files = await readPackageFilesForRegistry(source.packageRoot);
