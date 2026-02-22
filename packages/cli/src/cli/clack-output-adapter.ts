@@ -31,7 +31,7 @@ export function createClackOutput(): OutputPort {
     },
 
     message(message: string): void {
-      log.message(message);
+      log.message(message, { spacing: 0 });
     },
 
     success(message: string): void {

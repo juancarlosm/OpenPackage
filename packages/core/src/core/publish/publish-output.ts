@@ -31,9 +31,9 @@ export function printPublishSuccess(
 
 export function logPublishSummary(packageName: string, profile: string, registryUrl: string, output?: OutputPort): void {
   const out = output ?? resolveOutput();
-  out.info(`\nPublishing package '${packageName}'...`);
-  out.info(`Profile: ${profile}`);
-  out.info(`Registry: ${registryUrl}`);
+  out.step(`Publishing package '${packageName}'...`);
+  out.message(`Profile: ${profile}`);
+  out.message(`Registry: ${registryUrl}`);
 }
 
 /**

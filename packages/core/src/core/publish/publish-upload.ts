@@ -39,7 +39,6 @@ export function preparePackageForUpload(pkg: Package, uploadName: string): Packa
 
 export async function createPublishTarball(pkg: Package, output?: OutputPort) {
   const out = output ?? resolveOutput();
-  out.info('Creating tarball...');
   const tarballInfo = await createTarballFromPackage(pkg);
   out.success(`Created tarball (${pkg.files.length} files, ${formatFileSize(tarballInfo.size)})`);
   return tarballInfo;
@@ -50,21 +49,23 @@ export async function uploadPackage(
   packageName: string,
   uploadVersion: string | undefined,
   tarballInfo: Awaited<ReturnType<typeof createTarballFromPackage>>,
-  output?: OutputPort
+  output?: OutputPort,
+  stopMessage?: string
 ): Promise<PushPackageResponse> {
   const out = output ?? resolveOutput();
   const formData = createFormDataForUpload(packageName, uploadVersion, tarballInfo);
   const uploadSpinner = out.spinner();
   return withSpinner(uploadSpinner, 'Uploading to registry...', () =>
-    httpClient.uploadFormData<PushPackageResponse>('/packages/push', formData)
+    httpClient.uploadFormData<PushPackageResponse>('/packages/push', formData),
+    stopMessage
   );
 }
 
-async function withSpinner<T>(spinner: ReturnType<OutputPort['spinner']>, message: string, fn: () => Promise<T>): Promise<T> {
+async function withSpinner<T>(spinner: ReturnType<OutputPort['spinner']>, message: string, fn: () => Promise<T>, stopMessage?: string): Promise<T> {
   spinner.start(message);
   try {
     return await fn();
   } finally {
-    spinner.stop();
+    spinner.stop(stopMessage);
   }
 }

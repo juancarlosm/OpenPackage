@@ -135,8 +135,9 @@ async function resolveSource(
       const sourceLabel = selected.type === 'cwd' ? 'current directory' :
                          selected.type === 'workspace' ? 'workspace packages' :
                          selected.type === 'global' ? 'global packages' : selected.type;
-      const out = output ?? resolveOutput();
-      out.success(`Found ${packageInput} in ${sourceLabel}`);
+      if (output) {
+        output.success(`Found ${packageInput} in ${sourceLabel}`);
+      }
     }
   }
 
@@ -247,13 +248,15 @@ async function runRemotePublishPipeline(
     const profile = authManager.getCurrentProfile(options);
 
     // Log summary
-    logPublishSummary(uploadPackageName, profile, registryUrl);
+    logPublishSummary(uploadPackageName, profile, registryUrl, out);
 
     // Create tarball
-    const tarballInfo = await createPublishTarball(uploadPkg);
+    const tarballInfo = await createPublishTarball(uploadPkg, out);
 
     // Upload to registry
-    const response = await uploadPackage(httpClient, uploadPackageName, version, tarballInfo);
+    const versionSuffix = version ? `@${version}` : '';
+    const publishedMessage = `Published ${source.name}${versionSuffix} to remote registry`;
+    const response = await uploadPackage(httpClient, uploadPackageName, version, tarballInfo, out, publishedMessage);
 
     // Print enhanced success message with pack-style formatting
     printPublishSuccessEnhanced(
@@ -297,24 +300,21 @@ function printPublishSuccessEnhanced(
   cwd: string,
   out: OutputPort
 ): void {
-  const versionLabel = source.version ? `@${source.version}` : '';
-  out.success(`Published ${source.name}${versionLabel} to remote registry`);
-  
   // Package description if available
   if (source.manifest.description) {
-    out.info(`Description: ${source.manifest.description}`);
+    out.message(`Description: ${source.manifest.description}`);
   }
   
   // Source path
   const displaySource = formatPathForDisplay(source.packageRoot, cwd);
-  out.info(`Source: ${displaySource}`);
+  out.message(`Source: ${displaySource}`);
   
   // Registry destination
-  out.info(`Registry: ${registryUrl}`);
-  out.info(`Profile: ${profile}`);
+  out.message(`Registry: ${registryUrl}`);
+  out.message(`Profile: ${profile}`);
   
   // File count
-  out.info(`Files: ${fileCount}`);
+  out.message(`Files: ${fileCount}`);
   
   // Size and checksum (remote-specific)
   const formatFileSize = (bytes: number): string => {
@@ -324,11 +324,11 @@ function printPublishSuccessEnhanced(
     return `${mb.toFixed(1)} MB`;
   };
   
-  out.info(`Size: ${formatFileSize(tarballInfo.size)}`);
-  out.info(`Checksum: ${tarballInfo.checksum.substring(0, 12)}...`);
+  out.message(`Size: ${formatFileSize(tarballInfo.size)}`);
+  out.message(`Checksum: ${tarballInfo.checksum.substring(0, 12)}...`);
   
   // Success message from server
   if (response.message) {
-    out.info(`\n${response.message}`);
+    out.message(`\n${response.message}`);
   }
 }
