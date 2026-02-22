@@ -10,7 +10,7 @@ import fs from 'node:fs/promises';
 import { 
   extractDirectoryFromPattern, 
   buildPreservedDirectoriesSet 
-} from '../../src/utils/directory-preservation.js';
+} from '../../src/core/platform/directory-preservation.js';
 
 // Test extractDirectoryFromPattern
 {

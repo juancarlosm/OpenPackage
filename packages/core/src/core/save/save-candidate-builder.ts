@@ -20,7 +20,7 @@ import { calculateFileHash } from '../../utils/hash-utils.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
 import { inferPlatformFromWorkspaceFile } from '../platforms.js';
 import { logger } from '../../utils/logger.js';
-import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
+import { splitFrontmatter } from '../markdown-frontmatter.js';
 import { getTargetPath } from '../../utils/workspace-index-helpers.js';
 import type { SaveCandidate, SaveCandidateSource, CandidateBuildError, LocalSourceRef } from './save-types.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';

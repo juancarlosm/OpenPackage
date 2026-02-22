@@ -1,7 +1,7 @@
 import { join, basename, resolve } from 'path';
 
 import { exists, isDirectory } from '../../utils/fs.js';
-import { classifyInputBase, type BaseInputClassification } from '../../utils/input-classifier-base.js';
+import { classifyInputBase, type BaseInputClassification } from '../install/input-classifier-base.js';
 import { ValidationError } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import { isValidPackageDirectory } from '../package-context.js';

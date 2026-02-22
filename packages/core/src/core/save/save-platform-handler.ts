@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { exists } from '../../utils/fs.js';
-import { createPlatformSpecificRegistryPath } from '../../utils/platform-specific-paths.js';
+import { createPlatformSpecificRegistryPath } from '../platform/platform-specific-paths.js';
 import { logger } from '../../utils/logger.js';
 import type { SaveCandidate, SaveCandidateGroup } from './save-types.js';
 

@@ -18,7 +18,7 @@
 import { dirname, join } from 'path';
 import { ensureDir, exists, readTextFile, writeTextFile } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
-import { createPlatformSpecificRegistryPath } from '../../utils/platform-specific-paths.js';
+import { createPlatformSpecificRegistryPath } from '../platform/platform-specific-paths.js';
 import { extractPackageContribution } from './save-merge-extractor.js';
 import { allocateTempSubdir } from './save-conversion-helper.js';
 import { getPlatformDefinition, getGlobalImportFlows, type Platform } from '../platforms.js';

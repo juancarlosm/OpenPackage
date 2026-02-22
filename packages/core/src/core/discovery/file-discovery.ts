@@ -1,7 +1,7 @@
 import { join } from 'path';
 import type { Platform } from '../platforms.js';
 import { getPlatformDefinition, deriveRootDirFromFlows } from '../platforms.js';
-import { mapPlatformFileToUniversal } from '../../utils/platform-mapper.js';
+import { mapPlatformFileToUniversal } from '../platform/platform-mapper.js';
 import { exists, isDirectory, readTextFile } from '../../utils/fs.js';
 import { DiscoveredFile } from '../../types/index.js';
 import { getFileMtime, findFilesByExtension } from '../../utils/file-processing.js';

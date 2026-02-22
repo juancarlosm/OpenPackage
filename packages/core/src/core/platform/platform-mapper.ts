@@ -1,16 +1,16 @@
 import { join, basename, dirname, extname, relative, resolve } from 'path';
 import { realpathSync } from 'fs';
-import type { Platform, PlatformPaths, PlatformDefinition } from '../types/platform.js';
+import type { Platform, PlatformPaths, PlatformDefinition } from '../../types/platform.js';
 import {
   getPlatformDefinition,
   getDetectedPlatforms,
   getAllPlatforms,
   getPlatformDirectoryPathsForPlatform
-} from '../core/platforms.js';
-import type { Flow } from '../types/flows.js';
-import { logger } from './logger.js';
-import { type UniversalSubdir } from '../constants/index.js';
-import { normalizePathForProcessing, findSubpathIndex } from './path-normalization.js';
+} from '../platforms.js';
+import type { Flow } from '../../types/flows.js';
+import { logger } from '../../utils/logger.js';
+import { type UniversalSubdir } from '../../constants/index.js';
+import { normalizePathForProcessing, findSubpathIndex } from '../../utils/path-normalization.js';
 
 /**
  * Extract pattern string from a flow pattern value
@@ -547,7 +547,7 @@ function mapUniversalToPlatformWithFlows(
     targetPathPattern = toPattern;
   } else {
     // Multi-target flow - use first target
-    const targets = toPattern as Record<string, Partial<import('../types/flows.js').Flow>>;
+    const targets = toPattern as Record<string, Partial<import('../../types/flows.js').Flow>>;
     const firstTargetConfig = Object.values(targets)[0];
     targetPathPattern = typeof firstTargetConfig === 'string' ? firstTargetConfig : (firstTargetConfig as any).to;
     

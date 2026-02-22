@@ -1,5 +1,5 @@
 import { extname, basename, dirname } from 'path';
-import { stripPlatformSuffixFromFilename } from '../core/flows/platform-suffix-handler.js';
+import { stripPlatformSuffixFromFilename } from './flows/platform-suffix-handler.js';
 
 function normalizeSlashPath(input: string): string {
   return input.replace(/\\/g, '/');
@@ -109,4 +109,3 @@ export function resolveRecursiveGlobTargetRelativePath(
 
   return toBase ? normalizeSlashPath(`${toBase}/${relativeSubpath}`) : normalizeSlashPath(relativeSubpath);
 }
-

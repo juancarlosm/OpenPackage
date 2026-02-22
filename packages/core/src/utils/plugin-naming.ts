@@ -1,6 +1,6 @@
 import { basename } from 'path';
 import { extractGitHubInfo } from './git-url-parser.js';
-import { DIR_TO_TYPE } from '../core/resources/resource-registry.js';
+import { DIR_TO_TYPE } from '../constants/index.js';
 import { logger } from './logger.js';
 
 /**

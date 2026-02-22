@@ -18,7 +18,7 @@ import {
   readWorkspaceIndex,
   writeWorkspaceIndex
 } from '../../../src/utils/workspace-index-yml.js';
-import { createWorkspacePackageYml } from '../../../src/utils/package-management.js';
+import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
 import { getLocalPackageYmlPath } from '../../../src/utils/paths.js';
 
 let testDir: string;

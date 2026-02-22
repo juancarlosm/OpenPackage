@@ -1,4 +1,4 @@
-import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
+import { splitFrontmatter } from '../markdown-frontmatter.js';
 
 export interface MarkdownResourceMetadata {
   name?: string;

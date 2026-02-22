@@ -6,7 +6,7 @@
  * field signatures for detection.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../../utils/logger.js';
@@ -18,10 +18,24 @@ import type {
 } from './detection-types.js';
 import { resolveSwitchExpressionFull } from '../flows/switch-resolver.js';
 
-// Get the path to platforms.jsonc for resolving relative schema paths
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const projectRoot = join(__dirname, '../../../');
+// Get the path to platforms.jsonc for resolving relative schema paths.
+// Walk up from __dirname until we find the file (mirrors getProjectRoot in jsonc.ts).
+function findProjectRoot(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  let dir = dirname(__filename);
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(join(dir, 'platforms.jsonc'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // Fallback to original 3-levels-up behaviour
+  return join(dirname(fileURLToPath(import.meta.url)), '../../../');
+}
+
+const projectRoot = findProjectRoot();
 const platformsJsoncPath = join(projectRoot, 'platforms.jsonc');
 
 /**

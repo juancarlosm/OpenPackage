@@ -18,7 +18,7 @@ import { getDetectedPlatforms, getPlatformDefinition } from '../platforms.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { resolveDeclaredPath } from '../../utils/path-resolution.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
-import { normalizePlatforms } from '../../utils/platform-mapper.js';
+import { normalizePlatforms } from '../platform/platform-mapper.js';
 import { logger } from '../../utils/logger.js';
 import type { Flow, SwitchExpression } from '../../types/flows.js';
 

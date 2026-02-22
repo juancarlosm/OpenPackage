@@ -18,9 +18,21 @@
 
 export type { OutputPort, UnifiedSpinner } from './core/ports/output.js';
 export type { PromptPort, PromptChoice, PromptGroupChoices, TextPromptOptions } from './core/ports/prompt.js';
+export type {
+  ProgressPort,
+  ProgressEvent,
+  ProgressLogLevel,
+  ProgressEventBase,
+  InstallProgressEvent,
+  PublishProgressEvent,
+  UninstallProgressEvent,
+  SearchProgressEvent,
+  LifecycleProgressEvent,
+} from './core/ports/progress.js';
 export { consoleOutput } from './core/ports/console-output.js';
 export { nonInteractivePrompt, NonInteractivePromptError } from './core/ports/console-prompt.js';
-export { resolveOutput, resolvePrompt } from './core/ports/resolve.js';
+export { consoleProgress, silentProgress } from './core/ports/console-progress.js';
+export { resolveOutput, resolvePrompt, resolveProgress } from './core/ports/resolve.js';
 
 // ============================================================================
 // Execution Context & Interaction Policy

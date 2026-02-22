@@ -9,7 +9,7 @@ import {
   resolvePackageByName,
   type PackageSourceCandidate,
   type SourceResolutionInfo
-} from '../../utils/package-name-resolution.js';
+} from '../package-name-resolution.js';
 import { detectPluginType } from './plugin-detector.js';
 import { DIR_PATTERNS, FILE_PATTERNS, CLAUDE_PLUGIN_PATHS } from '../../constants/index.js';
 

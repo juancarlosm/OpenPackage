@@ -14,21 +14,21 @@ import {
 import {
   buildIndexMappingForPackageFiles,
   loadOtherPackageIndexes
-} from '../../utils/index-based-installer.js';
+} from '../install/index-based-installer.js';
 import { UNVERSIONED } from '../../constants/index.js';
 import type { PackageFile } from '../../types/index.js';
 import type { PackageContext } from '../package-context.js';
-import { parseUniversalPath } from '../../utils/platform-file.js';
-import { mapUniversalToPlatform } from '../../utils/platform-mapper.js';
+import { parseUniversalPath } from '../platform/platform-file.js';
+import { mapUniversalToPlatform } from '../platform/platform-mapper.js';
 import { getPlatformsState, isPlatformId, type Platform } from '../platforms.js';
 import {
   normalizeRegistryPath,
   isRootRegistryPath,
   isSkippableRegistryPath,
   isAllowedRegistryPath
-} from '../../utils/registry-entry-filter.js';
+} from '../platform/registry-entry-filter.js';
 import { createWorkspaceHash } from '../../utils/version-generator.js';
-import { getPlatformRootFileNames, stripRootCopyPrefix, isRootCopyPath } from '../../utils/platform-root-files.js';
+import { getPlatformRootFileNames, stripRootCopyPrefix, isRootCopyPath } from '../platform/platform-root-files.js';
 
 /**
  * Compute the directory key (registry side) to collapse file mappings under.

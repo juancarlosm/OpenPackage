@@ -13,7 +13,7 @@ import { getPlatformDefinition } from '../platforms.js';
 import { getPatternFromFlow, schemaRegistry } from './schema-registry.js';
 import { applyMapPipeline, createMapContext } from '../flows/map-pipeline/index.js';
 import { defaultTransformRegistry } from '../flows/flow-transforms.js';
-import { splitFrontmatter, dumpYaml } from '../../utils/markdown-frontmatter.js';
+import { splitFrontmatter, dumpYaml } from '../markdown-frontmatter.js';
 import { basename, dirname, extname } from 'path';
 import { stripPlatformSuffixFromFilename } from '../flows/platform-suffix-handler.js';
 import { scoreAgainstSchema } from './file-format-detector.js';

@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import { constants } from 'fs';
 import { ensureOpenPackageDirectories } from '@opkg/core/core/directory.js';
 import { getVersion } from '@opkg/core/utils/package.js';
-import { withErrorHandling } from '@opkg/core/utils/errors.js';
+import { withErrorHandling } from './utils/error-handling.js';
 
 /**
  * OpenPackage CLI - Main entry point

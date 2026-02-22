@@ -14,8 +14,8 @@ import {
   DIR_PATTERNS,
   FILE_PATTERNS,
 } from "../constants/index.js"
-import { mapPlatformFileToUniversal } from "../utils/platform-mapper.js"
-import { parseUniversalPath } from "../utils/platform-file.js"
+import { mapPlatformFileToUniversal } from "./platform/platform-mapper.js"
+import { parseUniversalPath } from "./platform/platform-file.js"
 import { readJsoncFileSync, readJsoncOrJson } from "../utils/jsonc.js"
 import * as os from "os"
 import type { Flow, SwitchExpression } from "../types/flows.js"

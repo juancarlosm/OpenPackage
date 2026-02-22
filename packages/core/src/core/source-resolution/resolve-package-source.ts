@@ -2,7 +2,7 @@ import path from 'path';
 
 import { resolveDeclaredPath } from '../../utils/path-resolution.js';
 import { arePackageNamesEquivalent, normalizePackageName } from '../../utils/package-name.js';
-import { isRegistryPath } from '../../utils/source-mutability.js';
+import { isRegistryPath } from '../source-mutability.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { MUTABILITY, SOURCE_TYPES } from '../../constants/index.js';
 import type { ResolvedPackageSource } from './types.js';

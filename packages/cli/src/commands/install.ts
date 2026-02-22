@@ -8,8 +8,8 @@ import type { InstallOptions } from '@opkg/core/types/index.js';
 import { createOrchestrator } from '@opkg/core/core/install/orchestrator/index.js';
 import { normalizeInstallOptions } from '@opkg/core/core/install/preprocessing/index.js';
 import { createCliExecutionContext } from '../cli/context.js';
-import { createTelemetryCollector } from '@opkg/core/utils/telemetry.js';
-import { createHttpClient } from '@opkg/core/utils/http-client.js';
+import { createTelemetryCollector } from '@opkg/core/core/telemetry.js';
+import { createHttpClient } from '@opkg/core/core/http-client.js';
 
 /**
  * Setup install command

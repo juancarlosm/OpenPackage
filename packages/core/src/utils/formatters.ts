@@ -1,6 +1,8 @@
 import { PackageYml } from '../types/index.js';
 import { relative, isAbsolute } from 'path';
 import { normalizePathWithTilde } from './home-directory.js';
+import type { OutputPort } from '../core/ports/output.js';
+import { consoleOutput } from '../core/ports/console-output.js';
 
 /**
  * Formatting utilities for consistent display across commands
@@ -67,15 +69,16 @@ export interface PackageTableEntry {
 /**
  * Format and display an extended package table with status information (used by list command)
  */
-export function displayExtendedPackageTable(packages: PackageTableEntry[]): void {
+export function displayExtendedPackageTable(packages: PackageTableEntry[], output?: OutputPort): void {
+  const out = output ?? consoleOutput;
   if (packages.length === 0) {
-    console.log('No packages found.');
+    out.message('No packages found.');
     return;
   }
   
   // Table header
-  console.log('FORMULA'.padEnd(20) + 'INSTALLED'.padEnd(12) + 'STATUS'.padEnd(15) + 'TYPE'.padEnd(15) + 'AVAILABLE');
-  console.log('-------'.padEnd(20) + '---------'.padEnd(12) + '------'.padEnd(15) + '----'.padEnd(15) + '---------');
+  out.message('FORMULA'.padEnd(20) + 'INSTALLED'.padEnd(12) + 'STATUS'.padEnd(15) + 'TYPE'.padEnd(15) + 'AVAILABLE');
+  out.message('-------'.padEnd(20) + '---------'.padEnd(12) + '------'.padEnd(15) + '----'.padEnd(15) + '---------');
   
   // Display each package
   for (const pkg of packages) {
@@ -85,11 +88,11 @@ export function displayExtendedPackageTable(packages: PackageTableEntry[]): void
     const type = (pkg.type || '').padEnd(15);
     const available = (pkg.available || '-').padEnd(9);
     
-    console.log(`${name}${version}${status}${type}${available}`);
+    out.message(`${name}${version}${status}${type}${available}`);
   }
   
-  console.log('');
-  console.log(`Total: ${packages.length} packages`);
+  out.message('');
+  out.message(`Total: ${packages.length} packages`);
 }
 
 /**
@@ -102,15 +105,17 @@ export function displayCustomTable<T>(
     width: number;
     accessor: (item: T) => string;
   }>,
-  title?: string
+  title?: string,
+  output?: OutputPort
 ): void {
+  const out = output ?? consoleOutput;
   if (title) {
-    console.log(title);
-    console.log('');
+    out.message(title);
+    out.message('');
   }
   
   if (items.length === 0) {
-    console.log('No items found.');
+    out.message('No items found.');
     return;
   }
   
@@ -118,17 +123,17 @@ export function displayCustomTable<T>(
   const headerLine = columns.map(col => col.header.padEnd(col.width)).join('');
   const separatorLine = columns.map(col => '-'.repeat(col.header.length).padEnd(col.width)).join('');
   
-  console.log(headerLine);
-  console.log(separatorLine);
+  out.message(headerLine);
+  out.message(separatorLine);
   
   // Display rows
   for (const item of items) {
     const row = columns.map(col => col.accessor(item).padEnd(col.width)).join('');
-    console.log(row);
+    out.message(row);
   }
   
-  console.log('');
-  console.log(`Total: ${items.length} items`);
+  out.message('');
+  out.message(`Total: ${items.length} items`);
 }
 
 /**
@@ -219,23 +224,24 @@ export function formatScopeBadge(scopes: Set<string> | string): string {
 /**
  * Display package configuration details in a consistent format
  */
-export function displayPackageConfig(packageConfig: PackageYml, path: string, isExisting: boolean = false): void {
+export function displayPackageConfig(packageConfig: PackageYml, path: string, isExisting: boolean = false, output?: OutputPort): void {
+  const out = output ?? consoleOutput;
   const action = isExisting ? 'already exists' : 'created';
   const displayPath = formatPathForDisplay(path);
   
-  console.log(`✓ ${displayPath} ${action}`);
+  out.success(`${displayPath} ${action}`);
 
-  console.log(`  - Name: ${packageConfig.name}`);
+  out.message(`  - Name: ${packageConfig.name}`);
   if (packageConfig.version) {
-    console.log(`  - Version: ${packageConfig.version}`);
+    out.message(`  - Version: ${packageConfig.version}`);
   }
   if (packageConfig.description) {
-    console.log(`  - Description: ${packageConfig.description}`);
+    out.message(`  - Description: ${packageConfig.description}`);
   }
   if (packageConfig.keywords && packageConfig.keywords.length > 0) {
-    console.log(`  - Keywords: ${packageConfig.keywords.join(', ')}`);
+    out.message(`  - Keywords: ${packageConfig.keywords.join(', ')}`);
   }
   if (packageConfig.private) {
-    console.log(`  - Private: Yes`);
+    out.message(`  - Private: Yes`);
   }
 }

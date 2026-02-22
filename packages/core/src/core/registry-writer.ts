@@ -77,33 +77,37 @@ export async function writePackageToRegistry(
         `(${existingFileCount} existing file${existingFileCount !== 1 ? 's' : ''})`
       );
     } else {
-      // Versioned packages: require confirmation
-      const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+      // Versioned packages: require confirmation via the prompt port
+      // If the prompt port is nonInteractivePrompt (the default), it will
+      // throw NonInteractivePromptError, which we catch below.
       
-      if (!canPrompt) {
-        // Non-interactive environment - fail with clear error
+      try {
+        // Interactive mode - prompt user with inline overwrite confirmation
         const displayPath = formatPathForDisplay(destination, process.cwd());
-        throw new Error(
-          `Package ${packageName}@${version} already exists in registry (${displayPath}).\n` +
-          `Use --force to overwrite, or update the version in openpackage.yml.`
+        out.info('');
+        out.warn(`Package '${packageName}@${version}' already exists in registry`);
+        out.info(`   Location: ${displayPath}`);
+        out.info(`   Existing files: ${existingFileCount}`);
+        out.info('');
+        
+        shouldOverwrite = await prm.confirm(
+          `Overwrite '${packageName}@${version}'? This action cannot be undone.`,
+          false
         );
-      }
-      
-      // Interactive mode - prompt user with inline overwrite confirmation
-      const displayPath = formatPathForDisplay(destination, process.cwd());
-      out.info('');
-      out.warn(`Package '${packageName}@${version}' already exists in registry`);
-      out.info(`   Location: ${displayPath}`);
-      out.info(`   Existing files: ${existingFileCount}`);
-      out.info('');
-      
-      shouldOverwrite = await prm.confirm(
-        `Overwrite '${packageName}@${version}'? This action cannot be undone.`,
-        false
-      );
-      
-      if (!shouldOverwrite) {
-        throw new Error(`${context} cancelled by user`);
+        
+        if (!shouldOverwrite) {
+          throw new Error(`${context} cancelled by user`);
+        }
+      } catch (promptError: any) {
+        // NonInteractivePromptError or similar -- non-interactive environment
+        if (promptError.name === 'NonInteractivePromptError') {
+          const displayPath = formatPathForDisplay(destination, process.cwd());
+          throw new Error(
+            `Package ${packageName}@${version} already exists in registry (${displayPath}).\n` +
+            `Use --force to overwrite, or update the version in openpackage.yml.`
+          );
+        }
+        throw promptError;
       }
     }
   }

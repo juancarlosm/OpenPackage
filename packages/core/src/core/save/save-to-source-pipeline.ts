@@ -16,7 +16,7 @@
 
 import type { CommandResult } from '../../types/index.js';
 import type { WorkspaceIndexFileMapping } from '../../types/workspace-index.js';
-import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
+import { assertMutableSourceOrThrow } from '../source-mutability.js';
 import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
 import { resolvePackageSource } from '../source-resolution/resolve-package-source.js';
 import { logger } from '../../utils/logger.js';

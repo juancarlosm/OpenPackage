@@ -10,7 +10,7 @@
 import { basename, dirname, join } from 'path';
 import type { Platform } from '../platforms.js';
 import { getAllPlatforms, isPlatformId } from '../platforms.js';
-import { parseUniversalPath } from '../../utils/platform-file.js';
+import { parseUniversalPath } from '../platform/platform-file.js';
 
 /**
  * Extract platform suffix from filename

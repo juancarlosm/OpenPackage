@@ -8,7 +8,7 @@ import type {
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
 import { buildResourceInstallContexts } from '../../unified/context-builders.js';
-import { normalizePlatforms } from '../../../../utils/platform-mapper.js';
+import { normalizePlatforms } from '../../../platform/platform-mapper.js';
 import { logger } from '../../../../utils/logger.js';
 import { applyBaseDetection, computePathScoping } from '../../preprocessing/base-resolver.js';
 import { resolveConvenienceResources } from '../../preprocessing/convenience-preprocessor.js';

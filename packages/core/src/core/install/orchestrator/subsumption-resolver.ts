@@ -13,7 +13,7 @@
 import type { PackageSource, InstallationContext } from '../unified/context.js';
 import type { WorkspaceIndex, WorkspaceIndexPackage } from '../../../types/workspace-index.js';
 import { readWorkspaceIndex, writeWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
-import { removePackageFromOpenpackageYml } from '../../../utils/package-management.js';
+import { removePackageFromOpenpackageYml } from '../../package-management.js';
 import { removeWorkspaceIndexEntry } from '../../../utils/workspace-index-ownership.js';
 import { normalizePackageName } from '../../../utils/package-name.js';
 import { normalizeGitUrl } from '../../../utils/git-url-parser.js';

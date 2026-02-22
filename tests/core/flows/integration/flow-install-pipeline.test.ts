@@ -29,7 +29,7 @@ import type { FlowContext } from '../../../../src/types/flows.js';
 import type { Platform } from '../../../../src/core/platforms.js';
 import type { PackageConversionContext } from '../../../../src/types/conversion-context.js';
 import { clearPlatformsCache } from '../../../../src/core/platforms.js';
-import { installPackageByIndexWithFlows } from '../../../../src/utils/flow-index-installer.js';
+import { installPackageByIndexWithFlows } from '../../../../src/core/install/flow-index-installer.js';
 import { readWorkspaceIndex } from '../../../../src/utils/workspace-index-yml.js';
 import { removeFileMapping } from '../../../../src/core/uninstall/flow-aware-uninstaller.js';
 

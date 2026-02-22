@@ -3,7 +3,7 @@ import { join } from 'path';
 import type { AddInputClassification } from './add-input-classifier.js';
 import type { PackageDependency } from '../../types/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
-import { addPackageToYml, ensureLocalOpenPackageStructure, createWorkspacePackageYml } from '../../utils/package-management.js';
+import { addPackageToYml, ensureLocalOpenPackageStructure, createWorkspacePackageYml } from '../package-management.js';
 import { parsePackageYml, writePackageYml } from '../../utils/package-yml.js';
 import { normalizePackageName, arePackageNamesEquivalent } from '../../utils/package-name.js';
 import { formatPathForYaml } from '../../utils/path-resolution.js';

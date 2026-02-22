@@ -1,7 +1,7 @@
 import { join } from 'path';
 
 import { exists, isDirectory, isFile } from '../../utils/fs.js';
-import { findMatchingDependencyInManifest } from '../../utils/package-management.js';
+import { findMatchingDependencyInManifest } from '../package-management.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
 import { logger } from '../../utils/logger.js';
 

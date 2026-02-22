@@ -14,7 +14,7 @@ import { arePackageNamesEquivalent } from '../../utils/package-name.js';
 import { scanUntrackedFiles, type UntrackedScanResult } from './untracked-files-scanner.js';
 import { getWorkspaceIndexPath } from '../../utils/workspace-index-yml.js';
 import { isPlatformId, getAllPlatforms, getPlatformDefinition } from '../platforms.js';
-import { normalizePlatforms } from '../../utils/platform-mapper.js';
+import { normalizePlatforms } from '../platform/platform-mapper.js';
 import { DIR_TO_TYPE, RESOURCE_TYPE_ORDER, toPluralKey, type ResourceTypeId } from '../resources/resource-registry.js';
 import { classifySourceKey } from '../resources/source-key-classifier.js';
 import { deriveResourceFullName } from '../resources/resource-namespace.js';

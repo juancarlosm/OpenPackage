@@ -29,7 +29,7 @@ import {
   loadOtherPackageIndexes,
   buildExpandedIndexesContext,
   type ExpandedIndexesContext,
-} from '../../../utils/index-based-installer.js';
+} from '../index-based-installer.js';
 
 // ============================================================================
 // Internal Types
@@ -654,7 +654,7 @@ export async function resolveConflictsForTargets(
   prompt?: PromptPort
 ): Promise<ConflictResolutionResult> {
   const warnings: string[] = [];
-  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const interactive = options.interactive ?? false;
   const isDryRun = Boolean(options.dryRun);
 
   // -------------------------------------------------------------------------

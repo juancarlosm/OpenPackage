@@ -1,17 +1,12 @@
-import { SCOPED_PACKAGE_REGEX, GITHUB_PACKAGE_REGEX, normalizePackageName, validatePackageName } from '../../utils/package-name.js';
+import { SCOPED_PACKAGE_REGEX, GITHUB_PACKAGE_REGEX, normalizePackageName, validatePackageName, isScopedName } from '../../utils/package-name.js';
+
+export { isScopedName } from '../../utils/package-name.js';
 import { listAllPackages, getPackagePath } from '../directory.js';
 import { exists } from '../../utils/fs.js';
 import { configManager } from '../config.js';
 import type { PromptPort } from '../ports/prompt.js';
 import { resolvePrompt } from '../ports/resolve.js';
 import { UserCancellationError } from '../../utils/errors.js';
-
-/**
- * Determine if a package name is scoped (@scope/name) or GitHub-prefixed (gh@username/repo).
- */
-export function isScopedName(name: string): boolean {
-  return SCOPED_PACKAGE_REGEX.test(name) || GITHUB_PACKAGE_REGEX.test(name);
-}
 
 /**
  * Extract the local (non-scope) part from a package name.

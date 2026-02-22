@@ -166,3 +166,17 @@ export type ConflictResolution = typeof CONFLICT_RESOLUTION[keyof typeof CONFLIC
 export type SourceType = typeof SOURCE_TYPES[keyof typeof SOURCE_TYPES];
 export type Mutability = typeof MUTABILITY[keyof typeof MUTABILITY];
 export type ResolutionSource = typeof RESOLUTION_SOURCES[keyof typeof RESOLUTION_SOURCES];
+
+import type { ResourceTypeId } from '../types/resources.js';
+
+/**
+ * Maps resource directory names to their canonical type IDs.
+ * Moved from core/resources/resource-registry.ts for utils accessibility.
+ */
+export const DIR_TO_TYPE: Readonly<Record<string, ResourceTypeId>> = {
+  rules: 'rule',
+  agents: 'agent',
+  commands: 'command',
+  skills: 'skill',
+  hooks: 'hook',
+};

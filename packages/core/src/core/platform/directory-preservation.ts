@@ -7,7 +7,7 @@
  */
 
 import path from 'path';
-import { getAllPlatforms, getPlatformDefinition } from '../core/platforms.js';
+import { getAllPlatforms, getPlatformDefinition } from '../platforms.js';
 
 /**
  * Extract the directory path from a detection pattern.

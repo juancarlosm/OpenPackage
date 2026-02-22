@@ -1,7 +1,7 @@
 import { HttpClient } from './http-client.js';
-import { logger } from './logger.js';
-import { getVersion } from './package.js';
-import { configManager } from '../core/config.js';
+import { logger } from '../utils/logger.js';
+import { getVersion } from '../utils/package.js';
+import { configManager } from './config.js';
 
 /**
  * Single install event

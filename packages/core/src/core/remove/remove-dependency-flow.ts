@@ -1,4 +1,4 @@
-import { removeDependencyFromManifest } from '../../utils/package-management.js';
+import { removeDependencyFromManifest } from '../package-management.js';
 import { logger } from '../../utils/logger.js';
 
 export interface RemoveDependencyResult {

@@ -1,6 +1,6 @@
 import type { InputClassification, InputFeatures } from '../orchestrator/types.js';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
-import { classifyInputBase, type BaseInputClassification } from '../../../utils/input-classifier-base.js';
+import { classifyInputBase, type BaseInputClassification } from '../input-classifier-base.js';
 
 /**
  * Classify package input for routing to appropriate install strategy.

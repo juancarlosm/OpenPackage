@@ -1,13 +1,13 @@
 import {
   FILE_PATTERNS
-} from '../constants/index.js';
+} from '../../constants/index.js';
 import { isRootCopyPath } from './platform-root-files.js';
-import { normalizePathForProcessing } from './path-normalization.js';
+import { normalizePathForProcessing } from '../../utils/path-normalization.js';
 import { 
   matchesUniversalPattern,
   isPlatformId 
-} from '../core/platforms.js';
-import { isManifestPath } from './manifest-paths.js';
+} from '../platforms.js';
+import { isManifestPath } from '../../utils/manifest-paths.js';
 import { isPlatformRootFile } from './platform-utils.js';
 
 export function normalizeRegistryPath(registryPath: string): string {

@@ -17,7 +17,7 @@ const { installPackageWithFlows } = await import(
 );
 
 const { installPackageByIndexWithFlows } = await import(
-  new URL('../../../src/utils/flow-index-installer.js', import.meta.url).href
+  new URL('../../../src/core/install/flow-index-installer.js', import.meta.url).href
 );
 
 console.log('platform-specific-files tests starting');

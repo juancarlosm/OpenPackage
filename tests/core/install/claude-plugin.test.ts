@@ -185,7 +185,7 @@ This agent has tools.
     console.log('Installed agent content:', installedContent);
 
     // Parse frontmatter
-    const { splitFrontmatter } = await import('../../../src/utils/markdown-frontmatter.js');
+    const { splitFrontmatter } = await import('../../../src/core/markdown-frontmatter.js');
     const parsed = splitFrontmatter(installedContent);
 
     // Verify tools were converted from "Glob, Grep, LS" to { glob: true, grep: true, ls: true }

@@ -8,7 +8,7 @@ import { getLocalOpenPackageDir, getLocalPackageYmlPath, getLocalPackagesDir, ge
 import { DEPENDENCY_ARRAYS, FILE_PATTERNS, PACKAGE_PATHS } from '../constants/index.js';
 import { createCaretRange, hasExplicitPrereleaseIntent, isPrereleaseVersion } from '../utils/version-ranges.js';
 import { extractBaseVersion } from '../utils/version-generator.js';
-import { isUnversionedVersion } from '../utils/package-versioning.js';
+import { isUnversionedVersion } from './package-versioning.js';
 import { normalizePackageName, arePackageNamesEquivalent, normalizePackageNameForLookup } from '../utils/package-name.js';
 import { extractGitHubInfo } from '../utils/git-url-parser.js';
 import { packageManager } from './package.js';

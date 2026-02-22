@@ -4,7 +4,7 @@ import { convertSourceToWorkspace, ensureComparableHash } from './save-conversio
 import { logger } from '../../utils/logger.js';
 import { exists, readTextFile } from '../../utils/fs.js';
 import { calculateFileHash } from '../../utils/hash-utils.js';
-import { createPlatformSpecificRegistryPath } from '../../utils/platform-specific-paths.js';
+import { createPlatformSpecificRegistryPath } from '../platform/platform-specific-paths.js';
 import type { OutputPort } from '../ports/output.js';
 import type { PromptPort } from '../ports/prompt.js';
 import { resolveOutput, resolvePrompt } from '../ports/resolve.js';

@@ -1,11 +1,11 @@
 import * as semver from 'semver';
 import yaml from 'js-yaml';
 import { PackageFile, PackageYml } from '../types/index.js';
-import { extractBaseVersion } from './version-generator.js';
-import { getPackageVersionPath } from '../core/directory.js';
-import { exists } from './fs.js';
+import { extractBaseVersion } from '../utils/version-generator.js';
+import { getPackageVersionPath } from './directory.js';
+import { exists } from '../utils/fs.js';
 import { FILE_PATTERNS, UNVERSIONED } from '../constants/index.js';
-import { isScopedName } from '../core/scoping/package-scoping.js';
+import { isScopedName } from '../utils/package-name.js';
 
 /**
  * Compute stable version from a prerelease version
@@ -118,4 +118,3 @@ export function getLatestStableVersion(versions: string[]): string | null {
   }
   return semver.rsort(stableVersions)[0];
 }
-

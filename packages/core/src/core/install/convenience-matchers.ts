@@ -8,7 +8,7 @@
 import { join, basename, dirname, relative, resolve, sep } from 'path';
 import { walkFiles } from '../../utils/file-walker.js';
 import { exists, readTextFile } from '../../utils/fs.js';
-import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
+import { splitFrontmatter } from '../markdown-frontmatter.js';
 import { logger } from '../../utils/logger.js';
 import type { OutputPort } from '../ports/output.js';
 import { resolveOutput } from '../ports/resolve.js';

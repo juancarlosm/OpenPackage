@@ -4,8 +4,8 @@ import { realpathSync } from 'fs';
 import { DIR_PATTERNS } from '../../constants/index.js';
 import { isDirectory, isFile, walkFiles } from '../../utils/fs.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
-import { mapWorkspaceFileToUniversal } from '../../utils/platform-mapper.js';
-import { isPlatformRootFile } from '../../utils/platform-utils.js';
+import { mapWorkspaceFileToUniversal } from '../platform/platform-mapper.js';
+import { isPlatformRootFile } from '../platform/platform-utils.js';
 import type { Flow } from '../../types/flows.js';
 
 export interface SourceEntry {

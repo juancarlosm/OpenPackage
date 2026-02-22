@@ -8,7 +8,7 @@
  * @see plans/conversion-context-architecture.md
  */
 
-import type { Platform } from '../core/platforms.js';
+import type { Platform } from './platform.js';
 
 /**
  * Complete conversion context for a package

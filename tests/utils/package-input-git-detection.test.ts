@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { classifyPackageInput } from '../../src/utils/package-input.js';
+import { classifyPackageInput } from '../../src/core/install/package-input.js';
 
 console.log('Testing package input classification with git detection...');
 

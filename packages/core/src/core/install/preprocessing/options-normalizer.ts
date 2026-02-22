@@ -1,6 +1,6 @@
 import type { InstallOptions } from '../../../types/index.js';
 import type { NormalizedInstallOptions } from '../orchestrator/types.js';
-import { normalizePlatforms } from '../../../utils/platform-mapper.js';
+import { normalizePlatforms } from '../../platform/platform-mapper.js';
 import { determineResolutionMode } from '../../../utils/resolution-mode.js';
 import { validateConflictStrategy } from '../validators/options-validator.js';
 

@@ -12,8 +12,8 @@
 
 import path from 'path';
 
-import { resolvePackageByName, type PackageSourceType } from '../../utils/package-name-resolution.js';
-import { isRegistryPath } from '../../utils/source-mutability.js';
+import { resolvePackageByName, type PackageSourceType } from '../package-name-resolution.js';
+import { isRegistryPath } from '../source-mutability.js';
 import { MUTABILITY, SOURCE_TYPES, type SourceType } from '../../constants/index.js';
 import { normalizePackageNameForLookup } from '../../utils/package-name.js';
 import { parsePackageYml } from '../../utils/package-yml.js';

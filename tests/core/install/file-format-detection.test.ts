@@ -17,7 +17,7 @@ import {
   groupFilesByFormat
 } from '../../../src/core/install/file-format-detector.js';
 import { schemaRegistry } from '../../../src/core/install/schema-registry.js';
-import { splitFrontmatter } from '../../../src/utils/markdown-frontmatter.js';
+import { splitFrontmatter } from '../../../src/core/markdown-frontmatter.js';
 import type { PackageFile, DetectionSchema } from '../../../src/core/install/detection-types.js';
 import type { Flow } from '../../../src/types/flows.js';
 

@@ -1,12 +1,12 @@
 import { basename } from 'path';
 import type { PackageYml } from '../types/index.js';
-import type { PackageScope } from '../utils/scope-resolution.js';
+import type { PackageScope } from './scope-resolution.js';
 import {
   getScopePackageDir,
   getScopePackageYmlPath,
   getScopeDisplayPath,
   getScopeDescription
-} from '../utils/scope-resolution.js';
+} from './scope-resolution.js';
 import {
   resolveCustomPath,
   validateCustomPath,

@@ -9,7 +9,7 @@ import {
   isPartialDownload
 } from '../remote-pull.js';
 import { packageManager } from '../package.js';
-import { getVersionInfoFromDependencyTree } from '../../utils/install-helpers.js';
+import { getVersionInfoFromDependencyTree } from './install-helpers.js';
 
 import type { OutputPort } from '../ports/output.js';
 import { resolveOutput } from '../ports/resolve.js';

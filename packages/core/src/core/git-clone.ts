@@ -3,9 +3,9 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { rm, rename } from 'fs/promises';
 
-import { logger } from './logger.js';
-import { ValidationError } from './errors.js';
-import { exists, ensureDir } from './fs.js';
+import { logger } from '../utils/logger.js';
+import { ValidationError } from '../utils/errors.js';
+import { exists, ensureDir } from '../utils/fs.js';
 import { DIR_PATTERNS, FILE_PATTERNS } from '../constants/index.js';
 
 /**
@@ -30,8 +30,8 @@ import {
   readCommitMetadata,
   touchCacheEntry,
   isCommitCached
-} from './git-cache.js';
-import { createCacheManager } from '../core/cache-manager.js';
+} from '../utils/git-cache.js';
+import { createCacheManager } from './cache-manager.js';
 
 const execFileAsync = promisify(execFile);
 const cacheManager = createCacheManager();
@@ -131,10 +131,10 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       const finalPath = subdir ? join(commitDir, subdir) : commitDir;
       if (!subdir || await exists(finalPath)) {
         logger.debug(`Using cached commit (${source})`, { url, ref, commit: shortSha });
-        // Show cache hit to user
+        // Show cache hit to user via OutputPort
         const refDisplay = ref ? `#${ref}` : '';
         const subdirDisplay = subdir ? `/${subdir}` : '';
-        console.log(`✓ Using cached ${getDisplayUrl()}${refDisplay}${subdirDisplay} [${shortSha}]`);
+        logger.info(`Using cached ${getDisplayUrl()}${refDisplay}${subdirDisplay} [${shortSha}]`);
         return { path: finalPath, commitSha: shortSha, repoPath: commitDir };
       }
     }
@@ -289,7 +289,7 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       lastAccessed: new Date().toISOString()
     });
     
-    // Cache the ref→commit mapping for future lookups
+    // Cache the ref->commit mapping for future lookups
     if (ref) {
       await cacheManager.cacheRefCommit(url, ref, commitSha);
     }

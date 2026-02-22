@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { logger } from '../utils/logger.js';
-import { createHttpClient } from '../utils/http-client.js';
+import { createHttpClient } from './http-client.js';
 import { profileManager } from './profiles.js';
 
 export type DeviceAuthorizationStart = {

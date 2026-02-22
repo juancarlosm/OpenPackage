@@ -5,13 +5,13 @@ import { packageManager } from './package.js';
 import type { PackageVersionState } from './package.js';
 import { ensureRegistryDirectories } from './directory.js';
 import { authManager } from './auth.js';
-import { createHttpClient, HttpClient } from '../utils/http-client.js';
+import { createHttpClient, HttpClient } from './http-client.js';
 import { extractPackageFromTarball, verifyTarballIntegrity, ExtractedPackage } from '../utils/tarball.js';
 import { logger } from '../utils/logger.js';
 import { ConfigError, ValidationError } from '../utils/errors.js';
 import { PACKAGE_PATHS } from '../constants/index.js';
-import { formatVersionLabel } from '../utils/package-versioning.js';
-import { normalizeRegistryPath } from '../utils/registry-entry-filter.js';
+import { formatVersionLabel } from './package-versioning.js';
+import { normalizeRegistryPath } from './platform/registry-entry-filter.js';
 import { mergePackageFiles } from '../utils/package-merge.js';
 import { createCacheManager } from './cache-manager.js';
 

@@ -58,7 +58,9 @@ export class UserCancellationError extends Error {
 }
 
 /**
- * Error handler function that provides consistent error handling across commands
+ * Error handler function that provides consistent error handling.
+ * Returns a CommandResult rather than performing any IO -- callers
+ * decide how to present or act on the result.
  */
 export function handleError(error: unknown): CommandResult {
   if (error instanceof OpenPackageError) {
@@ -82,28 +84,3 @@ export function handleError(error: unknown): CommandResult {
     };
   }
 }
-
-/**
- * Wraps an async function with error handling for Commander.js actions
- */
-export function withErrorHandling<T extends any[]>(
-  fn: (...args: T) => Promise<void>
-): (...args: T) => Promise<void> {
-  return async (...args: T): Promise<void> => {
-    try {
-      await fn(...args);
-    } catch (error) {
-      // Handle user cancellation gracefully - just exit without error message
-      if (error instanceof UserCancellationError) {
-        process.exit(0);
-        return;
-      }
-      
-      const result = handleError(error);
-      console.error(result.error);
-      process.exit(1);
-    }
-  };
-}
-
-

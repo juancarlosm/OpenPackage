@@ -1,4 +1,4 @@
-import { cloneRepoToCache } from '../../utils/git-clone.js';
+import { cloneRepoToCache } from '../git-clone.js';
 import { loadPackageFromPath } from './path-package-loader.js';
 import { detectPluginType } from './plugin-detector.js';
 import type { Package } from '../../types/index.js';

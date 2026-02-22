@@ -209,9 +209,14 @@ export async function scanWorkspaceFiles(
 }
 
 /**
- * Check if the current environment supports interactive prompts
+ * Check if the current environment supports interactive prompts.
+ *
+ * Prefer using `ExecutionContext.interactive` when available -- this
+ * function exists as a last-resort fallback for code paths that
+ * don't have access to a context object.
  * 
  * @returns True if stdin and stdout are TTY (terminal)
+ * @deprecated Use ExecutionContext.interactive instead when possible.
  */
 export function canPrompt(): boolean {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);

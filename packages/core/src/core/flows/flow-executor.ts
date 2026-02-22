@@ -22,7 +22,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { minimatch } from 'minimatch';
 import * as fsUtils from '../../utils/fs.js';
 import { mergePackageContentIntoRootFile } from '../../utils/root-file-merger.js';
-import { resolveRecursiveGlobTargetRelativePath } from '../../utils/glob-target-mapping.js';
+import { resolveRecursiveGlobTargetRelativePath } from '../glob-target-mapping.js';
 import type {
   Flow,
   FlowContext,
@@ -41,7 +41,7 @@ import {
   defaultTransformRegistry, 
   TransformRegistry,
 } from './flow-transforms.js';
-import { mergeInlinePlatformOverride } from '../../utils/platform-yaml-merge.js';
+import { mergeInlinePlatformOverride } from '../platform-yaml-merge.js';
 import { 
   getNestedValue,
   setNestedValue,

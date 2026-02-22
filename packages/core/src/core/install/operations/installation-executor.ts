@@ -12,7 +12,7 @@ import { logger } from '../../../utils/logger.js';
 import { UserCancellationError } from '../../../utils/errors.js';
 import { discoverAndCategorizeFiles } from '../helpers/file-discovery.js';
 import { installOrSyncRootFiles } from './root-files.js';
-import { installPackageByIndexWithFlows as installPackageByIndex, type IndexInstallResult } from '../../../utils/flow-index-installer.js';
+import { installPackageByIndexWithFlows as installPackageByIndex, type IndexInstallResult } from '../flow-index-installer.js';
 import type { RelocatedFile } from '../conflicts/file-conflict-resolver.js';
 import { ensureDir, exists, writeTextFile } from '../../../utils/fs.js';
 import { dirname, join } from 'path';

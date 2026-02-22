@@ -8,7 +8,7 @@ import type { InstallationContext, PackageSource } from '../../unified/context.j
 import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
-import { normalizePlatforms } from '../../../../utils/platform-mapper.js';
+import { normalizePlatforms } from '../../../platform/platform-mapper.js';
 
 export class RegistryInstallStrategy extends BaseInstallStrategy {
   readonly name = 'registry';

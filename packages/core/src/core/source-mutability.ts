@@ -1,5 +1,5 @@
 import path from 'path';
-import { getRegistryDirectories } from '../core/directory.js';
+import { getRegistryDirectories } from './directory.js';
 
 export function isRegistryPath(absPath: string): boolean {
   const registryRoot = getRegistryDirectories().packages;

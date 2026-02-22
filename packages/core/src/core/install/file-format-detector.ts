@@ -7,7 +7,7 @@
 
 import { minimatch } from 'minimatch';
 import { logger } from '../../utils/logger.js';
-import { splitFrontmatter } from '../../utils/markdown-frontmatter.js';
+import { splitFrontmatter } from '../markdown-frontmatter.js';
 import { schemaRegistry, getPatternFromFlow } from './schema-registry.js';
 import { getPlatformDefinitions, isPlatformId, matchesUniversalPattern } from '../platforms.js';
 import { extractPlatformSuffixFromFilename } from '../flows/platform-suffix-handler.js';

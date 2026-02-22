@@ -9,7 +9,7 @@ import { updateManifestPhase } from './phases/manifest.js';
 import { reportResultsPhase } from './phases/report.js';
 import { shouldResolveDependencies, shouldUpdateManifest } from './context-helpers.js';
 import { logger } from '../../../utils/logger.js';
-import { createWorkspacePackageYml } from '../../../utils/package-management.js';
+import { createWorkspacePackageYml } from '../../package-management.js';
 import { cleanupTempDirectory } from '../strategies/helpers/temp-directory.js';
 import { resolveOutput } from '../../ports/resolve.js';
 

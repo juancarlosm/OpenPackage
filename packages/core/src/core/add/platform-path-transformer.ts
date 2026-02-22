@@ -1,10 +1,10 @@
 import { join, resolve } from 'path';
 
 import { getPlatformDefinition, deriveRootDirFromFlows } from '../platforms.js';
-import { mapPlatformFileToUniversal } from '../../utils/platform-mapper.js';
-import { suffixFileBasename, suffixFirstContentDir } from '../../utils/platform-specific-paths.js';
+import { mapPlatformFileToUniversal } from '../platform/platform-mapper.js';
+import { suffixFileBasename, suffixFirstContentDir } from '../platform/platform-specific-paths.js';
 import { isWithinDirectory } from '../../utils/path-normalization.js';
-import { isPlatformRootFile } from '../../utils/platform-utils.js';
+import { isPlatformRootFile } from '../platform/platform-utils.js';
 import type { SourceEntry } from './source-collector.js';
 
 export interface PlatformPathTransformOptions {

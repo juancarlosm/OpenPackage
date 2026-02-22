@@ -4,7 +4,7 @@ import type { CommandResult } from '../../types/index.js';
 import type { ExecutionContext } from '../../types/execution-context.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
-import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
+import { assertMutableSourceOrThrow } from '../source-mutability.js';
 import { collectSourceEntries, type SourceEntry } from './source-collector.js';
 import { copyFilesWithConflictResolution } from './add-conflict-handler.js';
 import type { PackageContext } from '../package-context.js';
@@ -12,7 +12,7 @@ import { parsePackageYml } from '../../utils/package-yml.js';
 import { exists } from '../../utils/fs.js';
 import { logger } from '../../utils/logger.js';
 import { resolveSourceOperationArguments } from '../../utils/source-operation-arguments.js';
-import { buildWorkspacePackageContext } from '../../utils/workspace-package-context.js';
+import { buildWorkspacePackageContext } from '../workspace-package-context.js';
 
 export interface AddToSourceOptions {
   platformSpecific?: boolean;

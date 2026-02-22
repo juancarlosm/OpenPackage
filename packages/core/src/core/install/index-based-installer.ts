@@ -15,7 +15,7 @@ import { logger } from '../../utils/logger.js';
 import {
   FILE_PATTERNS,
 } from '../../constants/index.js';
-import { getPlatformRootFileNames, stripRootCopyPrefix } from '../../utils/platform-root-files.js';
+import { getPlatformRootFileNames, stripRootCopyPrefix } from '../platform/platform-root-files.js';
 import type { Platform } from '../platforms.js';
 import { getPlatformsState } from '../platforms.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
@@ -26,11 +26,11 @@ import {
   isSkippableRegistryPath,
   normalizeRegistryPath,
   extractUniversalSubdirInfo
-} from '../../utils/registry-entry-filter.js';
-import { mapUniversalToPlatform } from '../../utils/platform-mapper.js';
+} from '../platform/registry-entry-filter.js';
+import { mapUniversalToPlatform } from '../platform/platform-mapper.js';
 import type { PackageFile } from '../../types/index.js';
-import { mergeInlinePlatformOverride } from '../../utils/platform-yaml-merge.js';
-import { parseUniversalPath } from '../../utils/platform-file.js';
+import { mergeInlinePlatformOverride } from '../platform-yaml-merge.js';
+import { parseUniversalPath } from '../platform/platform-file.js';
 import { getPlatformDefinition, deriveRootDirFromFlows } from '../platforms.js';
 import {
   sortMapping,

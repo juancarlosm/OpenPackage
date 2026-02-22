@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { parsePackageYml } from '../../../src/utils/package-yml.js';
 import { writeTextFile, readTextFile } from '../../../src/utils/fs.js';
-import { classifyPackageInput } from '../../../src/utils/package-input.js';
+import { classifyPackageInput } from '../../../src/core/install/package-input.js';
 
 /**
  * Phase 3 Integration Tests

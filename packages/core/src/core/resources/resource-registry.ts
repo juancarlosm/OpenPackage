@@ -1,6 +1,9 @@
 import type { ResourceTypeId, InstallableResourceTypeId, ResourceTypeDef } from '../../types/resources.js';
 export type { ResourceTypeId, InstallableResourceTypeId, ResourceTypeDef };
 
+import { DIR_TO_TYPE } from '../../constants/index.js';
+export { DIR_TO_TYPE };
+
 const DEFINITIONS: readonly ResourceTypeDef[] = [
   { id: 'rule',    dirName: 'rules',    labelPlural: 'Rules',              pluralKey: 'rules',    order: 0, installable: true  },
   { id: 'agent',   dirName: 'agents',   labelPlural: 'Agents',             pluralKey: 'agents',   order: 1, installable: true  },
@@ -14,13 +17,6 @@ const DEFINITIONS: readonly ResourceTypeDef[] = [
 const BY_ID = new Map<ResourceTypeId, ResourceTypeDef>(
   DEFINITIONS.map(d => [d.id, d])
 );
-
-const DIR_TO_TYPE_MAP: Record<string, ResourceTypeId> = {};
-for (const def of DEFINITIONS) {
-  if (def.dirName) {
-    DIR_TO_TYPE_MAP[def.dirName] = def.id;
-  }
-}
 
 const NORMALIZE_MAP: Record<string, ResourceTypeId> = {};
 for (const def of DEFINITIONS) {
@@ -36,8 +32,6 @@ export const RESOURCE_TYPES: readonly ResourceTypeDef[] = DEFINITIONS;
 export const RESOURCE_TYPE_ORDER: readonly ResourceTypeId[] = DEFINITIONS.map(d => d.id);
 
 export const RESOURCE_TYPE_ORDER_PLURAL: readonly string[] = DEFINITIONS.map(d => d.pluralKey);
-
-export const DIR_TO_TYPE: Readonly<Record<string, ResourceTypeId>> = DIR_TO_TYPE_MAP;
 
 export function getResourceTypeDef(id: ResourceTypeId): ResourceTypeDef {
   return BY_ID.get(id)!;
@@ -61,5 +55,5 @@ export function getInstallableTypes(): ResourceTypeDef[] {
 }
 
 export function getSingularTypeFromDir(dirName: string): ResourceTypeId | undefined {
-  return DIR_TO_TYPE_MAP[dirName];
+  return DIR_TO_TYPE[dirName];
 }

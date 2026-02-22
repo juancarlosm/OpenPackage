@@ -2,7 +2,7 @@ import { PACKAGE_PATHS } from '../../constants/index.js';
 import type { PushPackageResponse } from '../../types/api.js';
 import type { Package } from '../../types/index.js';
 import { formatFileSize } from '../../utils/formatters.js';
-import type { HttpClient } from '../../utils/http-client.js';
+import type { HttpClient } from '../http-client.js';
 import { normalizePathForProcessing } from '../../utils/path-normalization.js';
 import type { OutputPort } from '../ports/output.js';
 import { resolveOutput } from '../ports/resolve.js';

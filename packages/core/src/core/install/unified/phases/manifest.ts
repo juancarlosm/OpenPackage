@@ -1,5 +1,5 @@
 import type { InstallationContext } from '../context.js';
-import { addPackageToYml } from '../../../../utils/package-management.js';
+import { addPackageToYml } from '../../../package-management.js';
 import { formatPathForYaml } from '../../../../utils/path-resolution.js';
 import { logger } from '../../../../utils/logger.js';
 

@@ -2,7 +2,7 @@ import { Command } from 'commander';
 
 import { CommandResult } from '@opkg/core/types/index.js';
 import { ValidationError } from '@opkg/core/utils/errors.js';
-import { parseWorkspaceScope } from '@opkg/core/utils/scope-resolution.js';
+import { parseWorkspaceScope } from '@opkg/core/core/scope-resolution.js';
 import { createCliExecutionContext } from '../cli/context.js';
 import {
   collectScopedData,

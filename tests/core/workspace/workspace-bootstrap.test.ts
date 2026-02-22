@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createWorkspacePackageYml } from '../../../src/utils/package-management.js';
+import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
 import { getWorkspaceIndexPath, readWorkspaceIndex, writeWorkspaceIndex } from '../../../src/utils/workspace-index-yml.js';
 
 const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'opkg-ws-bootstrap-'));

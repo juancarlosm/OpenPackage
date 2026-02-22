@@ -5,10 +5,11 @@
  * directory resolution for commands with --global support.
  */
 
-import type { TelemetryCollector } from '../utils/telemetry.js';
+import type { TelemetryCollector } from '../core/telemetry.js';
 import type { InteractionPolicy } from '../core/interaction-policy.js';
 import type { OutputPort } from '../core/ports/output.js';
 import type { PromptPort } from '../core/ports/prompt.js';
+import type { ProgressPort } from '../core/ports/progress.js';
 
 /**
  * ExecutionContext - Single source of truth for directory resolution
@@ -72,6 +73,13 @@ export interface ExecutionContext {
    * CLI provides ClackPromptAdapter; GUI provides its own adapter.
    */
   prompt?: PromptPort;
+
+  /**
+   * Progress port for streaming structured progress events to the UI.
+   * When not provided, defaults to silentProgress (no-op).
+   * CLI provides ClackProgressAdapter; GUI provides its own adapter.
+   */
+  progress?: ProgressPort;
 }
 
 /**

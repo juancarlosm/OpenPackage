@@ -4,16 +4,16 @@
  */
 
 import { join } from 'path';
-import { getPathLeaf } from './path-normalization.js';
-import { FILE_PATTERNS } from '../constants/index.js';
-import type { Platform, PlatformDetectionResult } from '../types/platform.js';
+import { getPathLeaf } from '../../utils/path-normalization.js';
+import { FILE_PATTERNS } from '../../constants/index.js';
+import type { Platform, PlatformDetectionResult } from '../../types/platform.js';
 import {
   getAllPlatforms,
   getPlatformRootFiles as getPlatformRootFileNames,
   getPlatformDefinition,
   getPlatformDirLookup,
   detectAllPlatforms
-} from '../core/platforms.js';
+} from '../platforms.js';
 
 /* Removed unused detectPlatformsWithDetails - use detectAllPlatforms directly for details */
 

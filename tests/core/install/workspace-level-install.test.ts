@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildWorkspaceRootInstallContext, buildInstallContext, type BulkInstallContextsResult } from '../../../src/core/install/unified/context-builders.js';
 import { exists, readTextFile } from '../../../src/utils/fs.js';
-import { createWorkspacePackageYml } from '../../../src/utils/package-management.js';
+import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
 import { parsePackageYml } from '../../../src/utils/package-yml.js';
 import { readWorkspaceIndex } from '../../../src/utils/workspace-index-yml.js';
 import { createExecutionContext } from '../../../src/core/execution-context.js';

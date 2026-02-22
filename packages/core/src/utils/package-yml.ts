@@ -1,7 +1,7 @@
 import * as yaml from 'js-yaml';
 import { PackageDependency, PackageYml } from '../types/index.js';
 import { readTextFile, writeTextFile } from './fs.js';
-import { isScopedName } from '../core/scoping/package-scoping.js';
+import { isScopedName } from './package-name.js';
 
 /**
  * Parse openpackage.yml file with validation and backward compatibility

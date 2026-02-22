@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 import { getRegistryDirectories } from '../../../src/core/directory.js';
-import { assertMutableSourceOrThrow, isRegistryPath } from '../../../src/utils/source-mutability.js';
+import { assertMutableSourceOrThrow, isRegistryPath } from '../../../src/core/source-mutability.js';
 
 // Ensure predictable registry root for this test
 const fakeHome = path.join(os.tmpdir(), 'opkg-home-mutability');

@@ -34,7 +34,7 @@ export async function executeInstallationPhase(
   
   // Resolve platforms if not already set (orchestrator preflight sets for bulk/single)
   if (ctx.platforms.length === 0) {
-    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const canPrompt = ctx.execution.interactive ?? false;
     ctx.platforms = await resolvePlatforms(
       ctx.targetDir,
       ctx.options.platforms,

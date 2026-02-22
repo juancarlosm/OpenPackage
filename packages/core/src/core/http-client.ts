@@ -1,6 +1,6 @@
 import { AuthOptions } from '../types/index.js';
-import { authManager } from '../core/auth.js';
-import { logger } from './logger.js';
+import { authManager } from './auth.js';
+import { logger } from '../utils/logger.js';
 import { ApiError } from '../types/api.js';
 
 /**

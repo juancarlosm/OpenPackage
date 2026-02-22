@@ -1,6 +1,6 @@
-import { FILE_PATTERNS } from '../constants/index.js';
-import type { Platform } from '../types/platform.js';
-import { getPlatformDefinition } from '../core/platforms.js';
+import { FILE_PATTERNS } from '../../constants/index.js';
+import type { Platform } from '../../types/platform.js';
+import { getPlatformDefinition } from '../platforms.js';
 
 function joinSegments(segments: string[]): string {
   return segments.filter(Boolean).join('/');

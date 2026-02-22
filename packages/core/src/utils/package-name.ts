@@ -311,6 +311,13 @@ export function normalizePackageNameForLookup(name: string): string {
 }
 
 /**
+ * Determine if a package name is scoped (@scope/name) or GitHub-prefixed (gh@username/repo).
+ */
+export function isScopedName(name: string): boolean {
+  return SCOPED_PACKAGE_REGEX.test(name) || GITHUB_PACKAGE_REGEX.test(name);
+}
+
+/**
  * Check if two package names are equivalent (case-insensitive).
  */
 export function arePackageNamesEquivalent(name1: string, name2: string): boolean {

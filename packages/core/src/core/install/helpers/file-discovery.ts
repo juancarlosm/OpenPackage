@@ -3,7 +3,7 @@ import { FILE_PATTERNS, PACKAGE_PATHS } from '../../../constants/index.js';
 import type { PackageFile } from '../../../types/index.js';
 import type { Platform } from '../../platforms.js';
 import { isManifestPath, normalizePackagePath } from '../../../utils/manifest-paths.js';
-import { getPlatformRootFileNames, stripRootCopyPrefix } from '../../../utils/platform-root-files.js';
+import { getPlatformRootFileNames, stripRootCopyPrefix } from '../../platform/platform-root-files.js';
 import { minimatch } from 'minimatch';
 import { join } from 'path';
 import { exists } from '../../../utils/fs.js';

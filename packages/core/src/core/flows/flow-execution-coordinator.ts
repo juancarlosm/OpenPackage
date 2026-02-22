@@ -16,7 +16,7 @@ import {
   extractCapturedName, 
   getFirstFromPattern 
 } from './flow-source-discovery.js';
-import { resolveRecursiveGlobTargetRelativePath } from '../../utils/glob-target-mapping.js';
+import { resolveRecursiveGlobTargetRelativePath } from '../glob-target-mapping.js';
 import { logger } from '../../utils/logger.js';
 import { stripPlatformSuffixFromFilename } from './platform-suffix-handler.js';
 import { resolveSwitchExpression } from './switch-resolver.js';

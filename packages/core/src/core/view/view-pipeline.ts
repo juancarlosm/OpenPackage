@@ -6,7 +6,7 @@
  */
 
 import { join } from 'path';
-import { resolvePackageByName, type PackageSourceType } from '../../utils/package-name-resolution.js';
+import { resolvePackageByName, type PackageSourceType } from '../package-name-resolution.js';
 import { parsePackageYml } from '../../utils/package-yml.js';
 import { exists } from '../../utils/fs.js';
 import { detectEntityType } from '../../utils/entity-detector.js';

@@ -9,7 +9,7 @@ import { exists } from '../../../utils/fs.js';
 import { logger } from '../../../utils/logger.js';
 import { getLocalPackageDir } from '../../../utils/paths.js';
 import { FILE_PATTERNS } from '../../../constants/index.js';
-import { getVersionInfoFromDependencyTree } from '../../../utils/install-helpers.js';
+import { getVersionInfoFromDependencyTree } from '../install-helpers.js';
 import type { PromptPort } from '../../ports/prompt.js';
 import { resolvePrompt, resolveOutput } from '../../ports/resolve.js';
 

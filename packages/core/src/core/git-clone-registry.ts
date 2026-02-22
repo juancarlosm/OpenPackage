@@ -2,10 +2,10 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 
-import { getRegistryDirectories } from '../core/directory.js';
-import { ensureDir, exists } from './fs.js';
+import { getRegistryDirectories } from './directory.js';
+import { ensureDir, exists } from '../utils/fs.js';
 import { FILE_PATTERNS, GIT, REGISTRY_PATH_PREFIXES } from '../constants/index.js';
-import { logger } from './logger.js';
+import { logger } from '../utils/logger.js';
 
 const execFileAsync = promisify(execFile);
 

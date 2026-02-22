@@ -17,7 +17,7 @@ import {
 } from '../../../src/core/install/resolution/index.js';
 import type { DependencyDeclaration } from '../../../src/core/install/resolution/types.js';
 import { getLocalPackageYmlPath } from '../../../src/utils/paths.js';
-import { createWorkspacePackageYml } from '../../../src/utils/package-management.js';
+import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
 import { DIR_PATTERNS, FILE_PATTERNS } from '../../../src/constants/index.js';
 
 let testDir: string;

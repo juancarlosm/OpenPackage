@@ -9,7 +9,7 @@ import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
-import { normalizePlatforms } from '../../../../utils/platform-mapper.js';
+import { normalizePlatforms } from '../../../platform/platform-mapper.js';
 
 export class PathInstallStrategy extends BaseInstallStrategy {
   readonly name = 'path';

@@ -395,7 +395,7 @@ export class InstallOrchestrator {
       };
     } else if (policy.canPrompt(PromptTier.Required)) {
       // Interactive: prompt user for single plugin selection
-      selectedPlugin = await promptPluginSelection(marketplace);
+      selectedPlugin = await promptPluginSelection(marketplace, execContext);
       
        if (!selectedPlugin) {
          out.warn('No plugin selected. Installation cancelled.');
@@ -403,7 +403,7 @@ export class InstallOrchestrator {
        }
        
        // Prompt for install mode
-       const mode = await promptInstallMode(selectedPlugin);
+       const mode = await promptInstallMode(selectedPlugin, execContext);
        
        if (!mode) {
          out.warn('Installation cancelled.');

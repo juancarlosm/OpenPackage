@@ -19,7 +19,7 @@ import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
 import { getLocalPackageYmlPath } from '../../../utils/paths.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
 import { ensureContentRoot } from './content-root-cache.js';
-import { resolvePackageByName } from '../../../utils/package-name-resolution.js';
+import { resolvePackageByName } from '../../package-name-resolution.js';
 import { logger } from '../../../utils/logger.js';
 
 const MAX_DEPTH_DEFAULT = 10;

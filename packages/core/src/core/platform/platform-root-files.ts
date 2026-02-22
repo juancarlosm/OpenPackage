@@ -3,9 +3,9 @@
  * Shared utilities for collecting and working with platform root file names
  */
 
-import { FILE_PATTERNS, PACKAGE_ROOT_DIRS } from '../constants/index.js';
-import type { Platform } from '../types/platform.js';
-import { getPlatformDefinition } from '../core/platforms.js';
+import { FILE_PATTERNS, PACKAGE_ROOT_DIRS } from '../../constants/index.js';
+import type { Platform } from '../../types/platform.js';
+import { getPlatformDefinition } from '../platforms.js';
 
 /**
  * Get all platform root file names (including universal AGENTS.md) for the given platforms.

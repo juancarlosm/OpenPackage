@@ -10,18 +10,31 @@ import { parse } from 'jsonc-parser';
 import { logger } from './logger.js';
 
 /**
- * Get the project root directory
- * Works in both development (src/) and production (dist/) environments
+ * Get the project root directory by walking up from the current file's
+ * location until we find platforms.jsonc (a known root marker).
+ *
+ * This approach is resilient to monorepo restructuring and esbuild bundling,
+ * where the runtime __dirname may be at varying depths relative to the
+ * repository root (e.g. packages/core/src/utils, packages/cli/dist, etc.).
  */
 function getProjectRoot(): string {
-  // Get the directory of the current file
   const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  
-  // If we're in dist/utils, go up two levels to project root
-  // If we're in src/utils, go up two levels to project root
-  // Both src/utils and dist/utils are 2 levels deep from root
-  return join(__dirname, '..', '..');
+  let dir = dirname(__filename);
+
+  // Walk up at most 10 levels to find the directory containing platforms.jsonc
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(join(dir, 'platforms.jsonc'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break; // reached filesystem root
+    dir = parent;
+  }
+
+  // Fallback: return two levels up (original behaviour) so we get a clear
+  // error message pointing at the resolved path rather than a silent failure.
+  const fallback = dirname(__filename);
+  return join(fallback, '..', '..');
 }
 
 /**

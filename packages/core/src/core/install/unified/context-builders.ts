@@ -1,12 +1,12 @@
 import { basename, join, relative } from 'path';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { InstallationContext, PackageSource } from './context.js';
-import { classifyPackageInput } from '../../../utils/package-input.js';
-import { normalizePlatforms } from '../../../utils/platform-mapper.js';
+import { classifyPackageInput } from '../package-input.js';
+import { normalizePlatforms } from '../../platform/platform-mapper.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
 import { getLocalPackageYmlPath, getLocalOpenPackageDir } from '../../../utils/paths.js';
 import { exists } from '../../../utils/fs.js';
-import { createWorkspacePackageYml, ensureLocalOpenPackageStructure } from '../../../utils/package-management.js';
+import { createWorkspacePackageYml, ensureLocalOpenPackageStructure } from '../../package-management.js';
 import { logger } from '../../../utils/logger.js';
 import { resolveDeclaredPath } from '../../../utils/path-resolution.js';
 import type { ResourceInstallationSpec } from '../convenience-matchers.js';

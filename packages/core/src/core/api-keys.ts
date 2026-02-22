@@ -1,6 +1,6 @@
 import { AuthOptions } from '../types/index.js';
 import { authManager } from './auth.js';
-import { createHttpClient } from '../utils/http-client.js';
+import { createHttpClient } from './http-client.js';
 
 export interface ApiKeyInfo {
   id: string;

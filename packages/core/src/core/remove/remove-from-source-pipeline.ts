@@ -4,7 +4,7 @@ import type { CommandResult } from '../../types/index.js';
 import type { ExecutionContext } from '../../types/execution-context.js';
 import { FILE_PATTERNS } from '../../constants/index.js';
 import { resolveMutableSource } from '../source-resolution/resolve-mutable-source.js';
-import { assertMutableSourceOrThrow } from '../../utils/source-mutability.js';
+import { assertMutableSourceOrThrow } from '../source-mutability.js';
 import { collectRemovalEntries, type RemovalEntry } from './removal-collector.js';
 import { classifyRemoveInput } from './remove-input-classifier.js';
 import { runRemoveDependencyFlow } from './remove-dependency-flow.js';
@@ -14,7 +14,7 @@ import { logger } from '../../utils/logger.js';
 import { UserCancellationError } from '../../utils/errors.js';
 import { cleanupEmptyParents } from '../../utils/cleanup-empty-parents.js';
 import { resolveSourceOperationArguments } from '../../utils/source-operation-arguments.js';
-import { buildWorkspacePackageContext } from '../../utils/workspace-package-context.js';
+import { buildWorkspacePackageContext } from '../workspace-package-context.js';
 
 export interface RemoveFromSourceOptions {
   force?: boolean;

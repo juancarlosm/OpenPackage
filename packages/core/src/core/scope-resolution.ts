@@ -1,7 +1,7 @@
 import { join } from 'path';
-import { getOpenPackageDirectories } from '../core/directory.js';
+import { getOpenPackageDirectories } from './directory.js';
 import { DIR_PATTERNS, OPENPACKAGE_DIRS } from '../constants/index.js';
-import { normalizePackageName, SCOPED_PACKAGE_REGEX } from './package-name.js';
+import { normalizePackageName, SCOPED_PACKAGE_REGEX } from '../utils/package-name.js';
 
 /**
  * Package scope types

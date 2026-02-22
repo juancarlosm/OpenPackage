@@ -13,9 +13,11 @@ import type { ExecutionContext, ExecutionOptions } from '@opkg/core/types/execut
 import { createExecutionContext } from '@opkg/core/core/execution-context.js';
 import { createClackOutput, createPlainOutput } from './clack-output-adapter.js';
 import { createClackPrompt } from './clack-prompt-adapter.js';
+import { createClackProgress, createPlainProgress } from './clack-progress-adapter.js';
 import { nonInteractivePrompt } from '@opkg/core/core/ports/console-prompt.js';
 import type { OutputPort } from '@opkg/core/core/ports/output.js';
 import type { PromptPort } from '@opkg/core/core/ports/prompt.js';
+import type { ProgressPort } from '@opkg/core/core/ports/progress.js';
 
 export interface CliContextOptions extends ExecutionOptions {
   /** Override interactive mode detection (undefined = auto-detect from TTY) */
@@ -26,15 +28,19 @@ export interface CliContextOptions extends ExecutionOptions {
 let cachedClackOutput: OutputPort | undefined;
 let cachedPlainOutput: OutputPort | undefined;
 let cachedClackPrompt: PromptPort | undefined;
+let cachedClackProgress: ProgressPort | undefined;
+let cachedPlainProgress: ProgressPort | undefined;
 
 function getCliPorts(isInteractive: boolean) {
   if (isInteractive) {
     cachedClackOutput ??= createClackOutput();
     cachedClackPrompt ??= createClackPrompt();
-    return { output: cachedClackOutput, prompt: cachedClackPrompt };
+    cachedClackProgress ??= createClackProgress();
+    return { output: cachedClackOutput, prompt: cachedClackPrompt, progress: cachedClackProgress };
   }
   cachedPlainOutput ??= createPlainOutput();
-  return { output: cachedPlainOutput, prompt: nonInteractivePrompt };
+  cachedPlainProgress ??= createPlainProgress();
+  return { output: cachedPlainOutput, prompt: nonInteractivePrompt, progress: cachedPlainProgress };
 }
 
 /** Detect whether the current session is interactive (TTY, no CI). */
@@ -57,6 +63,7 @@ export async function createCliExecutionContext(options: CliContextOptions = {})
 
   ctx.output = ports.output;
   ctx.prompt = ports.prompt;
+  ctx.progress = ports.progress;
 
   return ctx;
 }
@@ -71,5 +78,6 @@ export function injectCliPorts(ctx: ExecutionContext, interactive?: boolean): Ex
   const ports = getCliPorts(isInteractive);
   ctx.output ??= ports.output;
   ctx.prompt ??= ports.prompt;
+  ctx.progress ??= ports.progress;
   return ctx;
 }

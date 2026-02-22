@@ -4,11 +4,11 @@
  */
 
 import { join } from 'path';
-import { exists, readTextFile, writeTextFile } from './fs.js';
-import { logger } from './logger.js';
-import { getAllPlatforms, getPlatformDefinition } from '../core/platforms.js';
-import { buildOpenMarkerRegex, CLOSE_MARKER_REGEX } from './root-file-extractor.js';
-import { FILE_PATTERNS } from '../constants/index.js';
+import { exists, readTextFile, writeTextFile } from '../../utils/fs.js';
+import { logger } from '../../utils/logger.js';
+import { getAllPlatforms, getPlatformDefinition } from '../platforms.js';
+import { buildOpenMarkerRegex, CLOSE_MARKER_REGEX } from '../../utils/root-file-extractor.js';
+import { FILE_PATTERNS } from '../../constants/index.js';
 
 /** Remove a single package section from root-file content using markers */
 function stripPackageSection(content: string, packageName: string): { changed: boolean; content: string } {

@@ -45,10 +45,10 @@ import { join } from 'path';
 import * as semver from 'semver';
 
 import { DIR_PATTERNS, OPENPACKAGE_DIRS, UNVERSIONED } from '../constants/index.js';
-import { isValidPackageDirectory, loadPackageConfig } from '../core/package-context.js';
-import { getOpenPackageDirectories, listPackageVersions, getPackageVersionPath } from '../core/directory.js';
-import { normalizePackageName, SCOPED_PACKAGE_REGEX } from './package-name.js';
-import { logger } from './logger.js';
+import { isValidPackageDirectory, loadPackageConfig } from './package-context.js';
+import { getOpenPackageDirectories, listPackageVersions, getPackageVersionPath } from './directory.js';
+import { normalizePackageName, SCOPED_PACKAGE_REGEX } from '../utils/package-name.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Types of package sources that can be resolved

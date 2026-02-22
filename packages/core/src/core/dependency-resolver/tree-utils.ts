@@ -1,6 +1,6 @@
 import type { DependencyNode } from './types.js';
 import { scanOpenPackagePackages } from '../openpackage.js';
-import { formatVersionLabel } from '../../utils/package-versioning.js';
+import { formatVersionLabel } from '../package-versioning.js';
 import { logger } from '../../utils/logger.js';
 
 /**

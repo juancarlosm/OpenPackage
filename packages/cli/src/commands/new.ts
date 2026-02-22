@@ -1,5 +1,5 @@
 import { createPackage } from '@opkg/core/core/package-creation.js';
-import { parseScope, type PackageScope } from '@opkg/core/utils/scope-resolution.js';
+import { parseScope, type PackageScope } from '@opkg/core/core/scope-resolution.js';
 import { logger } from '@opkg/core/utils/logger.js';
 import { createCliExecutionContext } from '../cli/context.js';
 import { resolveOutput, resolvePrompt } from '@opkg/core/core/ports/resolve.js';

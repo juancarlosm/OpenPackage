@@ -1,7 +1,7 @@
 import type { PushPackageResponse } from '../../types/api.js';
 import type { TarballInfo } from '../../utils/tarball.js';
 import { formatFileSize, formatPathForDisplay } from '../../utils/formatters.js';
-import { formatVersionLabel } from '../../utils/package-versioning.js';
+import { formatVersionLabel } from '../package-versioning.js';
 import type { PackageYml } from '../../types/index.js';
 import type { OutputPort } from '../ports/output.js';
 import { resolveOutput } from '../ports/resolve.js';

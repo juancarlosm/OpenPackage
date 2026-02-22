@@ -118,8 +118,9 @@ function selectDeepestMatch(matches: BaseMatch[]): BaseMatch {
 
 /**
  * Check if the current environment supports interactive prompts.
- * 
+ *
  * @returns True if interactive prompts are supported
+ * @deprecated Use ExecutionContext.interactive instead when possible.
  */
 export function canPrompt(): boolean {
   // Check if stdin is a TTY (terminal)

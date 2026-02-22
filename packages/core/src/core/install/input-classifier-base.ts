@@ -1,7 +1,7 @@
 import { resolve, basename } from 'path';
 
 import { parseResourceArg, type ResourceSpec } from '../../utils/resource-arg-parser.js';
-import { classifyPackageInput } from '../../utils/package-input.js';
+import { classifyPackageInput } from './package-input.js';
 import { detectGitSource } from '../../utils/git-url-detection.js';
 import { exists } from '../../utils/fs.js';
 import { isValidPackageDirectory } from '../package-context.js';

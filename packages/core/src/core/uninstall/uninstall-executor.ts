@@ -11,7 +11,7 @@ import type { UninstallOptions } from '../../types/index.js';
 import type { ExecutionContext } from '../../types/execution-context.js';
 import { ValidationError } from '../../utils/errors.js';
 import { remove, exists } from '../../utils/fs.js';
-import { buildPreservedDirectoriesSet } from '../../utils/directory-preservation.js';
+import { buildPreservedDirectoriesSet } from '../platform/directory-preservation.js';
 import { cleanupEmptyParents } from '../../utils/cleanup-empty-parents.js';
 import { runUninstallPipeline, runSelectiveUninstallPipeline } from './uninstall-pipeline.js';
 import { reportUninstallResult, reportResourceUninstallResult } from './uninstall-reporter.js';
