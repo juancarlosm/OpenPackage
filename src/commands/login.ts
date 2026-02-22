@@ -8,6 +8,8 @@ import {
 import { profileManager } from '../core/profiles.js';
 import { logger } from '../utils/logger.js';
 import { getCurrentUsername } from '../core/api-keys.js';
+import { createCliExecutionContext } from '../cli/context.js';
+import { resolveOutput } from '../core/ports/resolve.js';
 
 type LoginOptions = {
 	profile?: string;
@@ -15,20 +17,22 @@ type LoginOptions = {
 
 export async function setupLoginCommand(args: any[]): Promise<void> {
 	const [options] = args as [LoginOptions];
+	const ctx = await createCliExecutionContext();
+	const out = resolveOutput(ctx);
 
 	const profileName = authManager.getCurrentProfile({
 		profile: options.profile,
 	});
 
-	console.log(`Using profile: ${profileName}`);
+	out.info(`Using profile: ${profileName}`);
 
 	const authorization = await startDeviceAuthorization();
 
-	console.log('A browser will open for you to confirm sign-in.');
-	console.log(`User code: ${authorization.userCode}`);
-	console.log(`Verification URL: ${authorization.verificationUri}`);
-	console.log('');
-	console.log('If the browser does not open, visit the URL and enter the code above.');
+	out.info('A browser will open for you to confirm sign-in.');
+	out.info(`User code: ${authorization.userCode}`);
+	out.info(`Verification URL: ${authorization.verificationUri}`);
+	out.message('');
+	out.info('If the browser does not open, visit the URL and enter the code above.');
 
 	openBrowser(authorization.verificationUriComplete);
 
@@ -44,14 +48,14 @@ export async function setupLoginCommand(args: any[]): Promise<void> {
 		const username = tokens.username ?? (await resolveUsername(profileName));
 		if (username) {
 			await profileManager.setProfileDefaultScope(profileName, `@${username}`);
-			console.log(`✓ Default scope set to @${username} for profile "${profileName}".`);
+			out.success(`Default scope set to @${username} for profile "${profileName}".`);
 		} else {
 			logger.debug('Could not derive username from API key; default scope not set');
 		}
 
-		console.log('');
-		console.log('✓ Login successful.');
-		console.log(`✓ API key stored for profile "${profileName}".`);
+		out.message('');
+		out.success('Login successful.');
+		out.success(`API key stored for profile "${profileName}".`);
 	} catch (error: any) {
 		logger.debug('Device login failed', { error });
 		throw error;

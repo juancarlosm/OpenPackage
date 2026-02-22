@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import type { InstallOptions } from '../types/index.js';
 import { createOrchestrator } from '../core/install/orchestrator/index.js';
 import { normalizeInstallOptions } from '../core/install/preprocessing/index.js';
-import { createExecutionContext } from '../core/execution-context.js';
+import { createCliExecutionContext } from '../cli/context.js';
 import { createTelemetryCollector } from '../utils/telemetry.js';
 import { createHttpClient } from '../utils/http-client.js';
 
@@ -39,8 +39,8 @@ export async function setupInstallCommand(args: any[]): Promise<void> {
   // Create telemetry collector
   const telemetryCollector = await createTelemetryCollector('install');
   
-  // Create execution context with telemetry
-  const execContext = await createExecutionContext({
+  // Create execution context with CLI ports and telemetry
+  const execContext = await createCliExecutionContext({
     global: options.global,
     cwd: programOpts.cwd
   });

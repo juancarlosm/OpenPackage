@@ -1,12 +1,13 @@
 /**
  * Smart Multiselect Prompt
  * 
- * Wrapper around prompts multiselect that expands category selections
- * Note: Real-time category toggling isn't possible with the prompts library,
+ * Wrapper around @clack/prompts multiselect that expands category selections.
+ * Note: Real-time category toggling isn't possible with clack's multiselect,
  * so we expand category selections after the user confirms.
  */
 
-import prompts from 'prompts';
+import * as clack from '@clack/prompts';
+import { UserCancellationError } from './errors.js';
 
 /**
  * Create a multiselect prompt with category expansion support
@@ -23,30 +24,29 @@ export async function smartMultiselect(
     min?: number;
   }
 ): Promise<number[]> {
+  const clackOptions = choices.map((c: any) => ({
+    label: c.title ?? c.label ?? String(c.value),
+    value: c.value as number,
+    hint: c.description ?? c.hint,
+  }));
+
   try {
-    const response = await prompts(
-      {
-        type: 'multiselect',
-        name: 'selectedIndices',
-        message,
-        choices,
-        hint: options?.hint,
-        min: options?.min,
-        instructions: false
-      },
-      {
-        onCancel: () => {
-          throw new Error('USER_CANCELLED');
-        }
-      }
-    );
-    
-    const selectedIndices = response.selectedIndices || [];
-    
+    const result = await clack.multiselect({
+      message,
+      options: clackOptions,
+      required: options?.min ? options.min > 0 : false,
+    });
+
+    if (clack.isCancel(result)) {
+      return [];
+    }
+
+    const selectedIndices = (result as number[]) || [];
+
     // Expand category selections to include all their resources
     return expandCategorySelections(selectedIndices, categoryMap);
   } catch (error) {
-    if (error instanceof Error && error.message === 'USER_CANCELLED') {
+    if (error instanceof UserCancellationError) {
       return [];
     }
     throw error;

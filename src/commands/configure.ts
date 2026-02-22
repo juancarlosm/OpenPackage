@@ -3,8 +3,11 @@ import { profileManager } from '../core/profiles.js';
 import { ensureOpenPackageDirectories } from '../core/directory.js';
 import { logger } from '../utils/logger.js';
 import { UserCancellationError } from '../utils/errors.js';
-import { safePrompts } from '../utils/prompts.js';
-import { showApiKeySignupMessage } from '../utils/messages.js';
+import { API_KEY_SIGNUP_MESSAGE } from '../utils/messages.js';
+import { createCliExecutionContext } from '../cli/context.js';
+import { resolveOutput, resolvePrompt } from '../core/ports/resolve.js';
+import type { OutputPort } from '../core/ports/output.js';
+import type { PromptPort } from '../core/ports/prompt.js';
 
 /**
  * Configure command implementation for profile management
@@ -19,53 +22,46 @@ interface ConfigureOptions {
 /**
  * Interactive profile setup
  */
-async function setupProfile(profileName: string): Promise<CommandResult> {
+async function setupProfile(profileName: string, out: OutputPort, prm: PromptPort): Promise<CommandResult> {
   try {
     logger.info(`Setting up profile: ${profileName}`);
 
     // Ensure directories exist
     await ensureOpenPackageDirectories();
 
-    showApiKeySignupMessage();
+    out.info(API_KEY_SIGNUP_MESSAGE);
 
     // Prompt for API key
-    const response = await safePrompts([
-      {
-        type: 'password',
-        name: 'apiKey',
-        message: `Enter API key for profile '${profileName}':`,
-        validate: (value: string) => value.length > 0 || 'API key is required'
-      },
-      {
-        type: 'text',
-        name: 'description',
-        message: `Enter description for profile '${profileName}' (optional):`,
-        initial: profileName === 'default' ? 'Default profile' : ''
-      }
-    ]);
+    const apiKey = await prm.text(`Enter API key for profile '${profileName}':`, {
+      validate: (value: string) => value.length > 0 ? true : 'API key is required'
+    });
 
-    if (!response.apiKey) {
+    const description = await prm.text(`Enter description for profile '${profileName}' (optional):`, {
+      initial: profileName === 'default' ? 'Default profile' : ''
+    });
+
+    if (!apiKey) {
       throw new UserCancellationError('Profile setup cancelled');
     }
 
     // Set profile configuration
     await profileManager.setProfile(profileName, {
-      description: response.description || undefined
+      description: description || undefined
     });
 
     // Set profile credentials
     await profileManager.setProfileCredentials(profileName, {
-      api_key: response.apiKey
+      api_key: apiKey
     });
 
-    console.log(`\u2705 Profile '${profileName}' configured successfully`);
+    out.success(`Profile '${profileName}' configured successfully`);
     
     if (profileName === 'default') {
-      console.log('');
-      console.log('\uD83D\uDCA1 You can now use remote registry features with this profile.');
+      out.message('');
+      out.info('You can now use remote registry features with this profile.');
     } else {
-      console.log('');
-      console.log(`\uD83D\uDCA1 You can now use remote registry features with --profile ${profileName}`);
+      out.message('');
+      out.info(`You can now use remote registry features with --profile ${profileName}`);
     }
 
     return {
@@ -87,31 +83,31 @@ async function setupProfile(profileName: string): Promise<CommandResult> {
 /**
  * List all profiles
  */
-async function listProfiles(): Promise<CommandResult> {
+async function listProfiles(out: OutputPort): Promise<CommandResult> {
   try {
     const profiles = await profileManager.listProfiles();
     
     if (profiles.length === 0) {
-      console.log('No profiles configured.');
-      console.log('');
-      console.log('To create a profile, run:');
-      console.log('  opkg configure');
-      console.log('  opkg configure --profile <name>');
+      out.info('No profiles configured.');
+      out.message('');
+      out.info('To create a profile, run:');
+      out.info('  opkg configure');
+      out.info('  opkg configure --profile <name>');
       return { success: true, data: { profiles: [] } };
     }
 
-    console.log('Configured profiles:');
-    console.log('');
+    out.info('Configured profiles:');
+    out.message('');
 
     for (const profileName of profiles) {
       const profile = await profileManager.getProfile(profileName);
       const hasCredentials = !!profile?.credentials?.api_key;
       const description = profile?.config?.description || '(no description)';
       
-      console.log(`  ${profileName}`);
-      console.log(`    Description: ${description}`);
-      console.log(`    Credentials: ${hasCredentials ? '\u2705 Configured' : '\u274C Missing'}`);
-      console.log('');
+      out.message(`  ${profileName}`);
+      out.message(`    Description: ${description}`);
+      out.message(`    Credentials: ${hasCredentials ? '\u2705 Configured' : '\u274C Missing'}`);
+      out.message('');
     }
 
     return {
@@ -127,7 +123,7 @@ async function listProfiles(): Promise<CommandResult> {
 /**
  * Delete a profile
  */
-async function deleteProfile(profileName: string): Promise<CommandResult> {
+async function deleteProfile(profileName: string, out: OutputPort, prm: PromptPort): Promise<CommandResult> {
   try {
     if (profileName === 'default') {
       return { success: false, error: 'Cannot delete the default profile' };
@@ -139,19 +135,17 @@ async function deleteProfile(profileName: string): Promise<CommandResult> {
     }
 
     // Confirm deletion
-    const response = await safePrompts({
-      type: 'confirm',
-      name: 'confirm',
-      message: `Are you sure you want to delete profile '${profileName}'?`,
-      initial: false
-    });
+    const confirmed = await prm.confirm(
+      `Are you sure you want to delete profile '${profileName}'?`,
+      false
+    );
 
-    if (!response.confirm) {
+    if (!confirmed) {
       throw new UserCancellationError('Profile deletion cancelled');
     }
 
     await profileManager.deleteProfile(profileName);
-    console.log(`\u2705 Profile '${profileName}' deleted successfully`);
+    out.success(`Profile '${profileName}' deleted successfully`);
 
     return {
       success: true,
@@ -173,21 +167,21 @@ async function deleteProfile(profileName: string): Promise<CommandResult> {
 /**
  * Main configure command implementation
  */
-async function configureCommand(options: ConfigureOptions): Promise<CommandResult> {
+async function configureCommand(options: ConfigureOptions, out: OutputPort, prm: PromptPort): Promise<CommandResult> {
   logger.info('Configure command executed', { options });
 
   // List profiles
   if (options.list) {
-    return await listProfiles();
+    return await listProfiles(out);
   }
 
   // Delete profile
   if (typeof options.delete === 'string') {
-    return await deleteProfile(options.delete);
+    return await deleteProfile(options.delete, out, prm);
   }
   if (options.delete && options.profile) {
     // Backward compatibility: allow --delete with --profile <name>
-    return await deleteProfile(options.profile);
+    return await deleteProfile(options.profile, out, prm);
   }
   if (options.delete) {
     return { success: false, error: 'Please provide a profile name via --delete <name> or --profile <name>.' };
@@ -195,11 +189,11 @@ async function configureCommand(options: ConfigureOptions): Promise<CommandResul
 
   // Setup default profile (default behavior)
   if (!options.profile) {
-    return await setupProfile('default');
+    return await setupProfile('default', out, prm);
   }
 
   // Setup profile
-  return await setupProfile(options.profile);
+  return await setupProfile(options.profile, out, prm);
 }
 
 /**
@@ -207,7 +201,10 @@ async function configureCommand(options: ConfigureOptions): Promise<CommandResul
  */
 export async function setupConfigureCommand(args: any[]): Promise<void> {
   const [options] = args as [ConfigureOptions];
-  const result = await configureCommand(options);
+  const ctx = await createCliExecutionContext();
+  const out = resolveOutput(ctx);
+  const prm = resolvePrompt(ctx);
+  const result = await configureCommand(options, out, prm);
   if (!result.success) {
     throw new Error(result.error || 'Configure operation failed');
   }

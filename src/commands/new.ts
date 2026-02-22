@@ -1,7 +1,8 @@
 import { createPackage } from '../core/package-creation.js';
 import { parseScope, type PackageScope } from '../utils/scope-resolution.js';
-import { promptPackageName } from '../utils/prompts.js';
 import { logger } from '../utils/logger.js';
+import { createCliExecutionContext } from '../cli/context.js';
+import { resolveOutput, resolvePrompt } from '../core/ports/resolve.js';
 
 /**
  * Command options for 'opkg new'
@@ -27,6 +28,9 @@ interface NewCommandOptions {
 export async function setupNewCommand(args: any[]): Promise<void> {
   let [packageName, options] = args as [string | undefined, NewCommandOptions | undefined];
   const cwd = process.cwd();
+  const ctx = await createCliExecutionContext();
+  const out = resolveOutput(ctx);
+  const prm = resolvePrompt(ctx);
 
   // Parse and validate scope or custom path
   let scope: PackageScope | undefined;
@@ -54,7 +58,16 @@ export async function setupNewCommand(args: any[]): Promise<void> {
 
   // Prompt for package name if not provided
   if (!packageName) {
-    packageName = await promptPackageName();
+    packageName = await prm.text('Enter package name:', {
+      placeholder: 'my-package',
+      validate: (value: string) => {
+        if (!value || value.trim().length === 0) return 'Package name is required';
+        if (!/^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/.test(value.trim())) {
+          return 'Package name must be lowercase alphanumeric, can contain dots, hyphens, underscores';
+        }
+        return true;
+      }
+    });
   }
 
   logger.debug('Creating new package', {
@@ -82,20 +95,28 @@ export async function setupNewCommand(args: any[]): Promise<void> {
 
   // Additional success messaging based on scope or custom path
   if (customPath) {
-    console.log(`\n💡 Next steps:`);
-    console.log(`   1. Add files to your package: opkg add <file-or-dir> --to ${actualPackageName}`);
-    console.log(`   2. Install to workspace: opkg install ${customPath}`);
+    out.note(
+      `1. Add files to your package: opkg add <file-or-dir> --to ${actualPackageName}\n` +
+      `2. Install to workspace: opkg install ${customPath}`,
+      'Next steps'
+    );
   } else if (scope === 'project') {
-    console.log(`\n💡 Next steps:`);
-    console.log(`   1. Add files to your package: opkg add <file-or-dir> --to ${actualPackageName}`);
-    console.log(`   2. Install to this workspace: opkg install ${actualPackageName}`);
+    out.note(
+      `1. Add files to your package: opkg add <file-or-dir> --to ${actualPackageName}\n` +
+      `2. Install to this workspace: opkg install ${actualPackageName}`,
+      'Next steps'
+    );
   } else if (scope === 'global') {
-    console.log(`\n💡 Next steps:`);
-    console.log(`   1. Add files to your package: opkg add <file-or-dir> --to ${actualPackageName}`);
-    console.log(`   2. Install to any workspace: opkg install ${actualPackageName}`);
+    out.note(
+      `1. Add files to your package: opkg add <file-or-dir> --to ${actualPackageName}\n` +
+      `2. Install to any workspace: opkg install ${actualPackageName}`,
+      'Next steps'
+    );
   } else if (scope === 'root') {
-    console.log(`\n💡 Next steps:`);
-    console.log(`   1. Add files to your package: opkg add <file-or-dir>`);
-    console.log(`   2. Install to other workspaces: opkg install ${actualPackageName}`);
+    out.note(
+      `1. Add files to your package: opkg add <file-or-dir>\n` +
+      `2. Install to other workspaces: opkg install ${actualPackageName}`,
+      'Next steps'
+    );
   }
 }

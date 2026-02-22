@@ -1,9 +1,6 @@
-import prompts from 'prompts';
-
 import { ValidationError, PackageNotFoundError, UserCancellationError } from '../utils/errors.js';
 import { runUnpublishPipeline } from '../core/unpublish/unpublish-pipeline.js';
 import type { UnpublishOptions } from '../core/unpublish/unpublish-types.js';
-import { safePrompts, promptConfirmation } from '../utils/prompts.js';
 import { 
   listAllPackages, 
   listPackageVersions, 
@@ -13,6 +10,10 @@ import {
 import { getDirectorySize, countFilesInDirectory } from '../utils/fs.js';
 import { formatFileSize, formatFileCount } from '../utils/formatters.js';
 import { normalizePackageName } from '../utils/package-name.js';
+import { createCliExecutionContext } from '../cli/context.js';
+import { resolveOutput, resolvePrompt } from '../core/ports/resolve.js';
+import type { OutputPort } from '../core/ports/output.js';
+import type { PromptPort } from '../core/ports/prompt.js';
 
 interface UnpublishCommandOptions extends UnpublishOptions {
   interactive?: boolean;
@@ -41,7 +42,7 @@ function formatVersionChoice(
  * Interactive package selection from registry
  * Returns selected package name or null if cancelled/empty
  */
-async function selectPackageFromList(): Promise<string | null> {
+async function selectPackageFromList(out: OutputPort, prm: PromptPort): Promise<string | null> {
   const packages = await listAllPackages();
   
   if (packages.length === 0) {
@@ -59,17 +60,14 @@ async function selectPackageFromList(): Promise<string | null> {
     })
   );
   
-  console.log(`  ${packages.length} package${packages.length === 1 ? '' : 's'} in local registry\n`);
+  out.info(`${packages.length} package${packages.length === 1 ? '' : 's'} in local registry`);
   
-  const response = await safePrompts({
-    type: 'select',
-    name: 'package',
-    message: 'Select package to unpublish:',
-    choices,
-    hint: 'Use arrow keys to navigate, Enter to select'
-  });
+  const result = await prm.select(
+    'Select package to unpublish:',
+    choices
+  );
   
-  return response.package || null;
+  return result || null;
 }
 
 /**
@@ -77,7 +75,9 @@ async function selectPackageFromList(): Promise<string | null> {
  * Returns array of selected version strings
  */
 async function selectVersionsFromPackage(
-  packageName: string
+  packageName: string,
+  out: OutputPort,
+  prm: PromptPort
 ): Promise<string[]> {
   const versions = await listPackageVersions(packageName);
   
@@ -99,26 +99,15 @@ async function selectVersionsFromPackage(
     })
   );
   
-  console.log(`  ${versions.length} version${versions.length === 1 ? '' : 's'} available\n`);
+  out.info(`${versions.length} version${versions.length === 1 ? '' : 's'} available`);
   
-  const response = await prompts(
-    {
-      type: 'multiselect',
-      name: 'versions',
-      message: `Select versions of '${packageName}' to unpublish:`,
-      choices,
-      hint: '- Space: select/deselect \u2022 Enter: confirm',
-      min: 1,
-      instructions: false
-    },
-    {
-      onCancel: () => {
-        throw new UserCancellationError('Operation cancelled by user');
-      }
-    }
+  const result = await prm.multiselect(
+    `Select versions of '${packageName}' to unpublish:`,
+    choices,
+    { min: 1 }
   );
   
-  return response.versions || [];
+  return result || [];
 }
 
 /**
@@ -127,7 +116,9 @@ async function selectVersionsFromPackage(
  */
 async function handleListUnpublish(
   packageSpec: string | undefined,
-  options: UnpublishCommandOptions
+  options: UnpublishCommandOptions,
+  out: OutputPort,
+  prm: PromptPort
 ): Promise<void> {
   // --interactive always operates on local registry (no validation needed)
   // The --local flag is auto-implied by the action handler
@@ -147,38 +138,35 @@ async function handleListUnpublish(
     selectedPackage = exists;
   } else {
     // No package specified - show interactive package selector
-    selectedPackage = await selectPackageFromList();
+    selectedPackage = await selectPackageFromList(out, prm);
     
     if (!selectedPackage) {
-      console.log('No packages found in local registry.');
+      out.info('No packages found in local registry.');
       return;
     }
   }
   
   // Step 2: Select versions to unpublish
-  const selectedVersions = await selectVersionsFromPackage(selectedPackage);
+  const selectedVersions = await selectVersionsFromPackage(selectedPackage, out, prm);
   
   if (selectedVersions.length === 0) {
-    console.log('No versions selected. Unpublish cancelled.');
+    out.info('No versions selected. Unpublish cancelled.');
     return;
   }
   
   // Step 3: Show summary
-  console.log(`\n\u2713 Selected ${selectedVersions.length} version${selectedVersions.length === 1 ? '' : 's'} to unpublish:`);
-  for (const version of selectedVersions) {
-    console.log(`  \u2022 ${selectedPackage}@${version}`);
-  }
-  console.log('');
+  const versionLines = selectedVersions.map(v => `  ${selectedPackage}@${v}`).join('\n');
+  out.step(`Selected ${selectedVersions.length} version${selectedVersions.length === 1 ? '' : 's'} to unpublish:\n${versionLines}`);
   
   // Step 4: Final confirmation (unless --force)
   if (!options.force) {
-    const confirmed = await promptConfirmation(
+    const confirmed = await prm.confirm(
       'This will delete the selected versions from the local registry. Continue?',
       false
     );
     
     if (!confirmed) {
-      console.log('Unpublish cancelled.');
+      out.info('Unpublish cancelled.');
       return;
     }
   }
@@ -194,22 +182,26 @@ async function handleListUnpublish(
       });
       
       if (!result.success) {
-        console.error(`Failed to unpublish ${packageSpecWithVersion}: ${result.error}`);
+        out.error(`Failed to unpublish ${packageSpecWithVersion}: ${result.error}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`Failed to unpublish ${packageSpecWithVersion}: ${message}`);
+      out.error(`Failed to unpublish ${packageSpecWithVersion}: ${message}`);
     }
   }
 }
 
 export async function setupUnpublishCommand(args: any[]): Promise<void> {
   const [packageSpec, options] = args as [string | undefined, UnpublishCommandOptions];
+  const ctx = await createCliExecutionContext();
+  const out = resolveOutput(ctx);
+  const prm = resolvePrompt(ctx);
+
   // Handle interactive mode
   if (options.interactive) {
     // Auto-imply --local when --interactive is used (interactive only works with local registry)
     options.local = true;
-    await handleListUnpublish(packageSpec, options);
+    await handleListUnpublish(packageSpec, options, out, prm);
     return;
   }
   

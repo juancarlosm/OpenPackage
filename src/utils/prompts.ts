@@ -1,4 +1,4 @@
-import prompts from 'prompts';
+import * as clack from '@clack/prompts';
 import { basename } from 'path';
 import { PackageYml } from '../types/index.js';
 import { UserCancellationError } from './errors.js';
@@ -9,43 +9,121 @@ import { readTextFile } from './fs.js';
 import { formatPathForDisplay } from './formatters.js';
 
 /**
- * Common prompt types and utilities for user interaction
+ * Common prompt types and utilities for user interaction.
+ *
+ * All prompts are backed by @clack/prompts. The `prompts` npm package
+ * is no longer used anywhere in the codebase.
  */
 
-/**
- * Safe wrapper around prompts() that ensures consistent cancellation handling
- * Use this instead of direct prompts() calls to ensure proper error handling
- */
-export async function safePrompts(
-  questions: prompts.PromptObject | prompts.PromptObject[],
-  options?: prompts.Options
-): Promise<prompts.Answers<string>> {
-  const response = await prompts(questions, {
-    onCancel: () => {
-      throw new UserCancellationError('Operation cancelled by user');
-    },
-    ...(options || {})
-  });
-  
-  if (isCancelled(response)) {
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function handleCancel(result: unknown): void {
+  if (clack.isCancel(result)) {
+    clack.cancel('Operation cancelled.');
     throw new UserCancellationError('Operation cancelled by user');
   }
-  
-  return response;
 }
+
+// ---------------------------------------------------------------------------
+// Legacy shim: safePrompts
+//
+// This previously wrapped the `prompts` npm package. It now delegates to
+// @clack/prompts. The API is intentionally kept compatible so existing
+// callers (configure.ts, unpublish.ts, clack-output-adapter.ts) continue
+// to work without changes.
+// ---------------------------------------------------------------------------
+
+/**
+ * @deprecated Prefer calling @clack/prompts directly or using PromptPort.
+ * This shim exists for backward-compat with callers that still pass a
+ * prompts-style question object.
+ */
+export async function safePrompts(
+  questions: Record<string, any> | Record<string, any>[],
+  _options?: Record<string, any>
+): Promise<Record<string, any>> {
+  const questionList = Array.isArray(questions) ? questions : [questions];
+  const answers: Record<string, any> = {};
+
+  for (const q of questionList) {
+    const name = q.name as string;
+    const message = q.message as string;
+
+    switch (q.type) {
+      case 'confirm': {
+        const result = await clack.confirm({
+          message,
+          initialValue: q.initial ?? false,
+        });
+        handleCancel(result);
+        answers[name] = result;
+        break;
+      }
+      case 'text':
+      case 'password': {
+        const result = await clack.text({
+          message,
+          placeholder: q.placeholder,
+          defaultValue: q.initial,
+          validate: q.validate
+            ? (async (value: string | undefined) => {
+                const r = await q.validate(value ?? '');
+                if (r === true || r === undefined) return undefined;
+                return String(r);
+              }) as any
+            : undefined,
+        });
+        handleCancel(result);
+        answers[name] = result;
+        break;
+      }
+      case 'select': {
+        const choices = (q.choices as Array<{ title: string; value: any; description?: string }>).map(c => ({
+          label: c.title,
+          value: c.value,
+          hint: c.description,
+        }));
+        const result = await clack.select({ message, options: choices });
+        handleCancel(result);
+        answers[name] = result;
+        break;
+      }
+      case 'multiselect': {
+        const choices = (q.choices as Array<{ title: string; value: any; description?: string }>).map(c => ({
+          label: c.title,
+          value: c.value,
+          hint: c.description,
+        }));
+        const result = await clack.multiselect({
+          message,
+          options: choices,
+          required: q.min ? q.min > 0 : false,
+        });
+        handleCancel(result);
+        answers[name] = result;
+        break;
+      }
+      default:
+        throw new Error(`Unsupported prompt type: ${q.type}`);
+    }
+  }
+
+  return answers;
+}
+
+// ---------------------------------------------------------------------------
+// Confirmation helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Prompt for simple confirmation
  */
 export async function promptConfirmation(message: string, initial: boolean = false): Promise<boolean> {
-  const response = await safePrompts({
-    type: 'confirm',
-    name: 'confirmed',
-    message,
-    initial
-  });
-  
-  return (response as any).confirmed || false;
+  const result = await clack.confirm({ message, initialValue: initial });
+  handleCancel(result);
+  return result as boolean;
 }
 
 /**
@@ -71,16 +149,16 @@ export async function promptPackOverwrite(
 ): Promise<boolean> {
   const locationType = isCustomOutput ? 'output directory' : 'registry';
   const displayPath = formatPathForDisplay(destination, process.cwd());
-  
-  console.log(''); // Spacing for readability
-  console.log(`⚠️  Package '${packageName}@${version}' already exists in ${locationType}`);
-  console.log(`   Location: ${displayPath}`);
-  console.log(`   Existing files: ${existingFileCount}`);
-  console.log('');
-  
+
+  clack.log.warn(
+    `Package '${packageName}@${version}' already exists in ${locationType}\n` +
+    `   Location: ${displayPath}\n` +
+    `   Existing files: ${existingFileCount}`
+  );
+
   return await promptConfirmation(
     `Overwrite '${packageName}@${version}'? This action cannot be undone.`,
-    false  // Default to no
+    false
   );
 }
 
@@ -96,10 +174,9 @@ export async function promptPackageDelete(packageName: string): Promise<boolean>
 
 /**
  * Prompt for unpublishing all versions of a package
- * More explicit than generic promptPackageDelete for multi-version context
  */
 export async function promptUnpublishConfirmation(
-  packageName: string, 
+  packageName: string,
   versions: string[]
 ): Promise<boolean> {
   return await promptConfirmation(
@@ -118,10 +195,12 @@ export async function promptCreatePackage(): Promise<boolean> {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Text / name prompts
+// ---------------------------------------------------------------------------
+
 /**
  * Prompt user to enter a package name
- * @param defaultName - Default package name to suggest
- * @param existsChecker - Optional async function to check if package name already exists
  */
 export async function promptPackageName(
   defaultName?: string,
@@ -130,22 +209,18 @@ export async function promptPackageName(
   const cwd = process.cwd();
   const suggestedName = defaultName || basename(cwd);
 
-  const response = await safePrompts({
-    type: 'text',
-    name: 'name',
+  const result = await clack.text({
     message: 'Package name:',
-    initial: suggestedName,
-    validate: async (value: string) => {
+    defaultValue: suggestedName,
+    validate: (async (value: string | undefined) => {
       if (!value) return 'Name is required';
       try {
         validatePackageName(value);
       } catch (error) {
-        // Strip "Validation error: " prefix to avoid duplication in prompts UI
         const message = (error as Error).message;
         return message.replace(/^Validation error:\s*/, '');
       }
-      
-      // Check if package already exists (if checker provided)
+
       if (existsChecker) {
         const normalized = normalizePackageName(value);
         const alreadyExists = await existsChecker(normalized);
@@ -153,82 +228,40 @@ export async function promptPackageName(
           return `Package '${normalized}' already exists. Please choose a different name.`;
         }
       }
-      
-      return true;
-    }
+      return undefined;
+    }) as any,
   });
-
-  return normalizePackageName(response.name);
+  handleCancel(result);
+  return normalizePackageName(result as string);
 }
 
 /**
  * Package details prompt for interactive package creation
- * @param defaultName - Default package name to suggest
- * @param existsChecker - Optional async function to check if package name already exists
  */
 export async function promptPackageDetails(
   defaultName?: string,
   existsChecker?: (name: string) => Promise<boolean>
 ): Promise<PackageYml> {
-  const cwd = process.cwd();
-  const suggestedName = defaultName || basename(cwd);
+  const name = await promptPackageName(defaultName, existsChecker);
 
-  const response = await safePrompts([
-    {
-      type: 'text',
-      name: 'name',
-      message: 'Package name:',
-      initial: suggestedName,
-      validate: async (value: string) => {
-        if (!value) return 'Name is required';
-        try {
-          validatePackageName(value);
-        } catch (error) {
-          // Strip "Validation error: " prefix to avoid duplication in prompts UI
-          const message = (error as Error).message;
-          return message.replace(/^Validation error:\s*/, '');
-        }
-        
-        // Check if package already exists (if checker provided)
-        if (existsChecker) {
-          const normalized = normalizePackageName(value);
-          const alreadyExists = await existsChecker(normalized);
-          if (alreadyExists) {
-            return `Package '${normalized}' already exists. Please choose a different name.`;
-          }
-        }
-        
-        return true;
-      }
-    },
-    {
-      type: 'text',
-      name: 'description',
-      message: 'Description:'
-    },
-    {
-      type: 'text',
-      name: 'keywords',
-      message: 'Keywords (space-separated):'
-    },
-    {
-      type: 'confirm',
-      name: 'private',
-      message: 'Private package?',
-      initial: false
-    }
-  ]);
+  const description = await clack.text({ message: 'Description:', defaultValue: '' });
+  handleCancel(description);
 
-  // Process keywords from space-separated string to array
-  const keywordsArray = response.keywords
-    ? response.keywords.trim().split(/\s+/).filter((k: string) => k.length > 0)
+  const keywords = await clack.text({ message: 'Keywords (space-separated):', defaultValue: '' });
+  handleCancel(keywords);
+
+  const isPrivate = await clack.confirm({ message: 'Private package?', initialValue: false });
+  handleCancel(isPrivate);
+
+  const keywordsArray = (keywords as string)
+    ? (keywords as string).trim().split(/\s+/).filter((k: string) => k.length > 0)
     : [];
 
   const config: PackageYml = {
-    name: normalizePackageName(response.name),
-    ...(response.description && { description: response.description }),
+    name: normalizePackageName(name),
+    ...((description as string) && { description: description as string }),
     ...(keywordsArray.length > 0 && { keywords: keywordsArray }),
-    ...(response.private && { private: response.private })
+    ...(isPrivate && { private: isPrivate as boolean })
   };
 
   return config;
@@ -238,35 +271,24 @@ export async function promptPackageDetails(
  * Package details prompt for named package creation (skips name prompt)
  */
 export async function promptPackageDetailsForNamed(packageName: string): Promise<PackageYml> {
-  const response = await safePrompts([
-    {
-      type: 'text',
-      name: 'description',
-      message: 'Description:'
-    },
-    {
-      type: 'text',
-      name: 'keywords',
-      message: 'Keywords (space-separated):'
-    },
-    {
-      type: 'confirm',
-      name: 'private',
-      message: 'Private package?',
-      initial: false
-    }
-  ]);
+  const description = await clack.text({ message: 'Description:', defaultValue: '' });
+  handleCancel(description);
 
-  // Process keywords from space-separated string to array
-  const keywordsArray = response.keywords
-    ? response.keywords.trim().split(/\s+/).filter((k: string) => k.length > 0)
+  const keywords = await clack.text({ message: 'Keywords (space-separated):', defaultValue: '' });
+  handleCancel(keywords);
+
+  const isPrivate = await clack.confirm({ message: 'Private package?', initialValue: false });
+  handleCancel(isPrivate);
+
+  const keywordsArray = (keywords as string)
+    ? (keywords as string).trim().split(/\s+/).filter((k: string) => k.length > 0)
     : [];
 
   const config: PackageYml = {
     name: normalizePackageName(packageName),
-    ...(response.description && { description: response.description }),
+    ...((description as string) && { description: description as string }),
     ...(keywordsArray.length > 0 && { keywords: keywordsArray }),
-    ...(response.private && { private: response.private })
+    ...(isPrivate && { private: isPrivate as boolean })
   };
 
   return config;
@@ -276,23 +298,24 @@ export async function promptPackageDetailsForNamed(packageName: string): Promise
  * Handle cancellation result from prompts
  */
 export function isCancelled(result: any): boolean {
-  return result === undefined;
+  return result === undefined || clack.isCancel(result);
 }
+
+// ---------------------------------------------------------------------------
+// Version prompts
+// ---------------------------------------------------------------------------
 
 /**
  * Prompt user to enter a new version number
  */
 export async function promptNewVersion(packageName: string, versionContext: string): Promise<string> {
-  // Extract current version from context for validation
   const currentVersionMatch = versionContext.match(/current: ([^,)]+)/);
   const currentVersion = currentVersionMatch ? currentVersionMatch[1] : versionContext;
-  
-  const response = await safePrompts({
-    type: 'text',
-    name: 'version',
+
+  const result = await clack.text({
     message: `Enter a new version for '${packageName}' (${versionContext}):`,
-    initial: currentVersion,
-    validate: (value: string) => {
+    defaultValue: currentVersion,
+    validate: (value: string | undefined) => {
       if (!value) return 'Version is required';
       if (!/^\d+\.\d+\.\d+/.test(value)) {
         return 'Version should follow semantic versioning (e.g., 1.0.0)';
@@ -300,11 +323,11 @@ export async function promptNewVersion(packageName: string, versionContext: stri
       if (value === currentVersion) {
         return 'New version must be different from current version';
       }
-      return true;
-    }
+      return undefined;
+    },
   });
-
-  return response.version;
+  handleCancel(result);
+  return result as string;
 }
 
 /**
@@ -317,25 +340,23 @@ export async function promptVersionOverwrite(packageName: string, oldVersion: st
   );
 }
 
+// ---------------------------------------------------------------------------
+// Select / multiselect prompts
+// ---------------------------------------------------------------------------
+
 /**
  * Prompt user to select platform they're using
  */
 export async function promptPlatformSelection(): Promise<string[]> {
-  const choices = Object.values(getPlatformDefinitions()).map((platform: PlatformDefinition) => ({
-    title: platform.name,
-    value: platform.id
+  const options = Object.values(getPlatformDefinitions()).map((platform: PlatformDefinition) => ({
+    label: platform.name,
+    value: platform.id,
   }));
 
-  const response = await safePrompts({
-    type: 'select',
-    name: 'platform',
-    message: 'Which platform are you using for AI-assisted development?',
-    choices,
-    hint: 'Use arrow keys to navigate, Enter to select'
-  });
+  const result = await clack.select({ message: 'Which platform are you using for AI-assisted development?', options });
+  handleCancel(result);
 
-  // Return single selection as array for consistency
-  return response.platform ? [response.platform] : [];
+  return result ? [result as string] : [];
 }
 
 /**
@@ -346,18 +367,13 @@ export async function promptVersionSelection(
   versions: string[],
   action: string = ''
 ): Promise<string> {
-  const response = await safePrompts({
-    type: 'select',
-    name: 'version',
+  const options = versions.map(version => ({ label: version, value: version }));
+  const result = await clack.select({
     message: `Select version of '${packageName}' ${action}:`,
-    choices: versions.map(version => ({
-      title: version,
-      value: version
-    })),
-    hint: 'Use arrow keys to navigate, Enter to select'
+    options,
   });
-
-  return response.version;
+  handleCancel(result);
+  return result as string;
 }
 
 /**
@@ -369,37 +385,33 @@ export async function promptPackageInstallConflict(
   newVersion: string,
   requiredVersion?: string
 ): Promise<'keep' | 'latest' | 'exact'> {
-  // Determine the version to show for "Install exact" option
   const exactVersion = requiredVersion || newVersion;
-  const exactDescription = requiredVersion 
+  const exactDescription = requiredVersion
     ? `Install version ${exactVersion} as required by dependency tree`
     : `Install version ${exactVersion}, may be older than current`;
 
-  const response = await safePrompts({
-    type: 'select',
-    name: 'choice',
+  const result = await clack.select({
     message: `Package '${packageName}' already installed. How would you like to proceed?`,
-    choices: [
+    options: [
       {
-        title: `Keep installed - Skip installation`,
-        value: 'keep',
-        description: 'Keep the currently installed version'
+        label: 'Keep installed - Skip installation',
+        value: 'keep' as const,
+        hint: 'Keep the currently installed version',
       },
       {
-        title: `Install latest - Overwrite`,
-        value: 'latest',
-        description: 'Install the latest version, overwriting existing'
+        label: 'Install latest - Overwrite',
+        value: 'latest' as const,
+        hint: 'Install the latest version, overwriting existing',
       },
       {
-        title: `Install exact (v${exactVersion}) - Overwrite with specific version`,
-        value: 'exact',
-        description: exactDescription
-      }
+        label: `Install exact (v${exactVersion}) - Overwrite with specific version`,
+        value: 'exact' as const,
+        hint: exactDescription,
+      },
     ],
-    hint: 'Use arrow keys to navigate, Enter to select'
   });
-
-  return response.choice;
+  handleCancel(result);
+  return result as 'keep' | 'latest' | 'exact';
 }
 
 /**
@@ -409,31 +421,28 @@ export async function promptVersionConflictResolution(
   packageName: string,
   existingVersion: string
 ): Promise<'bump-patch' | 'bump-minor' | 'overwrite'> {
-  const response = await safePrompts({
-    type: 'select',
-    name: 'choice',
+  const result = await clack.select({
     message: `Version '${existingVersion}' of package '${packageName}' already exists. How would you like to proceed?`,
-    choices: [
+    options: [
       {
-        title: `Bump patch - Increment patch version (${existingVersion} → ${bumpPatchVersion(existingVersion)})`,
-        value: 'bump-patch',
-        description: 'Increment the patch version for bug fixes'
+        label: `Bump patch (${existingVersion} -> ${bumpPatchVersion(existingVersion)})`,
+        value: 'bump-patch' as const,
+        hint: 'Increment the patch version for bug fixes',
       },
       {
-        title: `Bump minor - Increment minor version (${existingVersion} → ${bumpMinorVersion(existingVersion)})`,
-        value: 'bump-minor',
-        description: 'Increment the minor version for new features'
+        label: `Bump minor (${existingVersion} -> ${bumpMinorVersion(existingVersion)})`,
+        value: 'bump-minor' as const,
+        hint: 'Increment the minor version for new features',
       },
       {
-        title: `Overwrite existing - Replace existing version`,
-        value: 'overwrite',
-        description: 'Replace the existing version (requires confirmation)'
-      }
+        label: 'Overwrite existing - Replace existing version',
+        value: 'overwrite' as const,
+        hint: 'Replace the existing version (requires confirmation)',
+      },
     ],
-    hint: 'Use arrow keys to navigate, Enter to select'
   });
-
-  return response.choice;
+  handleCancel(result);
+  return result as 'bump-patch' | 'bump-minor' | 'overwrite';
 }
 
 /**
@@ -443,19 +452,16 @@ export async function promptOverwriteConfirmation(
   packageName: string,
   version: string
 ): Promise<boolean> {
-  const response = await safePrompts({
-    type: 'confirm',
-    name: 'confirmed',
-    message: `Are you sure you want to overwrite version '${version}' of package '${packageName}'? This action cannot be undone.`,
-    initial: false
-  });
-
-  return response.confirmed || false;
+  return await promptConfirmation(
+    `Are you sure you want to overwrite version '${version}' of package '${packageName}'? This action cannot be undone.`,
+    false
+  );
 }
 
-/**
- * Bump patch version (e.g., 1.2.3 → 1.2.4)
- */
+// ---------------------------------------------------------------------------
+// Internal version helpers
+// ---------------------------------------------------------------------------
+
 function bumpPatchVersion(version: string): string {
   const parts = version.split('.');
   if (parts.length >= 3) {
@@ -465,9 +471,6 @@ function bumpPatchVersion(version: string): string {
   return version;
 }
 
-/**
- * Bump minor version (e.g., 1.2.3 → 1.3.0)
- */
 function bumpMinorVersion(version: string): string {
   const parts = version.split('.');
   if (parts.length >= 2) {
@@ -477,9 +480,10 @@ function bumpMinorVersion(version: string): string {
   return version;
 }
 
-/**
- * File selection option interface
- */
+// ---------------------------------------------------------------------------
+// Platform-specific file selection
+// ---------------------------------------------------------------------------
+
 interface FileSelectionOption {
   platform: string;
   sourcePath: string;
@@ -492,21 +496,25 @@ interface FileSelectionOption {
 export async function promptPlatformSpecificSelection(
   options: FileSelectionOption[],
   message: string = 'Select files to mark as platform-specific (they will keep their platform prefixes):',
-  hint?: string
+  _hint?: string
 ): Promise<number[]> {
-  const response = await safePrompts({
-    type: 'multiselect',
-    name: 'platformSpecificIndices',
-    message,
-    choices: options.map((option, index) => ({
-      title: `${option.platform}: ${option.registryPath}`,
-      value: index,
-    })),
-    hint: hint || 'Use space to select, Enter to confirm'
-  });
+  const clackOptions = options.map((option, index) => ({
+    label: `${option.platform}: ${option.registryPath}`,
+    value: index,
+  }));
 
-  return response.platformSpecificIndices || [];
+  const result = await clack.multiselect({
+    message,
+    options: clackOptions,
+    required: false,
+  });
+  handleCancel(result);
+  return (result as number[]) || [];
 }
+
+// ---------------------------------------------------------------------------
+// Utility
+// ---------------------------------------------------------------------------
 
 /**
  * Get preview of file content (first few lines)
@@ -523,43 +531,45 @@ export async function getContentPreview(filePath: string, maxLines: number = 3):
 
 /**
  * Display a multiselect prompt
- * Wrapper around safePrompts for consistent multiselect UX
  */
 export async function promptMultiselect<T = string>(
   message: string,
   choices: Array<{ title: string; value: T; description?: string }>,
   options?: { hint?: string; min?: number }
 ): Promise<T[]> {
-  const response = await safePrompts({
-    type: 'multiselect',
-    name: 'selected',
-    message,
-    choices,
-    hint: options?.hint || '- Space: select/deselect • Enter: confirm',
-    min: options?.min,
-    instructions: false
-  });
+  const clackOptions = choices.map(c => ({
+    label: c.title,
+    value: c.value,
+    hint: c.description,
+  }));
 
-  return response.selected || [];
+  const result = await clack.multiselect({
+    message,
+    options: clackOptions as any,
+    required: options?.min ? options.min > 0 : false,
+  });
+  handleCancel(result);
+  return (result as T[]) || [];
 }
 
 /**
  * Display a select prompt
- * Wrapper around safePrompts for consistent select UX
  */
 export async function promptSelect<T = string>(
   message: string,
   choices: Array<{ title: string; value: T; description?: string }>,
-  options?: { hint?: string }
+  _options?: { hint?: string }
 ): Promise<T | null> {
-  const response = await safePrompts({
-    type: 'select',
-    name: 'selected',
+  const clackOptions = choices.map(c => ({
+    label: c.title,
+    value: c.value,
+    hint: c.description,
+  }));
+
+  const result = await clack.select({
     message,
-    choices,
-    hint: options?.hint || 'Use arrow keys to navigate, Enter to select'
+    options: clackOptions as any,
   });
-
-  return response.selected ?? null;
+  handleCancel(result);
+  return (result as T) ?? null;
 }
-

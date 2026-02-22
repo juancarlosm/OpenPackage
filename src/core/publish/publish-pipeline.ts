@@ -28,13 +28,14 @@ import { resolveOutput } from '../ports/resolve.js';
  */
 export async function runPublishPipeline(
   packageInput: string | undefined,
-  options: PublishOptions
+  options: PublishOptions,
+  output?: OutputPort
 ): Promise<PublishResult<any>> {
   // Route to appropriate pipeline
   if (options.local) {
     return await runLocalPublishPipeline(packageInput, options);
   } else {
-    return await runRemotePublishPipeline(packageInput, options);
+    return await runRemotePublishPipeline(packageInput, options, output);
   }
 }
 

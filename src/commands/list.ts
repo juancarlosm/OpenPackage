@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { CommandResult } from '../types/index.js';
 import { ValidationError } from '../utils/errors.js';
 import { parseWorkspaceScope } from '../utils/scope-resolution.js';
-import { createExecutionContext } from '../core/execution-context.js';
+import { createCliExecutionContext } from '../cli/context.js';
 import {
   collectScopedData,
   mergeTrackedAndUntrackedResources,
@@ -77,7 +77,7 @@ async function listCommand(
       },
       cwd: programOpts.cwd
     },
-    (opts) => createExecutionContext({ global: opts.global, cwd: opts.cwd })
+    (opts) => createCliExecutionContext({ global: opts.global, cwd: opts.cwd })
   );
 
   if (results.length === 0) {
@@ -111,7 +111,7 @@ async function listCommand(
           type: firstResult.headerType
         };
   } else if (showProject) {
-    const projectContext = await createExecutionContext({
+    const projectContext = await createCliExecutionContext({
       global: false,
       cwd: programOpts.cwd
     });

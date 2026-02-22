@@ -1,25 +1,20 @@
 import path from 'path';
 import type { Command } from 'commander';
-import { note, spinner, outro, cancel, taskLog } from '@clack/prompts';
 
 import type { UninstallOptions, ExecutionContext } from '../types/index.js';
 import { ValidationError } from '../utils/errors.js';
-import { runUninstallPipeline, runSelectiveUninstallPipeline } from '../core/uninstall/uninstall-pipeline.js';
-import { reportUninstallResult, reportResourceUninstallResult } from '../core/uninstall/uninstall-reporter.js';
-import { createExecutionContext } from '../core/execution-context.js';
-import { remove, exists } from '../utils/fs.js';
+import { createCliExecutionContext } from '../cli/context.js';
+import { resolveOutput, resolvePrompt } from '../core/ports/resolve.js';
 import { buildWorkspaceResources, type ResolvedResource, type ResolvedPackage } from '../core/resources/resource-builder.js';
 import { resolveByName, type ResolutionCandidate } from '../core/resources/resource-resolver.js';
 import { traverseScopes, traverseScopesFlat, type ResourceScope } from '../core/resources/scope-traversal.js';
 import { disambiguate } from '../core/resources/disambiguation-prompt.js';
-import { buildPreservedDirectoriesSet } from '../utils/directory-preservation.js';
-import { cleanupEmptyParents } from '../utils/cleanup-empty-parents.js';
 import { formatScopeTag, formatPathForDisplay } from '../utils/formatters.js';
-import { clackGroupMultiselect } from '../utils/clack-multiselect.js';
 import { normalizeType, RESOURCE_TYPE_ORDER, toLabelPlural } from '../core/resources/resource-registry.js';
 import { parsePackageYml } from '../utils/package-yml.js';
 import { readWorkspaceIndex } from '../utils/workspace-index-yml.js';
 import { join } from 'path';
+import { executeUninstallCandidate } from '../core/uninstall/uninstall-executor.js';
 
 interface UninstallCommandOptions extends UninstallOptions {
   global?: boolean;
@@ -83,20 +78,19 @@ async function handleDirectUninstall(
   );
 
   if (selected.length === 0) {
-    console.log('Uninstall cancelled');
+    const ctx = await createCliExecutionContext({ interactive: false });
+    const out = resolveOutput(ctx);
+    out.info('Uninstall cancelled');
     return;
   }
 
-  // #region agent log
-  for (const c of selected) { fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'uninstall.ts:handleDirectUninstall',message:'direct uninstall selected',data:{candidateKind:c.kind,packageName:c.package?.packageName ?? c.resource?.packageName},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{}); }
-  // #endregion
   for (const candidate of selected) {
-    const ctx = await createExecutionContext({
+    const ctx = await createCliExecutionContext({
       global: candidate.resource?.scope === 'global' || candidate.package?.scope === 'global',
       cwd: programOpts.cwd,
       interactive: false
     });
-    await executeCandidate(candidate, options, ctx);
+    await executeUninstallCandidate(candidate, options, ctx);
   }
 }
 
@@ -110,8 +104,12 @@ async function handleListUninstall(
   programOpts: Record<string, any>,
   traverseOpts: { programOpts?: Record<string, any>; globalOnly?: boolean; projectOnly?: boolean }
 ) {
+  const ctx = await createCliExecutionContext({ interactive: true });
+  const out = resolveOutput(ctx);
+  const prm = resolvePrompt(ctx);
+
   // Build resources from applicable scopes with spinner
-  const s = spinner();
+  const s = out.spinner();
   s.start('Loading installed resources');
   
   // Store scope-to-targetDir mapping for later use
@@ -141,11 +139,11 @@ async function handleListUninstall(
     }
   }
 
-  // Build grouped options for clack
+  // Build grouped options for prompt
   type ChoiceValue = 
     | { kind: 'resource'; resource: ResolvedResource }
     | { kind: 'package'; packageName: string; scope: ResourceScope; resources: ResolvedResource[] };
-  const groupedOptions: Record<string, Array<{ value: ChoiceValue; label: string; hint: string }>> = {};
+  const groupedOptions: Record<string, Array<{ label: string; value: ChoiceValue }>> = {};
   
   // Separate tracked resources by package+scope and untracked resources
   const resourcesByPackageAndScope = new Map<string, ResolvedResource[]>();
@@ -187,8 +185,7 @@ async function handleListUninstall(
   
   if (totalItems === 0) {
     s.stop('No installed resources found');
-    note('Run `opkg install --interactive` to install resources.', 'Info');
-    outro();
+    out.note('Run `opkg install --interactive` to install resources.', 'Info');
     return;
   }
 
@@ -223,7 +220,7 @@ async function handleListUninstall(
   }
 
   // 1. Build "Packages" category with flat package items
-  const packageOptions: Array<{ value: ChoiceValue; label: string; hint: string }> = [];
+  const packageOptions: Array<{ label: string; value: ChoiceValue }> = [];
   
   for (const [key, resources] of packageGroups) {
     const [pkgName, scope] = key.split('::');
@@ -248,8 +245,7 @@ async function handleListUninstall(
     
     packageOptions.push({
       value: { kind: 'package', packageName: pkgName, scope: scope as ResourceScope, resources },
-      label: `${pkgName}${versionSuffix}${scopeTag}`,
-      hint
+      label: `${pkgName}${versionSuffix}${scopeTag} (${hint})`
     });
   }
   
@@ -279,31 +275,24 @@ async function handleListUninstall(
       const scopeTag = formatScopeTag(resource.scope);
       const fileCount = resource.targetFiles.length;
       return {
-        value: { kind: 'resource', resource },
-        label: `${resource.resourceName}${scopeTag}`,
-        hint: `${fileCount} ${fileCount === 1 ? 'file' : 'files'}`
+        value: { kind: 'resource' as const, resource },
+        label: `${resource.resourceName}${scopeTag} (${fileCount} ${fileCount === 1 ? 'file' : 'files'})`
       };
     });
   }
 
-  const selected = await clackGroupMultiselect<ChoiceValue>(
+  const selected = await prm.groupMultiselect<ChoiceValue>(
     'Select items to uninstall:',
-    groupedOptions,
-    {
-      selectableGroups: false,
-      groupSpacing: 0
-    }
+    groupedOptions
   );
 
   if (!selected || selected.length === 0) {
-    cancel('Uninstall cancelled');
+    out.info('Uninstall cancelled');
     return;
   }
 
-  // Create task log for batch uninstall (minimal output - no per-resource grouping)
-  const log = taskLog({
-    title: `Uninstalling ${selected.length} item${selected.length === 1 ? '' : 's'}`
-  });
+  // Process batch uninstall
+  out.step(`Uninstalling ${selected.length} item${selected.length === 1 ? '' : 's'}`);
 
   // Track counts by type for summary
   const typeCounts = new Map<string, number>();
@@ -317,7 +306,7 @@ async function handleListUninstall(
       const { packageName, scope, resources } = selection;
       const targetDir = scopeToTargetDir.get(scope);
       const pkg = filteredPackages.find(p => p.packageName === packageName && p.scope === scope);
-      const ctx = await createExecutionContext({
+      const execCtx = await createCliExecutionContext({
         global: scope === 'global',
         cwd: programOpts.cwd,
         interactive: true
@@ -336,11 +325,11 @@ async function handleListUninstall(
         if (targetDir) {
           candidate.package!.targetFiles.forEach(f => allRemovedFiles.push({ path: f, targetDir }));
         }
-        await executeCandidate(candidate, options, ctx);
+        await executeUninstallCandidate(candidate, options, execCtx);
         typeCounts.set('packages', (typeCounts.get('packages') || 0) + 1);
         uninstalledCount++;
       } catch (error) {
-        log.error(`Failed to uninstall ${packageName}`);
+        out.error(`Failed to uninstall ${packageName}`);
         throw error;
       }
     } else {
@@ -348,7 +337,7 @@ async function handleListUninstall(
       const resource = selection.resource;
       const targetDir = scopeToTargetDir.get(resource.scope);
       const candidate: ResolutionCandidate = { kind: 'resource', resource };
-      const ctx = await createExecutionContext({
+      const execCtx = await createCliExecutionContext({
         global: resource.scope === 'global',
         cwd: programOpts.cwd,
         interactive: true
@@ -360,14 +349,14 @@ async function handleListUninstall(
           resource.targetFiles.forEach(f => allRemovedFiles.push({ path: f, targetDir }));
         }
         
-        await executeCandidate(candidate, options, ctx);
+        await executeUninstallCandidate(candidate, options, execCtx);
         
         // Track by resource type
         const typePlural = toLabelPlural(normalizeType(resource.resourceType)).toLowerCase();
         typeCounts.set(typePlural, (typeCounts.get(typePlural) || 0) + 1);
         uninstalledCount++;
       } catch (error) {
-        log.error(`Failed to uninstall ${resource.resourceName}`);
+        out.error(`Failed to uninstall ${resource.resourceName}`);
         throw error;
       }
     }
@@ -379,9 +368,9 @@ async function handleListUninstall(
     .map(([type, count]) => `${count} ${type}`)
     .join(', ');
 
-  log.success(`Successfully uninstalled ${uninstalledCount} item${uninstalledCount === 1 ? '' : 's'} (${breakdown})`);
+  out.success(`Successfully uninstalled ${uninstalledCount} item${uninstalledCount === 1 ? '' : 's'} (${breakdown})`);
 
-  // Show removed files as flat list using clack note (no tree branch - interactive box provides structure)
+  // Show removed files as flat list using note (no tree branch - interactive box provides structure)
   if (allRemovedFiles.length > 0) {
     const cwd = process.cwd();
     // Resolve to absolute paths for unified formatter, dedupe, then sort
@@ -391,99 +380,10 @@ async function handleListUninstall(
     const displayFiles = absolutePaths.slice(0, 10);
     const fileLines = displayFiles.map(f => `${formatPathForDisplay(f, cwd)}`);
     const more = absolutePaths.length > 10 ? `\n... and ${absolutePaths.length - 10} more` : '';
-    note(fileLines.join('\n') + more, 'Removed files');
+    out.note(fileLines.join('\n') + more, 'Removed files');
   }
 
-  outro('Uninstall complete');
-}
-
-// ---------------------------------------------------------------------------
-// Execution
-// ---------------------------------------------------------------------------
-
-async function executeCandidate(
-  candidate: ResolutionCandidate,
-  options: UninstallOptions,
-  execContext: ExecutionContext
-): Promise<void> {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'uninstall.ts:executeCandidate',message:'executeCandidate called',data:{candidateKind:candidate.kind,packageName:candidate.package?.packageName ?? candidate.resource?.packageName},timestamp:Date.now(),hypothesisId:'A',runId:'post-fix'})}).catch(()=>{});
-  // #endregion
-  if (candidate.kind === 'package') {
-    const pkg = candidate.package!;
-    const result = await runUninstallPipeline(pkg.packageName, options, execContext);
-    if (!result.success) {
-      throw new ValidationError(result.error || `Uninstall failed for ${pkg.packageName}`);
-    }
-    reportUninstallResult({
-      packageName: pkg.packageName,
-      removedFiles: result.data?.removedFiles ?? [],
-      rootFilesUpdated: result.data?.rootFilesUpdated ?? []
-    }, execContext);
-    return;
-  }
-
-  const resource = candidate.resource!;
-
-  if (resource.kind === 'tracked') {
-    // Selective uninstall from package via source keys
-    const result = await runSelectiveUninstallPipeline(
-      resource.packageName!,
-      resource.sourceKeys,
-      options,
-      execContext
-    );
-    if (!result.success) {
-      throw new ValidationError(result.error || `Uninstall failed for ${resource.resourceName}`);
-    }
-    reportResourceUninstallResult({
-      resourceName: resource.resourceName,
-      resourceType: resource.resourceType,
-      packageName: resource.packageName,
-      removedFiles: result.data?.removedFiles ?? [],
-      rootFilesUpdated: result.data?.rootFilesUpdated ?? []
-    }, execContext);
-    return;
-  }
-
-  // Untracked resource — direct file deletion
-  const targetDir = execContext.targetDir;
-  const removedFiles: string[] = [];
-
-  if (options.dryRun) {
-    console.log(`\n(dry-run) Would remove ${resource.targetFiles.length} file${resource.targetFiles.length === 1 ? '' : 's'}:`);
-    const displayFiles = resource.targetFiles.slice(0, 10);
-    for (const file of displayFiles) {
-      console.log(`   ├── ${file}`);
-    }
-    if (resource.targetFiles.length > 10) {
-      console.log(`   ... and ${resource.targetFiles.length - 10} more`);
-    }
-  }
-
-  for (const filePath of resource.targetFiles) {
-    const absPath = path.join(targetDir, filePath);
-  if (options.dryRun && !execContext.interactive) {
-      removedFiles.push(filePath);
-    } else if (await exists(absPath)) {
-      await remove(absPath);
-      removedFiles.push(filePath);
-    }
-  }
-
-  // Cleanup empty parent directories
-  if (!options.dryRun && removedFiles.length > 0) {
-    const preservedDirs = buildPreservedDirectoriesSet(targetDir);
-    const deletedAbsPaths = removedFiles.map(f => path.join(targetDir, f));
-    await cleanupEmptyParents(targetDir, deletedAbsPaths, preservedDirs);
-  }
-
-  reportResourceUninstallResult({
-    resourceName: resource.resourceName,
-    resourceType: resource.resourceType,
-    removedFiles,
-    rootFilesUpdated: []
-  }, execContext);
+  out.success('Uninstall complete');
 }
 
 // ---------------------------------------------------------------------------
@@ -519,20 +419,6 @@ function formatFileListDescription(files: string[]): string {
     desc += `\n+${remaining} more`;
   }
   return desc;
-}
-
-/**
- * Format file list for hints (show 2-3 files max)
- */
-function formatFileListHint(files: string[], maxFiles: number = 2): string {
-  if (files.length === 0) return 'no files';
-  const displayFiles = files.slice(0, maxFiles);
-  const remaining = files.length - displayFiles.length;
-  let hint = displayFiles.join(', ');
-  if (remaining > 0) {
-    hint += `, +${remaining} more`;
-  }
-  return hint;
 }
 
 // ---------------------------------------------------------------------------

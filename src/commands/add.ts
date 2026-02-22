@@ -9,11 +9,11 @@ import { runAddDependencyFlow, type AddDependencyResult } from '../core/add/add-
 import { formatPathForDisplay, getTreeConnector } from '../utils/formatters.js';
 import { interactiveFileSelect } from '../utils/interactive-file-selector.js';
 import { expandDirectorySelections, hasDirectorySelections } from '../utils/expand-directory-selections.js';
-import { createExecutionContext } from '../core/execution-context.js';
+import { createCliExecutionContext } from '../cli/context.js';
 import { resolveMutableSource } from '../core/source-resolution/resolve-mutable-source.js';
 import { buildWorkspacePackageContext } from '../utils/workspace-package-context.js';
 import { createInteractionPolicy, PromptTier } from '../core/interaction-policy.js';
-import { setOutputMode, output, isInteractive } from '../utils/output.js';
+import { resolveOutput } from '../core/ports/resolve.js';
 import { exists } from '../utils/fs.js';
 
 /**
@@ -22,7 +22,7 @@ import { exists } from '../utils/fs.js';
  * Non-interactive: tree view with connectors.
  * @param skipHeader - When true (interactive add), header was already shown before selection
  */
-function displayAddResults(data: AddToSourceResult, skipHeader = false): void {
+function displayAddResults(data: AddToSourceResult, out: ReturnType<typeof resolveOutput>, interactive: boolean, skipHeader = false): void {
   const { filesAdded, packageName: resolvedName, addedFilePaths, isWorkspaceRoot, sourcePath } = data;
   const target = isWorkspaceRoot ? 'workspace package' : resolvedName;
 
@@ -30,47 +30,47 @@ function displayAddResults(data: AddToSourceResult, skipHeader = false): void {
     const pkgLabel = isWorkspaceRoot ? 'workspace package' : resolvedName;
     const displayPath = formatPathForDisplay(sourcePath, process.cwd());
     const header = `To: ${pkgLabel} (${displayPath})`;
-    if (isInteractive()) output.info(header);
-    else output.success(header);
+    if (interactive) out.info(header);
+    else out.success(header);
   }
 
   if (filesAdded > 0) {
     const count = filesAdded === 1 ? '1 file' : `${filesAdded} files`;
-    output.success(`Added ${count} to ${target}`);
+    out.success(`Added ${count} to ${target}`);
     const sortedFiles = [...(addedFilePaths || [])].sort((a, b) => a.localeCompare(b));
     const relPaths = sortedFiles.map((f) => relative(sourcePath, f).replace(/\\/g, '/'));
 
-    if (isInteractive()) {
+    if (interactive) {
       const maxDisplay = 10;
       const displayPaths = relPaths.slice(0, maxDisplay);
       const more = relPaths.length > maxDisplay ? `\n... and ${relPaths.length - maxDisplay} more` : '';
-      output.note(displayPaths.join('\n') + more, 'Added files');
+      out.note(displayPaths.join('\n') + more, 'Added files');
     } else {
       for (let i = 0; i < relPaths.length; i++) {
         const connector = getTreeConnector(i === relPaths.length - 1);
-        output.message(`  ${connector}${relPaths[i]}`);
+        out.message(`  ${connector}${relPaths[i]}`);
       }
     }
   } else {
-    output.success(`No new files added to ${target}`);
+    out.success(`No new files added to ${target}`);
   }
 }
 
-function displayDependencyResult(result: AddDependencyResult, classification: AddInputClassification): void {
+function displayDependencyResult(result: AddDependencyResult, classification: AddInputClassification, out: ReturnType<typeof resolveOutput>, interactive: boolean): void {
   const displayPath = formatPathForDisplay(result.targetManifest, process.cwd());
   const header = `To: ${result.packageName} (${displayPath})`;
-  if (isInteractive()) output.info(header);
-  else output.success(header);
+  if (interactive) out.info(header);
+  else out.success(header);
 
   // Show auto-detection hint for local paths
   if (result.wasAutoDetected) {
-    output.info(`Detected package at ${classification.localPath} — adding as dependency.`);
-    output.message('To copy files instead, use --copy.');
+    out.info(`Detected package at ${classification.localPath} — adding as dependency.`);
+    out.message('To copy files instead, use --copy.');
   }
 
   const versionSuffix = classification.version ? `@${classification.version}` : '';
-  output.success(`Added ${result.packageName}${versionSuffix} to ${result.section}`);
-  output.message(`in ${formatPathForDisplay(result.targetManifest, process.cwd())}`);
+  out.success(`Added ${result.packageName}${versionSuffix} to ${result.section}`);
+  out.message(`in ${formatPathForDisplay(result.targetManifest, process.cwd())}`);
 }
 
 /** Check if input looks like a bare name (could be registry or local path) */
@@ -91,7 +91,9 @@ async function processAddResource(
   resourceSpec: string,
   options: any,
   cwd: string,
-  execContext: ExecutionContext
+  execContext: ExecutionContext,
+  out: ReturnType<typeof resolveOutput>,
+  interactive: boolean
 ): Promise<void> {
   const classification = await classifyAddInput(resourceSpec, cwd, {
     copy: options.copy,
@@ -108,7 +110,7 @@ async function processAddResource(
         dev: options.dev,
         to: options.to,
       });
-      displayDependencyResult(result, classification);
+      displayDependencyResult(result, classification, out, interactive);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (isBareNameInput(resourceSpec)) {
@@ -126,7 +128,7 @@ async function processAddResource(
       throw new Error('--dev can only be used when adding a dependency, not when copying files');
     }
     const resource = classification.resolvedResource!;
-    const ctx = await createExecutionContext({
+    const ctx = await createCliExecutionContext({
       global: resource.scope === 'global',
     });
     const absPath = resource.sourcePath || join(ctx.targetDir, resource.targetFiles[0]);
@@ -137,8 +139,8 @@ async function processAddResource(
       throw new Error(result.error || 'Add operation failed');
     }
     if (result.data) {
-      output.info(`Resolved "${resourceSpec}" from installed workspace resources.`);
-      displayAddResults(result.data);
+      out.info(`Resolved "${resourceSpec}" from installed workspace resources.`);
+      displayAddResults(result.data, out, interactive);
     }
   } else {
     if (options.dev) {
@@ -150,7 +152,7 @@ async function processAddResource(
       throw new Error(result.error || 'Add operation failed');
     }
     if (result.data) {
-      displayAddResults(result.data);
+      displayAddResults(result.data, out, interactive);
     }
   }
 }
@@ -160,19 +162,22 @@ export async function setupAddCommand(args: any[]): Promise<void> {
   const cwd = process.cwd();
   const programOpts = command.parent?.opts() || {};
 
-  const execContext = await createExecutionContext({
+  // Determine interactive mode: interactive when no resource arg, plain otherwise
+  const interactive = !resource;
+
+  const execContext = await createCliExecutionContext({
     global: false,
     cwd: programOpts.cwd,
+    interactive,
   });
 
   const policy = createInteractionPolicy({
-    interactive: !resource,
+    interactive,
     force: options.force,
   });
   execContext.interactionPolicy = policy;
 
-  // Set output mode: interactive (clack UI) when no resource, plain console otherwise
-  setOutputMode(!resource);
+  const out = resolveOutput(execContext);
 
   // If no resource provided, show interactive file selector
   if (!resource) {
@@ -200,8 +205,8 @@ export async function setupAddCommand(args: any[]): Promise<void> {
       sourcePath = context.packageRootDir;
     }
     const displayPath = formatPathForDisplay(sourcePath, cwd);
-    output.step(`To: ${pkgLabel} (${displayPath})`);
-    output.connector();
+    out.step(`To: ${pkgLabel} (${displayPath})`);
+    out.connector();
 
     // Show interactive file selector
     const selectedFiles = await interactiveFileSelect({ cwd, includeDirs: true });
@@ -215,7 +220,7 @@ export async function setupAddCommand(args: any[]): Promise<void> {
     let filesToProcess: string[];
     if (hasDirectorySelections(selectedFiles)) {
       filesToProcess = await expandDirectorySelections(selectedFiles, cwd);
-      output.info(`Found ${filesToProcess.length} total file${filesToProcess.length === 1 ? '' : 's'} to add`);
+      out.info(`Found ${filesToProcess.length} total file${filesToProcess.length === 1 ? '' : 's'} to add`);
     } else {
       filesToProcess = selectedFiles;
     }
@@ -223,11 +228,11 @@ export async function setupAddCommand(args: any[]): Promise<void> {
     const absPaths = filesToProcess.map((f) => join(cwd, f));
     const result = await runAddToSourcePipelineBatch(options.to, absPaths, cwd, { ...options, execContext });
     if (!result.success) throw new Error(result.error || 'Add operation failed');
-    if (result.data) displayAddResults(result.data, true);
+    if (result.data) displayAddResults(result.data, out, interactive, true);
 
     return;
   }
   
   // Process single resource (existing behavior)
-  await processAddResource(resource, options, cwd, execContext);
+  await processAddResource(resource, options, cwd, execContext, out, interactive);
 }
