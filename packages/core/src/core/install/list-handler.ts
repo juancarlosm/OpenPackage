@@ -6,8 +6,7 @@
 
 import { resolve } from 'path';
 import { logger } from '../../utils/logger.js';
-import type { OutputPort } from '../ports/output.js';
-import { resolveOutput } from '../ports/resolve.js';
+import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { PromptTier } from '../../core/interaction-policy.js';
 import { discoverResources } from './resource-discoverer.js';
 import { promptResourceSelection, displaySelectionSummary } from './resource-selection-menu.js';
@@ -97,11 +96,12 @@ export async function handleListSelection(
   selected = await promptResourceSelection(
     discovery,
     context.source.packageName,
-    context.source.version
+    context.source.version,
+    resolveOutput(execContext),
+    resolvePrompt(execContext)
   );
   
   if (selected.length === 0) {
-    out.warn('No resources selected. Installation cancelled.');
     return {
       success: true,
       data: { installed: 0, skipped: 0 }

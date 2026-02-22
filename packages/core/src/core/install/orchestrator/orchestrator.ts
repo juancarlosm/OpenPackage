@@ -15,7 +15,7 @@ import {
 import { createInteractionPolicy, PromptTier } from '../../interaction-policy.js';
 import type { InteractionPolicy } from '../../interaction-policy.js';
 import type { OutputPort } from '../../ports/output.js';
-import { resolveOutput } from '../../ports/resolve.js';
+import { resolveOutput, resolvePrompt } from '../../ports/resolve.js';
 import {
   parseMarketplace,
   promptPluginSelection,
@@ -563,15 +563,16 @@ export class InstallOrchestrator {
    s.stop(`Found ${mergedDiscovery.total} resource${mergedDiscovery.total === 1 ? '' : 's'}`);
    
    // Interactive selection
-   const selected = await promptResourceSelection(
-     mergedDiscovery,
-     marketplace.name,
-     undefined
-   );
+    const selected = await promptResourceSelection(
+      mergedDiscovery,
+      marketplace.name,
+      undefined,
+      resolveOutput(execContext),
+      resolvePrompt(execContext)
+    );
 
    if (selected.length === 0) {
-      out.warn('No resources selected. Installation cancelled.');
-     return { success: true, data: { installed: 0, skipped: 0 } };
+      return { success: true, data: { installed: 0, skipped: 0 } };
    }
    
    displaySelectionSummary(selected);

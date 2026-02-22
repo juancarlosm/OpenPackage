@@ -277,11 +277,12 @@ async function installPluginPartial(
   const selected: SelectedResource[] = await promptResourceSelection(
     discovery,
     context.source.packageName || pluginEntry.name,
-    context.source.version
+    context.source.version,
+    resolveOutput(context.execution),
+    resolvePrompt(context.execution)
   );
   
   if (selected.length === 0) {
-    out.warn('No resources selected. Installation cancelled.');
     return {
       success: true,
       data: { installed: 0, skipped: 0 }
