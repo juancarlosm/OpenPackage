@@ -2,7 +2,7 @@
  * View Command (CLI layer)
  *
  * Thin shell over core/view/ pipeline.
- * Handles CLI arg parsing and display rendering.
+ * Handles CLI arg parsing and delegates rendering to view-printers.
  */
 
 import { basename } from 'path';
@@ -16,17 +16,13 @@ import { exists } from '@opkg/core/utils/fs.js';
 import { parsePackageYml } from '@opkg/core/utils/package-yml.js';
 import { createCliExecutionContext } from '../cli/context.js';
 import {
-  dim,
-  sectionHeader,
-  printResourcesView,
-  printRemotePackageDetail,
-  printMetadataSection,
-} from '@opkg/core/core/list/list-printers.js';
-import {
   resolvePackageView,
   type ViewPipelineOptions,
 } from '@opkg/core/core/view/view-pipeline.js';
-import { enhanceResourceGroups } from '@opkg/core/core/view/view-helpers.js';
+import {
+  printLocalPackageView,
+  printRemotePackageView,
+} from '@opkg/core/core/view/view-printers.js';
 
 // ---------------------------------------------------------------------------
 // Main command
@@ -68,44 +64,12 @@ async function viewCommand(
   );
 
   switch (result.kind) {
-    case 'workspace-index': {
-      if (result.resources.length === 0) {
-        console.log(dim(`No resources found for package '${packageName}'.`));
-        return { success: true };
-      }
-      printResourcesView(result.resources, !!options.files, result.headerInfo, {
-        showScopeBadges: false,
-        metadata: result.metadata,
-      });
-      if (result.dependencies.length > 0) {
-        printDependenciesList(result.dependencies);
-      }
+    case 'local-package':
+      printLocalPackageView(result.localResult, !!options.files);
       return { success: true };
-    }
-    case 'local-package': {
-      const { report, headerInfo, scope, metadata } = result.localResult;
-      const enhanced = enhanceResourceGroups(report, scope);
 
-      if (enhanced.length > 0) {
-        printResourcesView(enhanced, !!options.files, headerInfo, {
-          showScopeBadges: false,
-          pathBaseForDisplay: report.path,
-          metadata,
-        });
-      } else {
-        console.log(`${headerInfo.name}${headerInfo.version ? `@${headerInfo.version}` : ''} ${dim(`(${headerInfo.path})`)} ${dim(`[${headerInfo.type}]`)}`);
-        printMetadataSection(metadata);
-        console.log(sectionHeader('Resources', 0));
-        console.log(dim('└── (no resources)'));
-      }
-
-      if (report.dependencies !== undefined) {
-        printDependenciesList(report.dependencies);
-      }
-      return { success: true };
-    }
     case 'remote':
-      printRemotePackageDetail(result.remoteResult, !!options.files, true);
+      printRemotePackageView(result.remoteResult, !!options.files);
       return { success: true };
 
     case 'not-found':
@@ -114,14 +78,6 @@ async function viewCommand(
       }
       throw new ValidationError(`Package '${packageName}' not found locally or remotely`);
   }
-}
-
-function printDependenciesList(dependencies: string[]): void {
-  console.log(sectionHeader('Dependencies', dependencies.length));
-  dependencies.forEach((dep, index) => {
-    const isLast = index === dependencies.length - 1;
-    console.log(`${isLast ? '└── ' : '├── '}${dep}`);
-  });
 }
 
 // ---------------------------------------------------------------------------

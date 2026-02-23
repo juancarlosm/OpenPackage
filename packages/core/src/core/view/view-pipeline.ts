@@ -2,7 +2,8 @@
  * View Pipeline
  *
  * Core logic for resolving and viewing package details.
- * No terminal-UI dependencies — display is handled by the CLI command layer.
+ * Resolves package contents (metadata, resources, dependencies) — not workspace
+ * install state. Display is handled by the CLI command layer.
  */
 
 import { join } from 'path';
@@ -15,19 +16,14 @@ import { logger } from '../../utils/logger.js';
 import { collectFiles } from '../list/remote-list-resolver.js';
 import { groupFilesIntoResources, type ListFileMapping, type ListPackageReport } from '../list/list-pipeline.js';
 import { extractMetadataFromManifest, type ViewMetadataEntry } from '../list/list-printers.js';
-import {
-  collectScopedData,
-  mergeTrackedAndUntrackedResources,
-  mergeResourcesAcrossScopes,
-  type HeaderInfo,
-} from '../list/scope-data-collector.js';
-import type { EnhancedResourceGroup, ResourceScope } from '../list/list-tree-renderer.js';
 import { resolveDeclaredPath } from '../../utils/path-resolution.js';
 import { classifyInput } from '../install/preprocessing/index.js';
 import { resolveRemoteList, type RemoteListResult } from '../list/remote-list-resolver.js';
 import type { ExecutionContext } from '../../types/execution-context.js';
 import { getLocalOpenPackageDir, getLocalPackageYmlPath } from '../../utils/paths.js';
 import { arePackageNamesEquivalent } from '../../utils/package-name.js';
+import { readWorkspaceIndex } from '../../utils/workspace-index-yml.js';
+import type { HeaderInfo } from '../list/scope-data-collector.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,20 +32,11 @@ import { arePackageNamesEquivalent } from '../../utils/package-name.js';
 export interface LocalPackageResult {
   report: ListPackageReport;
   headerInfo: HeaderInfo;
-  scope: ResourceScope;
   metadata: ViewMetadataEntry[];
 }
 
 export interface ViewResult {
-  kind: 'workspace-index' | 'local-package' | 'remote' | 'not-found';
-}
-
-export interface WorkspaceIndexViewResult extends ViewResult {
-  kind: 'workspace-index';
-  resources: EnhancedResourceGroup[];
-  headerInfo: HeaderInfo;
-  metadata: ViewMetadataEntry[];
-  dependencies: string[];
+  kind: 'local-package' | 'remote' | 'not-found';
 }
 
 export interface LocalPackageViewResult extends ViewResult {
@@ -67,7 +54,6 @@ export interface NotFoundViewResult extends ViewResult {
 }
 
 export type ResolvedViewResult =
-  | WorkspaceIndexViewResult
   | LocalPackageViewResult
   | RemoteViewResult
   | NotFoundViewResult;
@@ -85,8 +71,111 @@ export interface ViewPipelineOptions {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function sourceTypeToScope(sourceType: PackageSourceType): ResourceScope {
-  return sourceType === 'global' ? 'global' : 'project';
+/**
+ * Build a LocalPackageResult from a resolved package directory.
+ * Shared by Tier 1 (workspace index) and Tier 2 (resolvePackageByName).
+ */
+async function buildLocalPackageResult(
+  packageName: string,
+  packageDir: string,
+  version?: string,
+): Promise<LocalPackageResult> {
+  let name = packageName;
+  let resolvedVersion = version;
+  let dependencies: string[] | undefined;
+  let metadata: ViewMetadataEntry[] = [];
+
+  const manifestPath = join(packageDir, 'openpackage.yml');
+  if (await exists(manifestPath)) {
+    try {
+      const manifest = await parsePackageYml(manifestPath);
+      name = manifest.name || packageName;
+      resolvedVersion = manifest.version || resolvedVersion;
+      metadata = extractMetadataFromManifest(manifest);
+      const allDeps = [
+        ...(manifest.dependencies || []),
+        ...(manifest['dev-dependencies'] || [])
+      ];
+      dependencies = allDeps.map(dep => dep.name);
+    } catch (error) {
+      logger.debug(`Failed to parse manifest at ${manifestPath}: ${error}`);
+    }
+  }
+  if (metadata.length === 0) metadata = extractMetadataFromManifest({ name, version: resolvedVersion });
+
+  const files = await collectFiles(packageDir, packageDir);
+  const fileList: ListFileMapping[] = files.map(f => ({
+    source: f,
+    target: join(packageDir, f),
+    exists: true
+  }));
+  const resourceGroups = fileList.length > 0 ? groupFilesIntoResources(fileList) : undefined;
+
+  const headerType = await detectEntityType(packageDir);
+
+  return {
+    report: {
+      name,
+      version: resolvedVersion,
+      path: packageDir,
+      state: 'synced',
+      totalFiles: fileList.length,
+      existingFiles: fileList.length,
+      fileList,
+      resourceGroups,
+      dependencies
+    },
+    headerInfo: {
+      name,
+      version: resolvedVersion !== '0.0.0' ? resolvedVersion : undefined,
+      path: formatPathForDisplay(packageDir),
+      type: headerType
+    },
+    metadata
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline: resolve from workspace index (tier 1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Look up the package in the workspace index to locate its source directory,
+ * then scan its contents. This answers "what does this package contain?"
+ * rather than "what is installed from it?".
+ */
+async function resolveFromWorkspaceIndex(
+  packageName: string,
+  targetDir: string,
+): Promise<LocalPackageResult | null> {
+  const { index } = await readWorkspaceIndex(targetDir);
+  const packages = index.packages || {};
+
+  // Find the package in the workspace index (exact or equivalent name match)
+  let entryKey: string | undefined;
+  if (packages[packageName]) {
+    entryKey = packageName;
+  } else {
+    for (const key of Object.keys(packages)) {
+      if (arePackageNamesEquivalent(key, packageName)) {
+        entryKey = key;
+        break;
+      }
+    }
+  }
+
+  if (!entryKey) return null;
+
+  const entry = packages[entryKey];
+  const resolved = resolveDeclaredPath(entry.path, targetDir);
+  const packageDir = resolved.absolute;
+
+  if (!(await exists(packageDir))) {
+    logger.debug(`Workspace index points to '${packageDir}' but it does not exist`);
+    return null;
+  }
+
+  return buildLocalPackageResult(packageName, packageDir, entry.version);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,62 +204,7 @@ export async function resolveLocalPackage(
     return null;
   }
 
-  const packageDir = resolution.path;
-  let name = packageName;
-  let version = resolution.version;
-  let dependencies: string[] | undefined;
-  let metadata: ViewMetadataEntry[] = [];
-
-  const manifestPath = join(packageDir, 'openpackage.yml');
-  if (await exists(manifestPath)) {
-    try {
-      const manifest = await parsePackageYml(manifestPath);
-      name = manifest.name || packageName;
-      version = manifest.version || version;
-      metadata = extractMetadataFromManifest(manifest);
-      const allDeps = [
-        ...(manifest.dependencies || []),
-        ...(manifest['dev-dependencies'] || [])
-      ];
-      dependencies = allDeps.map(dep => dep.name);
-    } catch (error) {
-      logger.debug(`Failed to parse manifest at ${manifestPath}: ${error}`);
-    }
-  }
-  if (metadata.length === 0) metadata = extractMetadataFromManifest({ name, version });
-
-  const files = await collectFiles(packageDir, packageDir);
-  const fileList: ListFileMapping[] = files.map(f => ({
-    source: f,
-    target: join(packageDir, f),
-    exists: true
-  }));
-  const resourceGroups = fileList.length > 0 ? groupFilesIntoResources(fileList) : undefined;
-
-  const headerType = await detectEntityType(packageDir);
-  const scope = sourceTypeToScope(resolution.sourceType!);
-
-  return {
-    report: {
-      name,
-      version,
-      path: packageDir,
-      state: 'synced',
-      totalFiles: fileList.length,
-      existingFiles: fileList.length,
-      fileList,
-      resourceGroups,
-      dependencies
-    },
-    headerInfo: {
-      name,
-      version: version !== '0.0.0' ? version : undefined,
-      path: formatPathForDisplay(packageDir),
-      type: headerType
-    },
-    scope,
-    metadata
-  };
+  return buildLocalPackageResult(packageName, resolution.path, resolution.version);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,46 +242,7 @@ async function resolveWorkspaceRootPackage(
   }
 
   const openpackageDir = getLocalOpenPackageDir(cwd);
-  const version = manifest.version;
-  const metadata = extractMetadataFromManifest(manifest);
-
-  const allDeps = [
-    ...(manifest.dependencies || []),
-    ...(manifest['dev-dependencies'] || [])
-  ];
-  const dependencies = allDeps.map(dep => dep.name);
-
-  const files = await collectFiles(openpackageDir, openpackageDir);
-  const fileList: ListFileMapping[] = files.map(f => ({
-    source: f,
-    target: join(openpackageDir, f),
-    exists: true
-  }));
-  const resourceGroups = fileList.length > 0 ? groupFilesIntoResources(fileList) : undefined;
-
-  const headerType = await detectEntityType(openpackageDir);
-
-  return {
-    report: {
-      name: workspaceName,
-      version,
-      path: openpackageDir,
-      state: 'synced',
-      totalFiles: fileList.length,
-      existingFiles: fileList.length,
-      fileList,
-      resourceGroups,
-      dependencies
-    },
-    headerInfo: {
-      name: workspaceName,
-      version: version !== '0.0.0' ? version : undefined,
-      path: formatPathForDisplay(openpackageDir),
-      type: headerType
-    },
-    scope: 'project',
-    metadata
-  };
+  return buildLocalPackageResult(workspaceName, openpackageDir, manifest.version);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,11 +278,13 @@ export async function resolveRemoteForPackage(
 
 /**
  * Resolve a package through the multi-tier fallback chain:
- *   Tier 1: Workspace index lookup
- *   Tier 2: Local packages directory (not in workspace index)
+ *   Tier 1: Workspace index lookup → scan package source directory
+ *   Tier 1.5: Workspace root package
+ *   Tier 2: Local packages directory (via resolvePackageByName)
  *   Tier 3: Remote registry/git
  *
- * Returns a typed result that the CLI or GUI can render appropriately.
+ * All tiers resolve the package's own contents (metadata, resources, deps),
+ * not the workspace install state.
  */
 export async function resolvePackageView(
   packageName: string,
@@ -312,76 +309,22 @@ export async function resolvePackageView(
   }
 
   // --- Tier 1: Workspace index lookup ---
-  const results = await collectScopedData(
-    packageName,
-    {
-      showProject,
-      showGlobal,
-      pipelineOptions: { files: options.files },
-      cwd: options.cwd
-    },
-    (opts) => createContext({ global: opts.global, cwd: opts.cwd })
-  );
-
-  if (results.length > 0) {
-    const scopedResources: Array<{ scope: ResourceScope; groups: EnhancedResourceGroup[] }> = [];
-
-    for (const { scope, result } of results) {
-      const merged = mergeTrackedAndUntrackedResources(result.tree, undefined, scope);
-      if (merged.length > 0) {
-        scopedResources.push({ scope, groups: merged });
-      }
+  // Look up the package in the workspace index to find its source path,
+  // then scan its contents directly (not the workspace install state).
+  if (showProject) {
+    const cwd = options.cwd || process.cwd();
+    const projectContext = await createContext({ global: false, cwd: options.cwd });
+    const projectResult = await resolveFromWorkspaceIndex(packageName, projectContext.targetDir);
+    if (projectResult) {
+      return { kind: 'local-package', localResult: projectResult };
     }
+  }
 
-    if (scopedResources.length > 0) {
-      const mergedResources = mergeResourcesAcrossScopes(scopedResources);
-      const firstResult = results[0].result;
-      const firstScope = results[0].scope;
-      const targetPkg = firstResult.data.targetPackage;
-
-      const headerInfo = targetPkg
-        ? {
-            name: targetPkg.name,
-            version: targetPkg.version !== '0.0.0' ? targetPkg.version : undefined,
-            path: firstResult.headerPath,
-            type: firstResult.headerType
-          }
-        : {
-            name: packageName,
-            version: undefined,
-            path: firstResult.headerPath,
-            type: firstResult.headerType
-          };
-
-      // Read manifest for metadata
-      let viewMetadata: ViewMetadataEntry[] = [];
-      if (targetPkg) {
-        try {
-          const execContext = await createContext({
-            global: firstScope === 'global',
-            cwd: options.cwd
-          });
-          const resolved = resolveDeclaredPath(targetPkg.path, execContext.targetDir);
-          const manifestPath = join(resolved.absolute, 'openpackage.yml');
-          if (await exists(manifestPath)) {
-            const manifest = await parsePackageYml(manifestPath);
-            viewMetadata = extractMetadataFromManifest(manifest);
-          }
-        } catch (e) {
-          logger.debug(`Failed to read manifest for metadata: ${e}`);
-        }
-      }
-      if (viewMetadata.length === 0) {
-        viewMetadata = extractMetadataFromManifest({ name: headerInfo.name, version: headerInfo.version });
-      }
-
-      return {
-        kind: 'workspace-index',
-        resources: mergedResources,
-        headerInfo,
-        metadata: viewMetadata,
-        dependencies: targetPkg?.dependencies ?? []
-      };
+  if (showGlobal) {
+    const globalContext = await createContext({ global: true, cwd: options.cwd });
+    const globalResult = await resolveFromWorkspaceIndex(packageName, globalContext.targetDir);
+    if (globalResult) {
+      return { kind: 'local-package', localResult: globalResult };
     }
   }
 

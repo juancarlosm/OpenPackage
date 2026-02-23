@@ -1,7 +1,6 @@
-import type { ListPackageReport, ListTreeNode, ListResourceGroup, ListFileMapping } from './list-pipeline.js';
-import type { RemoteListResult } from './remote-list-resolver.js';
-import { flattenResourceGroups, renderFlatResourceList, getChildPrefix, type TreeRenderConfig, type EnhancedFileMapping, type EnhancedResourceGroup, type EnhancedResourceInfo, type ResourceScope } from './list-tree-renderer.js';
-import { formatScopeBadge, formatPathForDisplay } from '../../utils/formatters.js';
+import type { ListPackageReport, ListTreeNode } from './list-pipeline.js';
+import { flattenResourceGroups, renderFlatResourceList, getChildPrefix, type TreeRenderConfig, type EnhancedFileMapping, type EnhancedResourceGroup, type ResourceScope } from './list-tree-renderer.js';
+import { formatScopeBadge } from '../../utils/formatters.js';
 import type { ScopeResult, HeaderInfo } from './scope-data-collector.js';
 import type { ViewMetadataEntry } from './view-metadata.js';
 import type { OutputPort } from '../ports/output.js';
@@ -87,70 +86,6 @@ function printFileList(
       ? dim(file.target)
       : `${dim(file.target)} ${red('[MISSING]')}`;
     out.info(`${prefix}${connector}${label}`);
-  }
-}
-
-/** Config for rendering ListFileMapping (deps view, remote package detail) */
-const LIST_FILE_CONFIG: TreeRenderConfig<ListFileMapping> = {
-  formatPath: (file) => file.target,
-  isMissing: (file) => !file.exists,
-  sortFiles: (a, b) => a.target.localeCompare(b.target)
-};
-
-function printResourceGroups(
-  groups: ListResourceGroup[],
-  prefix: string,
-  showFiles: boolean
-): void {
-  const flatResources = flattenResourceGroups(groups);
-  renderFlatResourceList(flatResources, prefix, showFiles, LIST_FILE_CONFIG);
-}
-
-// ---------------------------------------------------------------------------
-// Remote package detail
-// ---------------------------------------------------------------------------
-
-export function printRemotePackageDetail(
-  result: RemoteListResult,
-  showFiles: boolean,
-  showDeps: boolean,
-  output?: OutputPort
-): void {
-  const out = output ?? resolveOutput();
-  const pkg = result.package;
-  out.info(`${formatPackageLine(pkg)} ${dim(`(${result.sourceLabel})`)} ${dim('[remote]')}`);
-
-  // [Metadata] section (first)
-  const metadata = result.metadata ?? [];
-  printMetadataSection(metadata, out);
-
-  // Resource count: from groups (flattened), file list, or 0
-  const resourceCount = pkg.resourceGroups && pkg.resourceGroups.length > 0
-    ? flattenResourceGroups(pkg.resourceGroups).length
-    : (pkg.fileList?.length ?? 0);
-  out.info(sectionHeader('Resources', resourceCount));
-
-  // Show resource groups if available (preferred view)
-  if (pkg.resourceGroups && pkg.resourceGroups.length > 0) {
-    printResourceGroups(pkg.resourceGroups, '', showFiles);
-  }
-  // Fallback to file list if no resource groups but files exist
-  else if (pkg.fileList && pkg.fileList.length > 0) {
-    printFileList(pkg.fileList, '', out);
-  }
-  // If no content available at all, show a message
-  else if (pkg.totalFiles === 0) {
-    out.info(dim('└── (no files)'));
-  }
-
-  if (showDeps) {
-    out.info(sectionHeader('Dependencies', result.dependencies.length));
-    result.dependencies.forEach((dep, index) => {
-      const isLast = index === result.dependencies.length - 1;
-      const connector = isLast ? '└── ' : '├── ';
-      const versionSuffix = dep.version ? `@${dep.version}` : '';
-      out.info(`${connector}${dep.name}${versionSuffix}`);
-    });
   }
 }
 
@@ -290,11 +225,6 @@ export function printResourcesView(
   groups: EnhancedResourceGroup[],
   showFiles: boolean,
   headerInfo?: HeaderInfo,
-  options?: {
-    showScopeBadges?: boolean;
-    pathBaseForDisplay?: string;
-    metadata?: ViewMetadataEntry[];
-  },
   output?: OutputPort
 ): void {
   const out = output ?? resolveOutput();
@@ -305,14 +235,6 @@ export function printResourcesView(
     out.info(`${headerInfo.name}${version} ${dim(`(${headerInfo.path})`)} ${typeTag}`);
   }
 
-  // [Metadata] section (first, when provided)
-  if (options?.metadata !== undefined) {
-    printMetadataSection(options.metadata, out);
-  }
-
-  const showScopeBadges = options?.showScopeBadges !== false;
-  const pathBase = options?.pathBaseForDisplay;
-
   // Show package label only when listing workspace (not a specific package).
   // Temporarily disabled behind feature flag; set OPKG_LIST_SHOW_PACKAGE_LABELS=true to enable.
   const showPackageLabels =
@@ -320,17 +242,10 @@ export function printResourcesView(
     process.env.OPKG_LIST_SHOW_PACKAGE_LABELS === 'true';
 
   const config: TreeRenderConfig<EnhancedFileMapping> = {
-    formatPath: (file) =>
-      pathBase ? formatPathForDisplay(file.target, pathBase) : formatFilePath(file),
+    formatPath: (file) => formatFilePath(file),
     isMissing: (file) => file.status === 'missing',
-    sortFiles: (a, b) => {
-      const pathA = pathBase ? formatPathForDisplay(a.target, pathBase) : formatFilePath(a);
-      const pathB = pathBase ? formatPathForDisplay(b.target, pathBase) : formatFilePath(b);
-      return pathA.localeCompare(pathB);
-    },
-    ...(showScopeBadges && {
-      getResourceBadge: (scopes) => scopes ? dim(formatScopeBadge(scopes)) : ''
-    }),
+    sortFiles: (a, b) => formatFilePath(a).localeCompare(formatFilePath(b)),
+    getResourceBadge: (scopes) => scopes ? dim(formatScopeBadge(scopes)) : '',
     ...(showPackageLabels && {
       getResourcePackageLabels: (packages) => {
         if (!packages || packages.size === 0) return [];

@@ -124,13 +124,15 @@ export {
   resolveRemoteForPackage,
   type LocalPackageResult,
   type ResolvedViewResult,
-  type WorkspaceIndexViewResult,
   type LocalPackageViewResult,
   type RemoteViewResult,
   type NotFoundViewResult,
   type ViewPipelineOptions,
 } from './core/view/view-pipeline.js';
-export { enhanceResourceGroups } from './core/view/view-helpers.js';
+export {
+  printLocalPackageView,
+  printRemotePackageView,
+} from './core/view/view-printers.js';
 
 // ============================================================================
 // Search Pipeline
