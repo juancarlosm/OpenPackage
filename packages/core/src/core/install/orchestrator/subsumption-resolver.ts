@@ -1,25 +1,24 @@
 /**
  * Subsumption Resolver
- * 
+ *
  * Detects and resolves overlapping installations between resource-scoped
  * installs (e.g., gh@user/repo/agents/agent1) and full-package installs
  * (e.g., gh@user/repo) from the same source.
- * 
+ *
  * Two scenarios:
  * 1. Resource installed first, then full package -> auto-replace resource entry
  * 2. Full package installed first, then resource -> skip (already covered)
  */
 
-import type { PackageSource, InstallationContext } from '../unified/context.js';
+import type { PackageSource } from '../unified/context.js';
 import type { WorkspaceIndex, WorkspaceIndexPackage } from '../../../types/workspace-index.js';
-import { readWorkspaceIndex, writeWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
-import { removePackageFromOpenpackageYml } from '../../package-management.js';
-import { removeWorkspaceIndexEntry } from '../../../utils/workspace-index-ownership.js';
+import { readWorkspaceIndex } from '../../../utils/workspace-index-yml.js';
 import { normalizePackageName } from '../../../utils/package-name.js';
 import { normalizeGitUrl } from '../../../utils/git-url-parser.js';
-import { logger } from '../../../utils/logger.js';
 import type { OutputPort } from '../../ports/output.js';
 import { resolveOutput } from '../../ports/resolve.js';
+import type { ExecutionContext } from '../../../types/execution-context.js';
+import { runUninstallPipeline } from '../../uninstall/uninstall-pipeline.js';
 
 // ============================================================================
 // Types
@@ -165,6 +164,16 @@ function entrySameSource(
 /**
  * Check for subsumption between the incoming install and existing entries.
  * 
+ * Uses a bidirectional approach: instead of guessing whether the incoming
+ * install is "full" or "resource-scoped" (which breaks for marketplace plugins
+ * at subpaths like gh@owner/repo/plugins/feature-dev), we check BOTH
+ * directions purely based on package name prefix relationships:
+ * 
+ *   1. Upgrade: existing entries whose names start with incoming + '/' are
+ *      resource-scoped children of the incoming install → remove them.
+ *   2. Already-covered: an existing entry whose name is a prefix of incoming
+ *      means the incoming resource is already covered → skip.
+ * 
  * @param source - The PackageSource for the incoming install
  * @param targetDir - The workspace target directory
  * @returns SubsumptionResult describing what action to take
@@ -178,7 +187,7 @@ export async function checkSubsumption(
     return { type: 'none' };
   }
 
-  const { sourceKey, basePackageName, isResourceScoped } = identity;
+  const { sourceKey, basePackageName } = identity;
 
   // Read current workspace index
   const wsRecord = await readWorkspaceIndex(targetDir);
@@ -190,51 +199,47 @@ export async function checkSubsumption(
 
   const normalizedIncoming = normalizePackageName(source.packageName);
 
-  if (!isResourceScoped) {
-    // ---------------------------------------------------------------
-    // Scenario 1: Installing a FULL PACKAGE
-    // Check if any resource-scoped entries from the same source exist
-    // ---------------------------------------------------------------
-    const entriesToRemove: SubsumedEntry[] = [];
+  // -------------------------------------------------------------------
+  // Direction 1 (upgrade): Are there existing entries whose names start
+  // with the incoming name + '/'?  If so, the incoming install subsumes
+  // those more-specific (resource-scoped) entries.
+  // -------------------------------------------------------------------
+  const entriesToRemove: SubsumedEntry[] = [];
 
-    for (const existingName of Object.keys(packages)) {
-      if (normalizePackageName(existingName) === normalizedIncoming) {
-        // Same package name -- not a subsumption, just a reinstall/update
-        continue;
-      }
-
-      if (entrySameSource(existingName, packages[existingName], sourceKey, basePackageName, source.type)) {
-        const normalizedExisting = normalizePackageName(existingName);
-        // The existing entry is resource-scoped (its name is longer than the base)
-        if (normalizedExisting.startsWith(normalizedIncoming + '/')) {
-          entriesToRemove.push({ packageName: existingName });
-        }
-      }
+  for (const existingName of Object.keys(packages)) {
+    if (normalizePackageName(existingName) === normalizedIncoming) {
+      // Same package name -- not a subsumption, just a reinstall/update
+      continue;
     }
 
-    if (entriesToRemove.length > 0) {
-      return { type: 'upgrade', entriesToRemove };
-    }
-  } else {
-    // ---------------------------------------------------------------
-    // Scenario 2: Installing a RESOURCE from a package
-    // Check if the full package from the same source is already installed
-    // ---------------------------------------------------------------
-    for (const existingName of Object.keys(packages)) {
-      if (!entrySameSource(existingName, packages[existingName], sourceKey, basePackageName, source.type)) {
-        continue;
-      }
-
+    if (entrySameSource(existingName, packages[existingName], sourceKey, basePackageName, source.type)) {
       const normalizedExisting = normalizePackageName(existingName);
-      // The existing entry is the full package (its name equals the base)
-      // and the incoming is more specific (resource-scoped)
-      if (normalizedExisting === normalizePackageName(basePackageName) &&
-          normalizedIncoming.startsWith(normalizedExisting + '/')) {
-        return {
-          type: 'already-covered',
-          coveringPackage: existingName
-        };
+      if (normalizedExisting.startsWith(normalizedIncoming + '/')) {
+        entriesToRemove.push({ packageName: existingName });
       }
+    }
+  }
+
+  if (entriesToRemove.length > 0) {
+    return { type: 'upgrade', entriesToRemove };
+  }
+
+  // -------------------------------------------------------------------
+  // Direction 2 (already-covered): Is there an existing entry whose name
+  // is a strict prefix of the incoming name?  If so, the incoming resource
+  // is already installed via that broader package → skip.
+  // -------------------------------------------------------------------
+  for (const existingName of Object.keys(packages)) {
+    if (!entrySameSource(existingName, packages[existingName], sourceKey, basePackageName, source.type)) {
+      continue;
+    }
+
+    const normalizedExisting = normalizePackageName(existingName);
+    if (normalizedIncoming.startsWith(normalizedExisting + '/')) {
+      return {
+        type: 'already-covered',
+        coveringPackage: existingName
+      };
     }
   }
 
@@ -246,34 +251,32 @@ export async function checkSubsumption(
 // ============================================================================
 
 /**
- * Resolve a subsumption upgrade by removing subsumed entries from both
- * the workspace manifest (openpackage.yml) and workspace index.
- * 
+ * Resolve a subsumption upgrade by removing subsumed entries via the uninstall
+ * pipeline. This ensures correct handling of merged files (key removal), root
+ * files, and directory cleanup, so the subsequent full-package install does
+ * not hit exists-unowned conflicts (which would trigger namespacing instead
+ * of installing to canonical paths).
+ *
  * @param result - The upgrade subsumption result
- * @param targetDir - The workspace target directory
+ * @param execContext - Execution context (targetDir, etc.) for uninstall operations
+ * @param output - Optional output port for user messages
  */
 export async function resolveSubsumption(
   result: SubsumptionUpgrade,
-  targetDir: string,
+  execContext: ExecutionContext,
   output?: OutputPort
 ): Promise<void> {
-  const out = output ?? resolveOutput();
-  const wsRecord = await readWorkspaceIndex(targetDir);
+  const out = output ?? resolveOutput(execContext);
 
   for (const entry of result.entriesToRemove) {
-    // Remove from workspace manifest (openpackage.yml)
-    const removed = await removePackageFromOpenpackageYml(targetDir, entry.packageName);
-    if (removed) {
-      logger.info(`Removed subsumed manifest entry: ${entry.packageName}`);
-    }
-
-    // Remove from workspace index
-    removeWorkspaceIndexEntry(wsRecord.index, entry.packageName);
-    logger.info(`Removed subsumed index entry: ${entry.packageName}`);
-
     out.info(`  Replacing ${entry.packageName} (subsumed by full package)`);
-  }
 
-  // Write updated workspace index
-  await writeWorkspaceIndex(wsRecord);
+    const uninstallResult = await runUninstallPipeline(entry.packageName, {}, execContext);
+
+    if (!uninstallResult.success) {
+      throw new Error(
+        `Failed to remove subsumed package ${entry.packageName}: ${uninstallResult.error ?? 'unknown error'}`
+      );
+    }
+  }
 }

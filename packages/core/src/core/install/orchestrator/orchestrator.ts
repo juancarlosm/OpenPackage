@@ -218,7 +218,7 @@ export class InstallOrchestrator {
           // Resource entries exist that will be subsumed by the full package
           const names = result.entriesToRemove.map(e => e.packageName).join(', ');
           out.info(`Upgrading to full package ${context.source.packageName} (replacing: ${names})`);
-          await resolveSubsumption(result, context.targetDir);
+          await resolveSubsumption(result, context.execution, out);
           return null; // Proceed with install
         }
 

@@ -169,9 +169,6 @@ export async function runUninstallPipeline(
   await writeWorkspaceIndex({ path: indexPath, index });
 
   // Update openpackage.yml (migration will happen on write)
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'uninstall-pipeline.ts:runUninstallPipeline',message:'calling removePackageFromOpenpackageYml',data:{packageName},timestamp:Date.now(),hypothesisId:'C',runId:'post-fix'})}).catch(()=>{});
-  // #endregion
   await removePackageFromOpenpackageYml(targetDir, packageName);
 
   // Cleanup empty directories (preserve platform roots from detection patterns)
@@ -256,9 +253,6 @@ export async function runSelectiveUninstallPipeline(
   removeWorkspaceIndexFileKeys(index, packageName, sourceKeysToRemove);
   await writeWorkspaceIndex({ path: indexPath, index });
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/f66bae36-2cc1-4c38-8529-d173654652f4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'uninstall-pipeline.ts:runSelectiveUninstallPipeline',message:'selective uninstall done - NO removePackageFromOpenpackageYml',data:{packageName},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   const preservedDirs = buildPreservedDirectoriesSet(targetDir);
   const deletedAbsolutePaths = deleted.map(relativePath => path.join(targetDir, relativePath));
   await cleanupEmptyParents(targetDir, deletedAbsolutePaths, preservedDirs);

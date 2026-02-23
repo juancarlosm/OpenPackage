@@ -20,6 +20,7 @@ import {
 } from '../../../src/utils/workspace-index-yml.js';
 import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
 import { getLocalPackageYmlPath } from '../../../src/utils/paths.js';
+import { createExecutionContext } from '../../../src/core/execution-context.js';
 
 let testDir: string;
 
@@ -407,13 +408,14 @@ dependencies:
 dev-dependencies: []
 `, 'utf-8');
 
-    // Resolve subsumption: remove the resource entry
+    // Resolve subsumption: remove the resource entry via uninstall pipeline
+    const execContext = await createExecutionContext({ cwd: testDir });
     await resolveSubsumption(
       {
         type: 'upgrade',
         entriesToRemove: [{ packageName: 'gh@user/repo/agents/agent1' }]
       },
-      testDir
+      execContext
     );
 
     // Verify workspace index no longer has the resource entry
@@ -476,6 +478,150 @@ async function testCaseInsensitiveMatching() {
 }
 
 // ============================================================================
+// checkSubsumption: Marketplace subpath — resources installed first, then
+// full plugin at a subpath (e.g., gh@owner/repo/plugins/feature-dev)
+// This is the bug scenario where subsumption previously failed because
+// extractSourceIdentity treated the plugin install as resource-scoped.
+// ============================================================================
+
+async function testMarketplaceSubpath_ResourcesThenPlugin() {
+  await setup();
+  try {
+    const indexPath = getWorkspaceIndexPath(testDir);
+    // Simulate individual resources installed via interactive mode (-i)
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@anthropics/claude-plugins-official/plugins/feature-dev/agents/code-architect.md': {
+            path: '.openpackage/cache/git/abc/def/plugins/feature-dev/agents/code-architect.md',
+            files: { 'agents/code-architect.md': ['.opencode/agents/code-architect.md'] }
+          },
+          'gh@anthropics/claude-plugins-official/plugins/feature-dev/agents/code-explorer.md': {
+            path: '.openpackage/cache/git/abc/def/plugins/feature-dev/agents/code-explorer.md',
+            files: { 'agents/code-explorer.md': ['.opencode/agents/code-explorer.md'] }
+          }
+        }
+      }
+    });
+
+    // Now install the full plugin at the subpath
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@anthropics/claude-plugins-official/plugins/feature-dev',
+      gitUrl: 'https://github.com/anthropics/claude-plugins-official',
+      resourcePath: 'plugins/feature-dev'
+    };
+
+    const result = await checkSubsumption(source, testDir);
+    assert.equal(result.type, 'upgrade',
+      'Full plugin install should subsume individual resource entries');
+    assert.ok('entriesToRemove' in result);
+    assert.equal(result.entriesToRemove.length, 2);
+
+    const names = result.entriesToRemove.map(e => e.packageName).sort();
+    assert.deepEqual(names, [
+      'gh@anthropics/claude-plugins-official/plugins/feature-dev/agents/code-architect.md',
+      'gh@anthropics/claude-plugins-official/plugins/feature-dev/agents/code-explorer.md'
+    ]);
+
+    console.log('  Marketplace subpath (resources -> full plugin) detection passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+// ============================================================================
+// checkSubsumption: Marketplace subpath — full plugin installed first, then
+// individual resource from the same plugin
+// ============================================================================
+
+async function testMarketplaceSubpath_PluginThenResource() {
+  await setup();
+  try {
+    const indexPath = getWorkspaceIndexPath(testDir);
+    // Simulate a full plugin already installed at a subpath
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@anthropics/claude-plugins-official/plugins/feature-dev': {
+            path: '.openpackage/cache/git/abc/def/plugins/feature-dev',
+            version: '0.0.0',
+            files: {
+              'agents/code-architect.md': ['.opencode/agents/code-architect.md'],
+              'agents/code-explorer.md': ['.opencode/agents/code-explorer.md'],
+              'agents/code-reviewer.md': ['.opencode/agents/code-reviewer.md'],
+              'commands/feature-dev.md': ['.opencode/commands/feature-dev.md']
+            }
+          }
+        }
+      }
+    });
+
+    // Now try to install a single resource from the same plugin
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@anthropics/claude-plugins-official/plugins/feature-dev/agents/code-architect.md',
+      gitUrl: 'https://github.com/anthropics/claude-plugins-official',
+      resourcePath: 'plugins/feature-dev/agents/code-architect.md'
+    };
+
+    const result = await checkSubsumption(source, testDir);
+    assert.equal(result.type, 'already-covered',
+      'Resource should be detected as already covered by the full plugin');
+    assert.ok('coveringPackage' in result);
+    assert.equal(result.coveringPackage,
+      'gh@anthropics/claude-plugins-official/plugins/feature-dev');
+
+    console.log('  Marketplace subpath (full plugin -> resource) detection passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+// ============================================================================
+// checkSubsumption: Marketplace subpath — reinstall same plugin (no subsumption)
+// ============================================================================
+
+async function testMarketplaceSubpath_SamePluginReinstall() {
+  await setup();
+  try {
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@anthropics/claude-plugins-official/plugins/feature-dev': {
+            path: '.openpackage/cache/git/abc/def/plugins/feature-dev',
+            version: '0.0.0',
+            files: {
+              'agents/code-architect.md': ['.opencode/agents/code-architect.md']
+            }
+          }
+        }
+      }
+    });
+
+    // Reinstalling the same plugin should not trigger subsumption
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@anthropics/claude-plugins-official/plugins/feature-dev',
+      gitUrl: 'https://github.com/anthropics/claude-plugins-official',
+      resourcePath: 'plugins/feature-dev'
+    };
+
+    const result = await checkSubsumption(source, testDir);
+    assert.equal(result.type, 'none',
+      'Reinstalling the same plugin should not trigger subsumption');
+
+    console.log('  Marketplace subpath (same plugin reinstall) passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+// ============================================================================
 // Run all tests
 // ============================================================================
 
@@ -491,6 +637,9 @@ try {
   await testEmptyIndex();
   await testResolveSubsumption();
   await testCaseInsensitiveMatching();
+  await testMarketplaceSubpath_ResourcesThenPlugin();
+  await testMarketplaceSubpath_PluginThenResource();
+  await testMarketplaceSubpath_SamePluginReinstall();
 
   console.log('\nsubsumption-resolver tests passed');
 } catch (error) {
