@@ -440,6 +440,8 @@ function buildResourceMatchedPattern(
 
 /**
  * Build multiple contexts for resource-centric installations.
+ * For single-file installs from plugins, scopes the package name to the resource path
+ * so the workspace index key is e.g. gh@user/repo/plugin/agents/foo.md rather than the plugin root.
  */
 export function buildResourceInstallContexts(
   baseContext: InstallationContext,
@@ -450,26 +452,47 @@ export function buildResourceInstallContexts(
   const baseRelative = baseContext.baseRelative ?? (relative(repoRoot, detectedBase) || '.');
 
   return resourceSpecs.map(spec => {
+    const effectiveBase = baseContext.detectedBase ?? spec.basePath;
+    const matchedPattern = buildResourceMatchedPattern(spec, repoRoot, effectiveBase) ?? baseContext.matchedPattern;
+
+    // For single-file installs, scope the package name so index key and manifest are e.g.
+    // gh@user/repo/plugins/feature-dev/agents/code-architect.md (not plugin root)
+    const isSingleFile = Boolean(
+      matchedPattern &&
+      !matchedPattern.includes('*') &&
+      !matchedPattern.includes('?') &&
+      !matchedPattern.includes('[')
+    );
+    const baseName = baseContext.source.packageName;
+    const scopedName = isSingleFile ? `${baseName}/${matchedPattern}` : baseName;
+
     const source: PackageSource = {
       ...baseContext.source,
+      packageName: scopedName,
       resourcePath: spec.resourcePath,
       resourceVersion: spec.resourceVersion
     };
 
-    const effectiveBase = baseContext.detectedBase ?? spec.basePath;
+    let resolvedPackages = baseContext.resolvedPackages;
+    if (isSingleFile && baseContext.resolvedPackages.length > 0) {
+      resolvedPackages = baseContext.resolvedPackages.map(pkg => ({
+        ...pkg,
+        name: pkg.isRoot ? scopedName : pkg.name
+      }));
+    } else if (baseContext.resolvedPackages.length === 0) {
+      resolvedPackages = [];
+    }
 
     return {
       ...baseContext,
       source,
-      resolvedPackages: baseContext.resolvedPackages.length > 0
-        ? baseContext.resolvedPackages
-        : [],
+      resolvedPackages,
       warnings: [],
       errors: [],
       detectedBase: effectiveBase,
       baseRelative: baseRelative === '' ? '.' : baseRelative,
       baseSource: baseContext.baseSource,
-      matchedPattern: buildResourceMatchedPattern(spec, repoRoot, effectiveBase) ?? baseContext.matchedPattern
+      matchedPattern
     };
   });
 }

@@ -105,7 +105,7 @@ export async function loadPackagePhase(ctx: InstallationContext, output?: Output
     // Create root resolved package (simplified - full dependency resolution in next phase)
     // Use the effective version from context (which has fallback chain applied)
     const effectiveVersion = ctx.source.version || loaded.version;
-    
+
     const rootPackage: any = {
       name: loaded.packageName,
       version: effectiveVersion,
