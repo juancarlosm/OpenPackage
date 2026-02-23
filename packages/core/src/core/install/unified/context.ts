@@ -139,6 +139,12 @@ export interface InstallationContext {
   
   /** Internal flag: Path scoping has been computed (prevents redundant computation) */
   _pathScopingPerformed?: boolean;
+
+  /**
+   * When true, report phase skips display and attaches report data to the result
+   * for the caller to merge and display (used by runMultiContextPipeline groupReport).
+   */
+  _deferredReport?: boolean;
   
   /** Ambiguous matches awaiting user resolution */
   ambiguousMatches?: Array<{

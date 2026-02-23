@@ -35,7 +35,7 @@ import { DependencyResolutionExecutor } from '../resolution/executor.js';
 import { getManifestPathAtContentRoot } from '../resolution/manifest-reader.js';
 import { handleListSelection } from '../list-handler.js';
 import { discoverResources } from '../resource-discoverer.js';
-import { promptResourceSelection, displaySelectionSummary } from '../resource-selection-menu.js';
+import { promptResourceSelection } from '../resource-selection-menu.js';
 import { buildResourceInstallContexts } from '../unified/context-builders.js';
 import { logger } from '../../../utils/logger.js';
 import type { ResourceInstallationSpec } from '../convenience-matchers.js';
@@ -587,8 +587,6 @@ export class InstallOrchestrator {
       return { success: true, data: { installed: 0, skipped: 0 } };
    }
    
-   displaySelectionSummary(selected);
-   
    // Build resource contexts per plugin and install
    // Group selected resources by which plugin they came from (by filePath prefix)
    const allResourceContexts: InstallationContext[] = [];
@@ -630,7 +628,10 @@ export class InstallOrchestrator {
      return { success: true, data: { installed: 0, skipped: 0 } };
    }
    
-   const pipelineResult = await runMultiContextPipeline(allResourceContexts);
+   const pipelineResult = await runMultiContextPipeline(allResourceContexts, {
+     groupReport: true,
+     groupReportPackageName: marketplace.name
+   });
    
    return {
      success: pipelineResult.success,

@@ -9,7 +9,7 @@ import { logger } from '../../utils/logger.js';
 import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { PromptTier } from '../../core/interaction-policy.js';
 import { discoverResources } from './resource-discoverer.js';
-import { promptResourceSelection, displaySelectionSummary } from './resource-selection-menu.js';
+import { promptResourceSelection } from './resource-selection-menu.js';
 import { buildResourceInstallContexts } from './unified/context-builders.js';
 import { runMultiContextPipeline } from './unified/multi-context-pipeline.js';
 import { getLoaderForSource } from './sources/loader-factory.js';
@@ -108,8 +108,6 @@ export async function handleListSelection(
     };
   }
   
-  displaySelectionSummary(selected);
-  
   // Convert selected resources to ResourceInstallationSpec format
   const resourceSpecs: ResourceInstallationSpec[] = selected.map(s => ({
     name: s.displayName,
@@ -134,8 +132,11 @@ export async function handleListSelection(
     return rc;
   });
   
-  // Run multi-context pipeline
-  const result = await runMultiContextPipeline(resourceContexts);
+  // Run multi-context pipeline with grouped report for multi-resource selection
+  const result = await runMultiContextPipeline(resourceContexts, {
+    groupReport: true,
+    groupReportPackageName: context.source.packageName
+  });
   
   return {
     success: result.success,

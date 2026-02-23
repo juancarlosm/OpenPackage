@@ -181,40 +181,6 @@ function truncateToLines(text: string, maxLines: number): string {
   return text.substring(0, maxChars - 3) + '...';
 }
 
-/**
- * Display summary of selected resources
- */
-export function displaySelectionSummary(selected: SelectedResource[], output?: OutputPort): void {
-  if (selected.length === 0) {
-    return;
-  }
-  
-  const out = output ?? resolveOutput();
-  
-  // Group by type
-  const byType = new Map<ResourceType, number>();
-  for (const resource of selected) {
-    const count = byType.get(resource.resourceType) || 0;
-    byType.set(resource.resourceType, count + 1);
-  }
-  
-  const summary = [`Selected ${selected.length} resource${selected.length === 1 ? '' : 's'}:`];
-  
-  for (const [type, count] of byType.entries()) {
-    const label = getTypeLabel(type);
-    summary.push(`  • ${count} ${label.toLowerCase()}`);
-  }
-  
-  out.info(summary.join('\n'));
-}
-
-/**
- * Get display label for resource type
- */
-function getTypeLabel(type: ResourceType): string {
-  return toLabelPlural(type);
-}
-
 export async function promptCatalogSelection(
   catalog: ResourceCatalog,
   header: { name: string; version?: string; action: string },

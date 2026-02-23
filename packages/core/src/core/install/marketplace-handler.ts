@@ -15,7 +15,7 @@ import { getLoaderForSource } from './sources/loader-factory.js';
 import { applyBaseDetection } from './preprocessing/base-resolver.js';
 import { resolveConvenienceResources } from './preprocessing/convenience-preprocessor.js';
 import { discoverResources } from './resource-discoverer.js';
-import { promptResourceSelection, displaySelectionSummary } from './resource-selection-menu.js';
+import { promptResourceSelection } from './resource-selection-menu.js';
 import type { ResourceInstallationSpec } from './convenience-matchers.js';
 import type { SelectedResource } from './resource-types.js';
 import {
@@ -289,9 +289,6 @@ async function installPluginPartial(
     };
   }
   
-  // Display selection summary
-  displaySelectionSummary(selected);
-  
   // Convert selected resources to ResourceInstallationSpec format
   const resourceSpecs: ResourceInstallationSpec[] = selected.map(s => ({
     name: s.displayName,
@@ -316,8 +313,11 @@ async function installPluginPartial(
     return rc;
   });
   
-  // Run multi-context pipeline
-  const result = await runMultiContextPipeline(resourceContexts);
+  // Run multi-context pipeline with grouped report for multi-resource selection
+  const result = await runMultiContextPipeline(resourceContexts, {
+    groupReport: true,
+    groupReportPackageName: context.source.packageName || pluginEntry.name
+  });
   
   return {
     success: result.success,
@@ -499,7 +499,10 @@ async function installRelativePathPlugin(
       }
       return rc;
     });
-    const multiResult = await runMultiContextPipeline(resourceContexts);
+    const multiResult = await runMultiContextPipeline(resourceContexts, {
+      groupReport: true,
+      groupReportPackageName: pluginEntry.name
+    });
     return {
       success: multiResult.success,
       error: multiResult.error
@@ -671,7 +674,10 @@ async function installGitPlugin(
     const resources = await resolveConvenienceResources(basePath, repoRoot, convenienceOptions ?? {});
 
     const resourceContexts = buildResourceInstallContexts(ctx, resources, repoRoot);
-    const multiResult = await runMultiContextPipeline(resourceContexts);
+    const multiResult = await runMultiContextPipeline(resourceContexts, {
+      groupReport: true,
+      groupReportPackageName: ctx.source.packageName || pluginEntry.name
+    });
     return {
       success: multiResult.success,
       error: multiResult.error
