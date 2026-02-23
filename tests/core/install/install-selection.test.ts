@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 const { selectInstallVersionUnified } = await import(
-  new URL('../../../src/core/install/version-selection.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/install/version-selection.js', import.meta.url).href
 );
 
 console.log('install-selection tests starting');

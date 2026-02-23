@@ -13,8 +13,8 @@ import {
   getPrimaryPlatformFromMarkers,
   isPurePlatformSpecific,
   isMixedFormat
-} from '../../../src/core/install/package-marker-detector.js';
-import type { PackageFile } from '../../../src/core/install/detection-types.js';
+} from '../../../packages/core/src/core/install/package-marker-detector.js';
+import type { PackageFile } from '../../../packages/core/src/core/install/detection-types.js';
 
 describe('Package Marker Detection', () => {
   describe('detectPlatformMarkers', () => {

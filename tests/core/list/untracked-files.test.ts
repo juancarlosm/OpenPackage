@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { scanUntrackedFiles, extractStaticWalkRoot } from '../../../src/core/list/untracked-files-scanner.js';
-import { writeWorkspaceIndex } from '../../../src/utils/workspace-index-yml.js';
-import { getWorkspaceIndexPath } from '../../../src/utils/workspace-index-yml.js';
-import type { WorkspaceIndex } from '../../../src/types/workspace-index.js';
+import { scanUntrackedFiles, extractStaticWalkRoot } from '../../../packages/core/src/core/list/untracked-files-scanner.js';
+import { writeWorkspaceIndex } from '../../../packages/core/src/utils/workspace-index-yml.js';
+import { getWorkspaceIndexPath } from '../../../packages/core/src/utils/workspace-index-yml.js';
+import type { WorkspaceIndex } from '../../../packages/core/src/types/workspace-index.js';
 
 // Helper functions
 async function createWorkspaceIndex(dir: string, index: WorkspaceIndex): Promise<void> {

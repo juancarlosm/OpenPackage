@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import os from 'node:os';
 
-import { getRegistryDirectories } from '../../../src/core/directory.js';
-import { assertMutableSourceOrThrow, isRegistryPath } from '../../../src/core/source-mutability.js';
+import { getRegistryDirectories } from '../../../packages/core/src/core/directory.js';
+import { assertMutableSourceOrThrow, isRegistryPath } from '../../../packages/core/src/core/source-mutability.js';
 
 // Ensure predictable registry root for this test
 const fakeHome = path.join(os.tmpdir(), 'opkg-home-mutability');

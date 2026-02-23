@@ -14,8 +14,8 @@ import {
   isMixedFormatDistribution,
   determinePackageFormat,
   groupFilesByPlatform
-} from '../../../src/core/install/format-distribution-analyzer.js';
-import type { FileFormat } from '../../../src/core/install/detection-types.js';
+} from '../../../packages/core/src/core/install/format-distribution-analyzer.js';
+import type { FileFormat } from '../../../packages/core/src/core/install/detection-types.js';
 
 describe('Format Distribution Analysis', () => {
   describe('analyzeFormatDistribution', () => {

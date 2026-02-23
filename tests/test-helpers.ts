@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, '..');
 export function getCliPath(): string {
   // Use the TypeScript entrypoint so tests validate current source behavior,
   // independent of whether `dist/` is rebuilt.
-  return path.resolve(repoRoot, 'src/index.ts');
+  return path.resolve(repoRoot, 'packages/cli/src/index.ts');
 }
 
 export function runCli(

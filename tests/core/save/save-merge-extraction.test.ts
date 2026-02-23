@@ -6,8 +6,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractPackageContribution } from '../../../src/core/save/save-merge-extractor.js';
-import type { SaveCandidate } from '../../../src/core/save/save-types.js';
+import { extractPackageContribution } from '../../../packages/core/src/core/save/save-merge-extractor.js';
+import type { SaveCandidate } from '../../../packages/core/src/core/save/save-types.js';
 
 describe('save-merge-extractor', () => {
   /**

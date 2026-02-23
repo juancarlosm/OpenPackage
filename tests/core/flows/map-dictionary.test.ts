@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { executePipeline, validatePipeline } from '../../../src/core/flows/map-pipeline/operations/transform.js';
+import { executePipeline, validatePipeline } from '../../../packages/core/src/core/flows/map-pipeline/operations/transform.js';
 
 describe('$map operation - replace mode', () => {
   it('should support replace-based value mapping', () => {

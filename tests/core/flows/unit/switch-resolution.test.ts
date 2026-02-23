@@ -4,8 +4,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveSwitchExpression, validateSwitchExpression } from '../../../../src/core/flows/switch-resolver.js';
-import type { SwitchExpression, FlowContext } from '../../../../src/types/flows.js';
+import { resolveSwitchExpression, validateSwitchExpression } from '../../../../packages/core/src/core/flows/switch-resolver.js';
+import type { SwitchExpression, FlowContext } from '../../../../packages/core/src/types/flows.js';
 
 describe('Switch Expression Resolution', () => {
   const createContext = (variables: Record<string, any>): FlowContext => ({

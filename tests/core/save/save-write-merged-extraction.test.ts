@@ -10,9 +10,9 @@ import assert from 'node:assert/strict';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
-import { ensureDir, writeTextFile, readTextFile } from '../../../src/utils/fs.js';
-import { writeResolution } from '../../../src/core/save/save-write-coordinator.js';
-import type { SaveCandidate, ResolutionResult } from '../../../src/core/save/save-types.js';
+import { ensureDir, writeTextFile, readTextFile } from '../../../packages/core/src/utils/fs.js';
+import { writeResolution } from '../../../packages/core/src/core/save/save-write-coordinator.js';
+import type { SaveCandidate, ResolutionResult } from '../../../packages/core/src/core/save/save-types.js';
 
 describe('save-write-merged-extraction', () => {
   let tempDir: string | null = null;

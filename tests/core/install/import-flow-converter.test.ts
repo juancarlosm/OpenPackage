@@ -11,9 +11,9 @@ import {
   convertSingleFile,
   applyImportFlows,
   validateUniversalFormat
-} from '../../../src/core/install/import-flow-converter.js';
-import type { PackageFile, FormatGroup } from '../../../src/core/install/detection-types.js';
-import type { Flow } from '../../../src/types/flows.js';
+} from '../../../packages/core/src/core/install/import-flow-converter.js';
+import type { PackageFile, FormatGroup } from '../../../packages/core/src/core/install/detection-types.js';
+import type { Flow } from '../../../packages/core/src/types/flows.js';
 
 describe('Import Flow Converter', () => {
   describe('convertSingleFile', () => {

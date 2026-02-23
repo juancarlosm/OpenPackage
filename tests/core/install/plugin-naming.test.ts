@@ -7,7 +7,7 @@ import {
   isScopedPluginName,
   detectOldGitHubNaming,
   deriveNamespaceSlug
-} from '../../../src/utils/plugin-naming.js';
+} from '../../../packages/core/src/utils/plugin-naming.js';
 
 describe('Plugin Naming', () => {
   describe('generatePluginName', () => {

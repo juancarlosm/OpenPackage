@@ -4,8 +4,8 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createExecutionContext, getContextVariables, getDisplayTargetDir } from '../../src/core/execution-context.js';
-import { getHomeDirectory } from '../../src/utils/home-directory.js';
+import { createExecutionContext, getContextVariables, getDisplayTargetDir } from '../../packages/core/src/core/execution-context.js';
+import { getHomeDirectory } from '../../packages/core/src/utils/home-directory.js';
 import { mkdir, rm } from 'fs/promises';
 import { realpathSync } from 'fs';
 import { join } from 'path';

@@ -11,10 +11,10 @@ import { join } from 'path';
 import { promises as fs } from 'fs';
 
 const { installPackageWithFlows } = await import(
-  new URL('../../../src/core/install/flow-based-installer.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/install/flow-based-installer.js', import.meta.url).href
 );
 const { createUniversalContext } = await import(
-  new URL('../../../src/core/conversion-context/creation.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/conversion-context/creation.js', import.meta.url).href
 );
 
 console.log('Testing frontmatter override during install...');

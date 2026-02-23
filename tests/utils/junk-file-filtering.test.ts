@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'path';
-import { walkFiles } from '../../src/utils/fs.js';
+import { walkFiles } from '../../packages/core/src/utils/fs.js';
 
 function ensureDir(p: string) {
   fs.mkdirSync(p, { recursive: true });

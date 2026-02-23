@@ -3,10 +3,10 @@ import assert from 'node:assert';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { createPlatformConverter } from '../../../src/core/flows/platform-converter.js';
-import { detectPackageFormat } from '../../../src/core/install/format-detector.js';
-import { createContextFromPackage } from '../../../src/core/conversion-context/creation.js';
-import type { Package, PackageFile } from '../../../src/types/index.js';
+import { createPlatformConverter } from '../../../packages/core/src/core/flows/platform-converter.js';
+import { detectPackageFormat } from '../../../packages/core/src/core/install/format-detector.js';
+import { createContextFromPackage } from '../../../packages/core/src/core/conversion-context/creation.js';
+import type { Package, PackageFile } from '../../../packages/core/src/types/index.js';
 
 describe('Platform Converter', () => {
   let testDir: string;

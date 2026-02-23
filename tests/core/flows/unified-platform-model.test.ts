@@ -13,12 +13,12 @@ import { describe, it, before, after } from 'node:test';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
-import { DefaultFlowExecutor } from '../../../src/core/flows/flow-executor.js';
-import { detectPackageFormat } from '../../../src/core/install/format-detector.js';
-import { getPlatformDefinition, clearPlatformsCache } from '../../../src/core/platforms.js';
-import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
-import type { Flow, FlowContext } from '../../../src/types/flows.js';
-import type { PackageFile } from '../../../src/types/index.js';
+import { DefaultFlowExecutor } from '../../../packages/core/src/core/flows/flow-executor.js';
+import { detectPackageFormat } from '../../../packages/core/src/core/install/format-detector.js';
+import { getPlatformDefinition, clearPlatformsCache } from '../../../packages/core/src/core/platforms.js';
+import { writeTextFile, ensureDir } from '../../../packages/core/src/utils/fs.js';
+import type { Flow, FlowContext } from '../../../packages/core/src/types/flows.js';
+import type { PackageFile } from '../../../packages/core/src/types/index.js';
 
 describe('Unified Platform Model', () => {
   let tempDir: string;

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 // This is a unit test of the selection logic, not full e2e
 {
   // Import after setup to ensure fresh module state
-  const { validatePluginNames } = await import('../../src/core/install/marketplace-handler.js');
+  const { validatePluginNames } = await import('../../packages/core/src/core/install/marketplace-handler.js');
 
   const marketplace = {
     name: 'test-marketplace',
@@ -28,7 +28,7 @@ import assert from 'node:assert/strict';
 
 // Test: --plugins flag with invalid plugin names should error
 {
-  const { validatePluginNames } = await import('../../src/core/install/marketplace-handler.js');
+  const { validatePluginNames } = await import('../../packages/core/src/core/install/marketplace-handler.js');
 
   const marketplace = {
     name: 'test-marketplace',

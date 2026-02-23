@@ -3,12 +3,12 @@ import assert from 'node:assert';
 import { join } from 'path';
 import { mkdir, rm, readFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import { createPackage } from '../../src/core/package-creation.js';
+import { createPackage } from '../../packages/core/src/core/package-creation.js';
 import { 
   resolveCustomPath, 
   validateCustomPath 
-} from '../../src/utils/custom-path-resolution.js';
-import { exists } from '../../src/utils/fs.js';
+} from '../../packages/core/src/utils/custom-path-resolution.js';
+import { exists } from '../../packages/core/src/utils/fs.js';
 
 describe('Custom Path Creation', () => {
   let testDir: string;

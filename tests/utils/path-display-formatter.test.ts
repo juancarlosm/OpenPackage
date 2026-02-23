@@ -2,7 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'path';
 import os from 'os';
-import { formatPathForDisplay } from '../../src/utils/formatters.js';
+import { formatPathForDisplay } from '../../packages/core/src/utils/formatters.js';
 
 describe('formatPathForDisplay', () => {
   const homeDir = os.homedir();

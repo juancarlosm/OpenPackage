@@ -13,11 +13,11 @@ import { join } from 'path';
 import { promises as fs } from 'fs';
 
 const { installPackageWithFlows } = await import(
-  new URL('../../../src/core/install/flow-based-installer.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/install/flow-based-installer.js', import.meta.url).href
 );
 
 const { installPackageByIndexWithFlows } = await import(
-  new URL('../../../src/core/install/flow-index-installer.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/install/flow-index-installer.js', import.meta.url).href
 );
 
 console.log('platform-specific-files tests starting');

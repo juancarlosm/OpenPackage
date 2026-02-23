@@ -10,11 +10,11 @@ import {
   coordinateConversion,
   shouldPreConvert,
   type PackageConversionResult
-} from '../../../src/core/install/conversion-coordinator.js';
+} from '../../../packages/core/src/core/install/conversion-coordinator.js';
 import type { 
   PackageFile,
   EnhancedPackageFormat
-} from '../../../src/core/install/detection-types.js';
+} from '../../../packages/core/src/core/install/detection-types.js';
 
 describe('Phase 4: Conversion Coordination', () => {
   describe('coordinateConversion', () => {

@@ -11,16 +11,16 @@ import {
   checkSubsumption,
   resolveSubsumption,
   extractSourceIdentity
-} from '../../../src/core/install/orchestrator/subsumption-resolver.js';
-import type { PackageSource } from '../../../src/core/install/unified/context.js';
+} from '../../../packages/core/src/core/install/orchestrator/subsumption-resolver.js';
+import type { PackageSource } from '../../../packages/core/src/core/install/unified/context.js';
 import {
   getWorkspaceIndexPath,
   readWorkspaceIndex,
   writeWorkspaceIndex
-} from '../../../src/utils/workspace-index-yml.js';
-import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
-import { getLocalPackageYmlPath } from '../../../src/utils/paths.js';
-import { createExecutionContext } from '../../../src/core/execution-context.js';
+} from '../../../packages/core/src/utils/workspace-index-yml.js';
+import { createWorkspacePackageYml } from '../../../packages/core/src/core/package-management.js';
+import { getLocalPackageYmlPath } from '../../../packages/core/src/utils/paths.js';
+import { createExecutionContext } from '../../../packages/core/src/core/execution-context.js';
 
 let testDir: string;
 

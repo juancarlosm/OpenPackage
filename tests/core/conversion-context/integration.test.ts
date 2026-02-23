@@ -22,15 +22,15 @@ import {
   withTargetPlatform,
   contextToJSON,
   contextFromJSON
-} from '../../../src/core/conversion-context/index.js';
+} from '../../../packages/core/src/core/conversion-context/index.js';
 import {
   writeConversionContext,
   readConversionContext
-} from '../../../src/core/install/strategies/helpers/temp-directory.js';
-import { detectPackageFormat } from '../../../src/core/install/format-detector.js';
-import type { Package, PackageFile } from '../../../src/types/index.js';
-import type { PackageConversionContext } from '../../../src/types/conversion-context.js';
-import { createPlatformConverter } from '../../../src/core/flows/platform-converter.js';
+} from '../../../packages/core/src/core/install/strategies/helpers/temp-directory.js';
+import { detectPackageFormat } from '../../../packages/core/src/core/install/format-detector.js';
+import type { Package, PackageFile } from '../../../packages/core/src/types/index.js';
+import type { PackageConversionContext } from '../../../packages/core/src/types/conversion-context.js';
+import { createPlatformConverter } from '../../../packages/core/src/core/flows/platform-converter.js';
 
 describe('Conversion Context - Integration', () => {
   describe('End-to-End Flow', () => {
@@ -277,7 +277,7 @@ describe('Conversion Context - Integration', () => {
       };
       
       // Validation should catch this
-      const { validateContextTransition } = await import('../../../src/core/conversion-context/validation.js');
+      const { validateContextTransition } = await import('../../../packages/core/src/core/conversion-context/validation.js');
       
       assert.throws(
         () => validateContextTransition(context, mutated),

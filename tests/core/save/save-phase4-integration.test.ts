@@ -10,8 +10,8 @@ import assert from 'node:assert';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { mkdtemp, rm, mkdir, writeFile, readFile } from 'fs/promises';
-import { runSaveToSourcePipeline } from '../../../src/core/save/save-to-source-pipeline.js';
-import { writeWorkspaceIndex, getWorkspaceIndexPath } from '../../../src/utils/workspace-index-yml.js';
+import { runSaveToSourcePipeline } from '../../../packages/core/src/core/save/save-to-source-pipeline.js';
+import { writeWorkspaceIndex, getWorkspaceIndexPath } from '../../../packages/core/src/utils/workspace-index-yml.js';
 
 test('Phase 4: Complete pipeline - single file update', async () => {
   // Setup

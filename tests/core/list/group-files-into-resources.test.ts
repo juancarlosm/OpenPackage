@@ -3,7 +3,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { groupFilesIntoResources, type ListFileMapping } from '../../../src/core/list/list-pipeline.js';
+import { groupFilesIntoResources, type ListFileMapping } from '../../../packages/core/src/core/list/list-pipeline.js';
 
 function createFile(source: string, target: string, exists = true): ListFileMapping {
   return { source, target, exists };

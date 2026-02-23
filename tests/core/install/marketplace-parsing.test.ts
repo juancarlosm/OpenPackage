@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseMarketplace } from '../../../src/core/install/marketplace-handler.js';
+import { parseMarketplace } from '../../../packages/core/src/core/install/marketplace-handler.js';
 
 // Helper to create a temp directory
 async function createTempDir(): Promise<string> {

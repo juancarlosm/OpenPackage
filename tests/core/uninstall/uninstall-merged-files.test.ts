@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { removeKeysFromMergedFile } from '../../../src/core/uninstall/flow-aware-uninstaller.js';
-import { extractAllKeys, deleteNestedKey, isEffectivelyEmpty } from '../../../src/core/flows/flow-key-extractor.js';
+import { removeKeysFromMergedFile } from '../../../packages/core/src/core/uninstall/flow-aware-uninstaller.js';
+import { extractAllKeys, deleteNestedKey, isEffectivelyEmpty } from '../../../packages/core/src/core/flows/flow-key-extractor.js';
 
 describe('Key Extraction', () => {
   test('extracts top-level keys', () => {

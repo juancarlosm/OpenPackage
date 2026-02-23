@@ -15,11 +15,11 @@ import {
   detectFileFormat, 
   scoreAgainstSchema,
   groupFilesByFormat
-} from '../../../src/core/install/file-format-detector.js';
-import { schemaRegistry } from '../../../src/core/install/schema-registry.js';
-import { splitFrontmatter } from '../../../src/core/markdown-frontmatter.js';
-import type { PackageFile, DetectionSchema } from '../../../src/core/install/detection-types.js';
-import type { Flow } from '../../../src/types/flows.js';
+} from '../../../packages/core/src/core/install/file-format-detector.js';
+import { schemaRegistry } from '../../../packages/core/src/core/install/schema-registry.js';
+import { splitFrontmatter } from '../../../packages/core/src/core/markdown-frontmatter.js';
+import type { PackageFile, DetectionSchema } from '../../../packages/core/src/core/install/detection-types.js';
+import type { Flow } from '../../../packages/core/src/types/flows.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { classifyAddInput } from '../../../src/core/add/add-input-classifier.js';
+import { classifyAddInput } from '../../../packages/core/src/core/add/add-input-classifier.js';
 
 function ensureDir(p: string) { fs.mkdirSync(p, { recursive: true }); }
 function writeFile(p: string, content: string) { ensureDir(path.dirname(p)); fs.writeFileSync(p, content, 'utf-8'); }

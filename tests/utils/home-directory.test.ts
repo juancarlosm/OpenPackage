@@ -9,7 +9,7 @@ import {
   isHomeDirectory, 
   normalizePathWithTilde, 
   expandTilde 
-} from '../../src/utils/home-directory.js';
+} from '../../packages/core/src/utils/home-directory.js';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
 

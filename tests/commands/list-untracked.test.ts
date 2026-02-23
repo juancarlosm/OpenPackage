@@ -6,11 +6,11 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runListPipeline } from '../../src/core/list/list-pipeline.js';
-import { writeWorkspaceIndex } from '../../src/utils/workspace-index-yml.js';
-import { getWorkspaceIndexPath } from '../../src/utils/workspace-index-yml.js';
-import type { WorkspaceIndex } from '../../src/types/workspace-index.js';
-import type { ExecutionContext } from '../../src/types/index.js';
+import { runListPipeline } from '../../packages/core/src/core/list/list-pipeline.js';
+import { writeWorkspaceIndex } from '../../packages/core/src/utils/workspace-index-yml.js';
+import { getWorkspaceIndexPath } from '../../packages/core/src/utils/workspace-index-yml.js';
+import type { WorkspaceIndex } from '../../packages/core/src/types/workspace-index.js';
+import type { ExecutionContext } from '../../packages/core/src/types/index.js';
 
 // Helper function
 async function createWorkspaceIndex(dir: string, index: WorkspaceIndex): Promise<void> {

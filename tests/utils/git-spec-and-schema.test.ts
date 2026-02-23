@@ -3,8 +3,8 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { parseGitSpec } from '../../src/utils/git-spec.js';
-import { parsePackageYml } from '../../src/utils/package-yml.js';
+import { parseGitSpec } from '../../packages/core/src/utils/git-spec.js';
+import { parsePackageYml } from '../../packages/core/src/utils/package-yml.js';
 
 // parseGitSpec: github shorthand
 {

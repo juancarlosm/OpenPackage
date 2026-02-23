@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'path';
 
-import { isAllowedRegistryPath } from '../../../src/core/platform/registry-entry-filter.js';
-import { resolveTargetDirectory, resolveTargetFilePath } from '../../../src/core/platform/platform-mapper.js';
+import { isAllowedRegistryPath } from '../../../packages/core/src/core/platform/registry-entry-filter.js';
+import { resolveTargetDirectory, resolveTargetFilePath } from '../../../packages/core/src/core/platform/platform-mapper.js';
 
 // Flow-based validation: paths must match universal patterns from platforms.jsonc
 // Universal subdirectory paths are allowed

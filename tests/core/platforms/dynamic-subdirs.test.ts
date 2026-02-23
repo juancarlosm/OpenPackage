@@ -8,9 +8,9 @@ import {
   mergePlatformsConfig,
   validatePlatformsConfig,
   getPlatformsState
-} from '../../../src/core/platforms.js';
+} from '../../../packages/core/src/core/platforms.js';
 import { join } from 'path';
-import { logger } from '../../../src/utils/logger.js'; // For potential spying, but skip
+import { logger } from '../../../packages/core/src/utils/logger.js'; // For potential spying, but skip
 
 describe('Dynamic Subdirectories Feature', () => {
   it('universalSubdirs returns unique set from all platforms', () => {

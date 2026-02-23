@@ -4,7 +4,7 @@ import {
   computeGitUrlHash,
   getGitCommitCacheDir,
   getGitCachePath
-} from '../../../src/utils/git-cache.js';
+} from '../../../packages/core/src/utils/git-cache.js';
 
 describe('Git Cache', () => {
   describe('computeGitUrlHash', () => {

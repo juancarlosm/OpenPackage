@@ -19,8 +19,8 @@ import {
   buildCandidates,
   materializeLocalCandidate,
   type CandidateBuilderOptions
-} from '../../../src/core/save/save-candidate-builder.js';
-import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
+} from '../../../packages/core/src/core/save/save-candidate-builder.js';
+import { writeTextFile, ensureDir } from '../../../packages/core/src/utils/fs.js';
 
 describe('save-candidate-builder', () => {
   let testDir: string;

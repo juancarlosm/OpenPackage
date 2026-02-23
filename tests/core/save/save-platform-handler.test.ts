@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
-import { pruneExistingPlatformCandidates } from '../../../src/core/save/save-platform-handler.js';
-import type { SaveCandidateGroup, SaveCandidate } from '../../../src/core/save/save-types.js';
+import { pruneExistingPlatformCandidates } from '../../../packages/core/src/core/save/save-platform-handler.js';
+import type { SaveCandidateGroup, SaveCandidate } from '../../../packages/core/src/core/save/save-types.js';
 
 describe('save-platform-handler', () => {
   let tempDir: string;

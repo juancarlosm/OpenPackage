@@ -6,13 +6,13 @@ import { tmpdir } from 'os';
 console.log('manifest-base-field tests starting');
 
 const { parsePackageYml, writePackageYml } = await import(
-  new URL('../../../src/utils/package-yml.js', import.meta.url).href
+  new URL('../../../packages/core/src/utils/package-yml.js', import.meta.url).href
 );
 const { buildInstallContext } = await import(
-  new URL('../../../src/core/install/unified/context-builders.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/install/unified/context-builders.js', import.meta.url).href
 );
 const { writeTextFile } = await import(
-  new URL('../../../src/utils/fs.js', import.meta.url).href
+  new URL('../../../packages/core/src/utils/fs.js', import.meta.url).href
 );
 
 console.log('Imports loaded successfully');

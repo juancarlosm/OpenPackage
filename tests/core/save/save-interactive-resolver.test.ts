@@ -16,8 +16,8 @@ import assert from 'node:assert/strict';
 import type { 
   InteractiveResolutionInput,
   InteractiveResolutionOutput 
-} from '../../../src/core/save/save-interactive-resolver.js';
-import type { SaveCandidate, SaveCandidateGroup } from '../../../src/core/save/save-types.js';
+} from '../../../packages/core/src/core/save/save-interactive-resolver.js';
+import type { SaveCandidate, SaveCandidateGroup } from '../../../packages/core/src/core/save/save-types.js';
 
 describe('save-interactive-resolver', () => {
   const packageRoot = '/package/source';

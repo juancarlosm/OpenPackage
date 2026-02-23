@@ -9,8 +9,8 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { DefaultFlowExecutor } from '../../../../src/core/flows/flow-executor.js';
-import type { Flow, FlowContext } from '../../../../src/types/flows.js';
+import { DefaultFlowExecutor } from '../../../../packages/core/src/core/flows/flow-executor.js';
+import type { Flow, FlowContext } from '../../../../packages/core/src/types/flows.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {
   deriveResourceFullName,
   getPathUnderCategory
-} from '../../../src/core/resources/resource-namespace.js';
+} from '../../../packages/core/src/core/resources/resource-namespace.js';
 
 // getPathUnderCategory
 {

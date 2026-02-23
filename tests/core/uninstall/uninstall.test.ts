@@ -132,7 +132,7 @@ async function cleanup(paths: string[]) {
       'utf8'
     );
 
-    const { buildWorkspaceResources } = await import('../../../src/core/resources/resource-builder.js');
+    const { buildWorkspaceResources } = await import('../../../packages/core/src/core/resources/resource-builder.js');
     const { resources, packages } = await buildWorkspaceResources(workspace, 'project');
     assert.ok(packages.some(p => p.packageName === 'test-workspace'), 'workspace package should appear in packages');
     assert.ok(resources.some(r => r.packageName === 'test-workspace'), 'workspace package resources should appear');

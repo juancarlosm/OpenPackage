@@ -4,8 +4,8 @@ import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { runCli } from '../../test-helpers.js';
-import { exists, readTextFile } from '../../../src/utils/fs.js';
-import { DIR_PATTERNS, CLAUDE_PLUGIN_PATHS } from '../../../src/constants/index.js';
+import { exists, readTextFile } from '../../../packages/core/src/utils/fs.js';
+import { DIR_PATTERNS, CLAUDE_PLUGIN_PATHS } from '../../../packages/core/src/constants/index.js';
 
 describe('Claude Plugin Conditional Flow Bug Fix', () => {
   let testDir: string;

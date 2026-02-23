@@ -4,8 +4,8 @@ import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { runCli } from '../../test-helpers.js';
-import { exists } from '../../../src/utils/fs.js';
-import { DIR_PATTERNS, FILE_PATTERNS, CLAUDE_PLUGIN_PATHS } from '../../../src/constants/index.js';
+import { exists } from '../../../packages/core/src/utils/fs.js';
+import { DIR_PATTERNS, FILE_PATTERNS, CLAUDE_PLUGIN_PATHS } from '../../../packages/core/src/constants/index.js';
 
 describe('Claude Code Plugin Installation', () => {
   let testDir: string;
@@ -103,8 +103,8 @@ This is a test command.
   it('should detect plugin manifest and transform to OpenPackage format', async () => {
     await createTestPlugin('my-plugin', '2.0.0');
 
-    const { detectPluginType } = await import('../../../src/core/install/plugin-detector.js');
-    const { transformPluginToPackage } = await import('../../../src/core/install/plugin-transformer.js');
+    const { detectPluginType } = await import('../../../packages/core/src/core/install/plugin-detector.js');
+    const { transformPluginToPackage } = await import('../../../packages/core/src/core/install/plugin-transformer.js');
 
     // Detect plugin
     const detection = await detectPluginType(pluginDir);
@@ -185,7 +185,7 @@ This agent has tools.
     console.log('Installed agent content:', installedContent);
 
     // Parse frontmatter
-    const { splitFrontmatter } = await import('../../../src/core/markdown-frontmatter.js');
+    const { splitFrontmatter } = await import('../../../packages/core/src/core/markdown-frontmatter.js');
     const parsed = splitFrontmatter(installedContent);
 
     // Verify tools were converted from "Glob, Grep, LS" to { glob: true, grep: true, ls: true }
@@ -198,7 +198,7 @@ This agent has tools.
   });
 
   it('should parse git spec with subdirectory syntax', async () => {
-    const { parseGitSpec } = await import('../../../src/utils/git-spec.js');
+    const { parseGitSpec } = await import('../../../packages/core/src/utils/git-spec.js');
 
     // Test subdirectory only
     const spec1 = parseGitSpec('git:https://github.com/user/repo.git#subdirectory=plugins/my-plugin');

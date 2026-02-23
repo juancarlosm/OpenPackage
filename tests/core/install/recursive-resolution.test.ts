@@ -14,11 +14,11 @@ import {
   extractDependencies,
   getManifestPathAtContentRoot,
   clearLoadCache
-} from '../../../src/core/install/resolution/index.js';
-import type { DependencyDeclaration } from '../../../src/core/install/resolution/types.js';
-import { getLocalPackageYmlPath } from '../../../src/utils/paths.js';
-import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
-import { DIR_PATTERNS, FILE_PATTERNS } from '../../../src/constants/index.js';
+} from '../../../packages/core/src/core/install/resolution/index.js';
+import type { DependencyDeclaration } from '../../../packages/core/src/core/install/resolution/types.js';
+import { getLocalPackageYmlPath } from '../../../packages/core/src/utils/paths.js';
+import { createWorkspacePackageYml } from '../../../packages/core/src/core/package-management.js';
+import { DIR_PATTERNS, FILE_PATTERNS } from '../../../packages/core/src/constants/index.js';
 
 let testDir: string;
 

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
-import { parsePackageYml } from '../../../src/utils/package-yml.js';
-import { writeTextFile, readTextFile } from '../../../src/utils/fs.js';
-import { classifyPackageInput } from '../../../src/core/install/package-input.js';
+import { parsePackageYml } from '../../../packages/core/src/utils/package-yml.js';
+import { writeTextFile, readTextFile } from '../../../packages/core/src/utils/fs.js';
+import { classifyPackageInput } from '../../../packages/core/src/core/install/package-input.js';
 
 /**
  * Phase 3 Integration Tests

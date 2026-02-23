@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'path';
-import { runAddToSourcePipeline } from '../../../src/core/add/add-to-source-pipeline.js';
+import { runAddToSourcePipeline } from '../../../packages/core/src/core/add/add-to-source-pipeline.js';
 
 const UTF8 = 'utf-8';
 

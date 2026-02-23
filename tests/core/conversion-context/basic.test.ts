@@ -17,8 +17,8 @@ import {
   validateContextHistory,
   contextToJSON,
   contextFromJSON
-} from '../../../src/core/conversion-context/index.js';
-import type { PackageFormat } from '../../../src/core/install/format-detector.js';
+} from '../../../packages/core/src/core/conversion-context/index.js';
+import type { PackageFormat } from '../../../packages/core/src/core/install/format-detector.js';
 
 describe('Conversion Context - Creation', () => {
   it('creates context from claude-plugin format', () => {

@@ -5,7 +5,7 @@
  */
 
 import { join } from 'path';
-import { discoverResources } from '../src/core/install/resource-discoverer.js';
+import { discoverResources } from '../packages/core/src/core/install/resource-discoverer.js';
 
 async function main() {
   const fixtureDir = join(process.cwd(), 'tests', 'fixtures', 'resource-discovery');

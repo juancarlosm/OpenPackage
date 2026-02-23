@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { runRemoveFromSourcePipeline } from '../../../src/core/remove/remove-from-source-pipeline.js';
-import { runAddToSourcePipeline } from '../../../src/core/add/add-to-source-pipeline.js';
-import { readWorkspaceIndex, getWorkspaceIndexPath } from '../../../src/utils/workspace-index-yml.js';
-import { parsePackageYml } from '../../../src/utils/package-yml.js';
+import { runRemoveFromSourcePipeline } from '../../../packages/core/src/core/remove/remove-from-source-pipeline.js';
+import { runAddToSourcePipeline } from '../../../packages/core/src/core/add/add-to-source-pipeline.js';
+import { readWorkspaceIndex, getWorkspaceIndexPath } from '../../../packages/core/src/utils/workspace-index-yml.js';
+import { parsePackageYml } from '../../../packages/core/src/utils/package-yml.js';
 
 const UTF8 = 'utf-8';
 

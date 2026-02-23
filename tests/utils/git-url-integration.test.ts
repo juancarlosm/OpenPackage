@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { classifyPackageInput } from '../../src/core/install/package-input.js';
+import { classifyPackageInput } from '../../packages/core/src/core/install/package-input.js';
 
 console.log('Testing git URL detection integration with install pipeline...');
 

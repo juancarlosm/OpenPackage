@@ -4,7 +4,7 @@
 
 import * as os from 'os';
 import * as path from 'path';
-import { smartEquals, smartNotEquals } from '../src/utils/path-comparison.js';
+import { smartEquals, smartNotEquals } from '../packages/core/src/utils/path-comparison.js';
 
 console.log('Testing $$targetRoot variable and path comparison logic\n');
 console.log('='.repeat(60));

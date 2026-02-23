@@ -22,8 +22,8 @@ import {
   resolveConflictsForTargets,
   buildOwnershipContext,
   type TargetEntry,
-} from '../../../src/core/install/conflicts/file-conflict-resolver.js';
-import type { InstallOptions } from '../../../src/types/index.js';
+} from '../../../packages/core/src/core/install/conflicts/file-conflict-resolver.js';
+import type { InstallOptions } from '../../../packages/core/src/types/index.js';
 
 // ============================================================================
 // generateNamespacedPath — pure function, no I/O

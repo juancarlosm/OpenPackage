@@ -8,8 +8,8 @@
 
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { detectEnhancedPackageFormat } from '../../../src/core/install/format-detector.js';
-import type { PackageFile } from '../../../src/core/install/detection-types.js';
+import { detectEnhancedPackageFormat } from '../../../packages/core/src/core/install/format-detector.js';
+import type { PackageFile } from '../../../packages/core/src/core/install/detection-types.js';
 
 describe('Enhanced Package Format Detection', () => {
   describe('Tier 1: Package-Level Markers (Fast Path)', () => {

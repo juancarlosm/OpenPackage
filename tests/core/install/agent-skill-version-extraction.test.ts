@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { applyConvenienceFilters } from '../../../src/core/install/convenience-matchers.js';
+import { applyConvenienceFilters } from '../../../packages/core/src/core/install/convenience-matchers.js';
 
 describe('Agent and Skill Version Extraction', () => {
   let tempDir: string;

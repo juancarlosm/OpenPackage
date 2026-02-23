@@ -12,12 +12,12 @@ import assert from 'node:assert/strict';
 import { rm, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildWorkspaceRootInstallContext, buildInstallContext, type BulkInstallContextsResult } from '../../../src/core/install/unified/context-builders.js';
-import { exists, readTextFile } from '../../../src/utils/fs.js';
-import { createWorkspacePackageYml } from '../../../src/core/package-management.js';
-import { parsePackageYml } from '../../../src/utils/package-yml.js';
-import { readWorkspaceIndex } from '../../../src/utils/workspace-index-yml.js';
-import { createExecutionContext } from '../../../src/core/execution-context.js';
+import { buildWorkspaceRootInstallContext, buildInstallContext, type BulkInstallContextsResult } from '../../../packages/core/src/core/install/unified/context-builders.js';
+import { exists, readTextFile } from '../../../packages/core/src/utils/fs.js';
+import { createWorkspacePackageYml } from '../../../packages/core/src/core/package-management.js';
+import { parsePackageYml } from '../../../packages/core/src/utils/package-yml.js';
+import { readWorkspaceIndex } from '../../../packages/core/src/utils/workspace-index-yml.js';
+import { createExecutionContext } from '../../../packages/core/src/core/execution-context.js';
 
 // Create temporary test workspace
 const testDir = join(tmpdir(), `opkg-test-workspace-${Date.now()}`);

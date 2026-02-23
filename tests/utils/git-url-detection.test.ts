@@ -11,7 +11,7 @@ import {
   parseGenericGitUrl,
   isGitUrl,
   normalizeGitHubUrl
-} from '../../src/utils/git-url-detection.js';
+} from '../../packages/core/src/utils/git-url-detection.js';
 
 // =============================================================================
 // GitHub Shorthand Parser Tests

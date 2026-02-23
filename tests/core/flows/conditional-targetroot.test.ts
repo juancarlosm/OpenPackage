@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { tmpdir, homedir } from 'os';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { DefaultFlowExecutor } from '../../../src/core/flows/flow-executor.js';
-import type { Flow, FlowContext } from '../../../src/types/flows.js';
+import { DefaultFlowExecutor } from '../../../packages/core/src/core/flows/flow-executor.js';
+import type { Flow, FlowContext } from '../../../packages/core/src/types/flows.js';
 
 describe('conditional-targetroot', () => {
   let tempDir: string;

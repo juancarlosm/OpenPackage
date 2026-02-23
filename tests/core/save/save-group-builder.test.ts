@@ -13,8 +13,8 @@ import assert from 'node:assert/strict';
 import {
   buildCandidateGroups,
   filterGroupsWithWorkspace
-} from '../../../src/core/save/save-group-builder.js';
-import type { SaveCandidate, LocalSourceRef } from '../../../src/core/save/save-types.js';
+} from '../../../packages/core/src/core/save/save-group-builder.js';
+import type { SaveCandidate, LocalSourceRef } from '../../../packages/core/src/core/save/save-types.js';
 
 describe('save-group-builder', () => {
   describe('buildCandidateGroups', () => {

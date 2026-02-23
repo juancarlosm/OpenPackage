@@ -3,7 +3,7 @@
  * Run this to see how different input formats are parsed.
  */
 
-import { detectGitSource } from '../src/utils/git-url-detection.js';
+import { detectGitSource } from '../packages/core/src/utils/git-url-detection.js';
 
 console.log('='.repeat(80));
 console.log('Git Source Detection Demo');

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { mkdtemp, rm, mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
-import { readWorkspaceIndex, writeWorkspaceIndex } from '../../../src/utils/workspace-index-yml.js';
-import { writeTextFile } from '../../../src/utils/fs.js';
+import { readWorkspaceIndex, writeWorkspaceIndex } from '../../../packages/core/src/utils/workspace-index-yml.js';
+import { writeTextFile } from '../../../packages/core/src/utils/fs.js';
 
 describe('Workspace index name migration', () => {
   it('should migrate package name with wrong path to use full path from cache location', async () => {

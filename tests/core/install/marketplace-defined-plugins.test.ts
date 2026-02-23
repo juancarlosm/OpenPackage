@@ -7,12 +7,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolvePluginMetadata } from '../../../src/core/install/plugin-metadata-resolver.js';
-import { detectPluginWithMarketplace } from '../../../src/core/install/plugin-detector.js';
+import { resolvePluginMetadata } from '../../../packages/core/src/core/install/plugin-metadata-resolver.js';
+import { detectPluginWithMarketplace } from '../../../packages/core/src/core/install/plugin-detector.js';
 import { join } from 'path';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import type { MarketplacePluginEntry } from '../../../src/core/install/marketplace-handler.js';
+import type { MarketplacePluginEntry } from '../../../packages/core/src/core/install/marketplace-handler.js';
 
 test('Plugin Metadata Resolver - use plugin.json when present', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'opkg-test-'));

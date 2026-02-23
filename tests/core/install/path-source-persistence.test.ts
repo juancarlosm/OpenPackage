@@ -4,8 +4,8 @@ import path from 'node:path';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import * as yaml from 'js-yaml';
 
-import { findExistingPathOrGitSource } from '../../../src/utils/install-helpers.js';
-import type { PackageYml } from '../../../src/types/index.js';
+import { findExistingPathOrGitSource } from '../../../packages/core/src/utils/install-helpers.js';
+import type { PackageYml } from '../../../packages/core/src/types/index.js';
 
 const tmpBase = mkdtempSync(path.join(os.tmpdir(), 'opkg-install-path-'));
 

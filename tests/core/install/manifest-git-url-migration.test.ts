@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
-import { parsePackageYml, writePackageYml } from '../../../src/utils/package-yml.js';
-import { writeTextFile, readTextFile } from '../../../src/utils/fs.js';
+import { parsePackageYml, writePackageYml } from '../../../packages/core/src/utils/package-yml.js';
+import { writeTextFile, readTextFile } from '../../../packages/core/src/utils/fs.js';
 
 describe('Manifest git→url migration (Phase 2)', () => {
   it('should migrate git field to url field on read', async () => {

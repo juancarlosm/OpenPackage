@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
-import { parsePackageYml, writePackageYml } from '../../../src/utils/package-yml.js';
-import { writeTextFile } from '../../../src/utils/fs.js';
+import { parsePackageYml, writePackageYml } from '../../../packages/core/src/utils/package-yml.js';
+import { writeTextFile } from '../../../packages/core/src/utils/fs.js';
 
 describe('Package name path migration', () => {
   it('should migrate package name to use full path from path field', async () => {

@@ -10,9 +10,9 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync, rmSync } from 'fs';
-import { buildCandidates, materializeLocalCandidate } from '../../../src/core/save/save-candidate-builder.js';
-import { buildCandidateGroups, filterGroupsWithWorkspace } from '../../../src/core/save/save-group-builder.js';
-import { writeTextFile, ensureDir } from '../../../src/utils/fs.js';
+import { buildCandidates, materializeLocalCandidate } from '../../../packages/core/src/core/save/save-candidate-builder.js';
+import { buildCandidateGroups, filterGroupsWithWorkspace } from '../../../packages/core/src/core/save/save-group-builder.js';
+import { writeTextFile, ensureDir } from '../../../packages/core/src/utils/fs.js';
 
   describe('Phase 1 Integration: Foundation & Types', () => {
   let testDir: string;
@@ -317,8 +317,8 @@ This is a test rule.`;
       );
 
       // Phase 1: Build candidates and groups
-      const { buildCandidates } = await import('../../../src/core/save/save-candidate-builder.js');
-      const { buildCandidateGroups, filterGroupsWithWorkspace } = await import('../../../src/core/save/save-group-builder.js');
+      const { buildCandidates } = await import('../../../packages/core/src/core/save/save-candidate-builder.js');
+      const { buildCandidateGroups, filterGroupsWithWorkspace } = await import('../../../packages/core/src/core/save/save-group-builder.js');
 
       const candidateResult = await buildCandidates({
         packageRoot: join(testDir, 'package-source'),
@@ -338,7 +338,7 @@ This is a test rule.`;
       assert.strictEqual(activeGroups[0].workspace.length, 2);
 
       // Phase 2: Prune platform candidates
-      const { pruneExistingPlatformCandidates } = await import('../../../src/core/save/save-platform-handler.js');
+      const { pruneExistingPlatformCandidates } = await import('../../../packages/core/src/core/save/save-platform-handler.js');
       await pruneExistingPlatformCandidates(join(testDir, 'package-source'), activeGroups);
 
       // Both candidates should remain (no platform files exist in source)
@@ -352,7 +352,7 @@ This is a test rule.`;
       }
 
       // Phase 2: Analyze conflicts
-      const { analyzeGroup } = await import('../../../src/core/save/save-conflict-analyzer.js');
+      const { analyzeGroup } = await import('../../../packages/core/src/core/save/save-conflict-analyzer.js');
       const analysis = await analyzeGroup(activeGroups[0], false, join(testDir, 'workspace'));
 
       // Should be needs-resolution (multiple differing candidates)
@@ -396,8 +396,8 @@ This is a test rule.`;
       );
 
       // Build candidates
-      const { buildCandidates } = await import('../../../src/core/save/save-candidate-builder.js');
-      const { buildCandidateGroups, filterGroupsWithWorkspace } = await import('../../../src/core/save/save-group-builder.js');
+      const { buildCandidates } = await import('../../../packages/core/src/core/save/save-candidate-builder.js');
+      const { buildCandidateGroups, filterGroupsWithWorkspace } = await import('../../../packages/core/src/core/save/save-group-builder.js');
 
       const candidateResult = await buildCandidates({
         packageRoot: join(testDir, 'package-source'),
@@ -416,7 +416,7 @@ This is a test rule.`;
       assert.strictEqual(activeGroups[0].workspace.length, 1);
 
       // Prune should remove cursor candidate (platform file exists)
-      const { pruneExistingPlatformCandidates } = await import('../../../src/core/save/save-platform-handler.js');
+      const { pruneExistingPlatformCandidates } = await import('../../../packages/core/src/core/save/save-platform-handler.js');
       await pruneExistingPlatformCandidates(join(testDir, 'package-source'), activeGroups);
 
       assert.strictEqual(activeGroups[0].workspace.length, 0);
@@ -453,9 +453,9 @@ This is a test rule.`;
       );
 
       // Build and analyze
-      const { buildCandidates } = await import('../../../src/core/save/save-candidate-builder.js');
-      const { buildCandidateGroups, filterGroupsWithWorkspace } = await import('../../../src/core/save/save-group-builder.js');
-      const { analyzeGroup } = await import('../../../src/core/save/save-conflict-analyzer.js');
+      const { buildCandidates } = await import('../../../packages/core/src/core/save/save-candidate-builder.js');
+      const { buildCandidateGroups, filterGroupsWithWorkspace } = await import('../../../packages/core/src/core/save/save-group-builder.js');
+      const { analyzeGroup } = await import('../../../packages/core/src/core/save/save-conflict-analyzer.js');
 
       const candidateResult = await buildCandidates({
         packageRoot: join(testDir, 'package-source'),

@@ -13,7 +13,7 @@ import {
   comparePathsWithGlobSupport,
   smartEquals,
   smartNotEquals
-} from '../../src/utils/path-comparison.js';
+} from '../../packages/core/src/utils/path-comparison.js';
 
 describe('path-comparison', () => {
   const originalHomedir = os.homedir();

@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { runRemoveFromSourcePipeline } from '../../../src/core/remove/remove-from-source-pipeline.js';
-import { getWorkspaceIndexPath } from '../../../src/utils/workspace-index-yml.js';
+import { runRemoveFromSourcePipeline } from '../../../packages/core/src/core/remove/remove-from-source-pipeline.js';
+import { getWorkspaceIndexPath } from '../../../packages/core/src/utils/workspace-index-yml.js';
 
 const UTF8 = 'utf-8';
 

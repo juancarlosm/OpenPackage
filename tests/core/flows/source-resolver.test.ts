@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
-import { SourcePatternResolver } from '../../../src/core/flows/source-resolver.js';
+import { SourcePatternResolver } from '../../../packages/core/src/core/flows/source-resolver.js';
 
 describe('SourcePatternResolver', () => {
   let tmpDir: string;

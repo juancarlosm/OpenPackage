@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mergeInlinePlatformOverride } from '../../../src/utils/platform-yaml-merge.js';
+import { mergeInlinePlatformOverride } from '../../../packages/core/src/utils/platform-yaml-merge.js';
 
 const inlineFrontmatter = `---
 name: yaml-test

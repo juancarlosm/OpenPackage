@@ -17,9 +17,9 @@ import {
   cacheImportFlows,
   getCachedImportFlows,
   createFormatGroupsFromPaths
-} from '../../../src/core/install/conversion-context.js';
-import type { PackageFile } from '../../../src/core/install/detection-types.js';
-import type { Flow } from '../../../src/types/flows.js';
+} from '../../../packages/core/src/core/install/conversion-context.js';
+import type { PackageFile } from '../../../packages/core/src/core/install/detection-types.js';
+import type { Flow } from '../../../packages/core/src/types/flows.js';
 
 describe('Conversion Context', () => {
   describe('createConversionContext', () => {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import type { InstallOptions } from '../../src/types/index.js';
+import type { InstallOptions } from '../../packages/core/src/types/index.js';
 
 // Test: InstallOptions accepts plugins array
 {
@@ -18,7 +18,7 @@ import type { InstallOptions } from '../../src/types/index.js';
 console.log('install-plugins-flag type tests passed');
 
 // Test: normalizePluginsOption handles array input
-import { normalizePluginsOption } from '../../src/core/install/preprocessing/options-normalizer.js';
+import { normalizePluginsOption } from '../../packages/core/src/core/install/preprocessing/options-normalizer.js';
 
 {
   const result = normalizePluginsOption(['plugin-1', 'plugin-2', 'plugin-3']);
@@ -51,8 +51,8 @@ import { normalizePluginsOption } from '../../src/core/install/preprocessing/opt
 
 console.log('normalizePluginsOption tests passed');
 
-import { validatePluginNames } from '../../src/core/install/marketplace-handler.js';
-import type { MarketplaceManifest } from '../../src/core/install/marketplace-handler.js';
+import { validatePluginNames } from '../../packages/core/src/core/install/marketplace-handler.js';
+import type { MarketplaceManifest } from '../../packages/core/src/core/install/marketplace-handler.js';
 
 // Test: validatePluginNames returns valid plugins
 {

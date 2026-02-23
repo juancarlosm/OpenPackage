@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 let validatePlatformsConfig, mergePlatformsConfig;
 
 try {
-  const module = await import(new URL('../../../src/core/platforms.js', import.meta.url).href);
+  const module = await import(new URL('../../../packages/core/src/core/platforms.js', import.meta.url).href);
   validatePlatformsConfig = module.validatePlatformsConfig;
   mergePlatformsConfig = module.mergePlatformsConfig;
 } catch (error) {

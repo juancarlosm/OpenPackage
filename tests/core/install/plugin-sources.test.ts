@@ -12,7 +12,7 @@ import {
   isGitSource,
   type GitHubSource,
   type GitUrlSource
-} from '../../../src/core/install/plugin-sources.js';
+} from '../../../packages/core/src/core/install/plugin-sources.js';
 
 // Test: relative path sources
 {

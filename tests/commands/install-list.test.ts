@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { discoverResources } from '../../src/core/install/resource-discoverer.js';
+import { discoverResources } from '../../packages/core/src/core/install/resource-discoverer.js';
 
 describe('install --interactive', () => {
   let testDir: string;

@@ -23,7 +23,7 @@ dependencies:
   console.log('✓ Created test manifest with base field');
   
   // Now try to parse it
-  const { parsePackageYml } = await import('../../../src/utils/package-yml.js');
+  const { parsePackageYml } = await import('../../../packages/core/src/utils/package-yml.js');
   
   const parsed = await parsePackageYml(manifestPath);
   

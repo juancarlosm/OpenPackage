@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { validatePackageName, normalizePackageNameForLookup } from '../../../src/utils/package-name.js';
+import { validatePackageName, normalizePackageNameForLookup } from '../../../packages/core/src/utils/package-name.js';
 
 describe('Package Name Validation', () => {
   describe('validatePackageName - strict validation but flexible format', () => {

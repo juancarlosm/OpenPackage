@@ -12,9 +12,9 @@
 
 import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { executeResolution } from '../../../src/core/save/save-resolution-executor.js';
-import type { SaveCandidate, SaveCandidateGroup } from '../../../src/core/save/save-types.js';
-import type { ConflictAnalysis } from '../../../src/core/save/save-conflict-analyzer.js';
+import { executeResolution } from '../../../packages/core/src/core/save/save-resolution-executor.js';
+import type { SaveCandidate, SaveCandidateGroup } from '../../../packages/core/src/core/save/save-types.js';
+import type { ConflictAnalysis } from '../../../packages/core/src/core/save/save-conflict-analyzer.js';
 
 describe('save-resolution-executor', () => {
   const packageRoot = '/package/source';

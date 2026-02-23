@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import {
   resolveCandidateVersionsForInstall,
   maybeWarnHigherRegistryVersion
-} from '../../../src/core/install/local-source-resolution.js';
+} from '../../../packages/core/src/core/install/local-source-resolution.js';
 
 const tmpBase = mkdtempSync(path.join(os.tmpdir(), 'opkg-local-source-'));
 const workspaceDir = path.join(tmpBase, 'workspace');

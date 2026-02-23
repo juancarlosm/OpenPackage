@@ -9,8 +9,8 @@ import assert from 'node:assert';
 import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runSetPipeline } from '../../src/core/set/set-pipeline.js';
-import type { SetCommandOptions } from '../../src/core/set/set-types.js';
+import { runSetPipeline } from '../../packages/core/src/core/set/set-pipeline.js';
+import type { SetCommandOptions } from '../../packages/core/src/core/set/set-types.js';
 
 describe('opkg set command', () => {
   let testDir: string;

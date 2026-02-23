@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { runAddToSourcePipeline } from '../../../src/core/add/add-to-source-pipeline.js';
-import { readWorkspaceIndex, getWorkspaceIndexPath } from '../../../src/utils/workspace-index-yml.js';
+import { runAddToSourcePipeline } from '../../../packages/core/src/core/add/add-to-source-pipeline.js';
+import { readWorkspaceIndex, getWorkspaceIndexPath } from '../../../packages/core/src/utils/workspace-index-yml.js';
 
 const UTF8 = 'utf-8';
 

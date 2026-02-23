@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 
 const { mapUniversalToPlatform } = await import(
-  new URL('../../../src/core/platform/platform-mapper.js', import.meta.url).href
+  new URL('../../../packages/core/src/core/platform/platform-mapper.js', import.meta.url).href
 );
 const { logger } = await import(
-  new URL('../../../src/utils/logger.js', import.meta.url).href
+  new URL('../../../packages/core/src/utils/logger.js', import.meta.url).href
 );
 
 console.log('platform extension filter tests starting');

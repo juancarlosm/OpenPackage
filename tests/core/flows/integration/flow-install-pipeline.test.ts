@@ -15,23 +15,23 @@ import {
   installPackageWithFlows,
   type FlowInstallContext,
   type FlowInstallResult
-} from '../../../../src/core/install/flow-based-installer.js';
+} from '../../../../packages/core/src/core/install/flow-based-installer.js';
 import {
   detectFormatWithContextFromDirectory
-} from '../../../../src/core/install/helpers/format-detection.js';
-import { aggregateFlowResults } from '../../../../src/core/install/helpers/result-aggregation.js';
+} from '../../../../packages/core/src/core/install/helpers/format-detection.js';
+import { aggregateFlowResults } from '../../../../packages/core/src/core/install/helpers/result-aggregation.js';
 import {
   trackTargetFiles,
   generateConflictReports
-} from '../../../../src/core/install/helpers/conflict-detection.js';
-import { getApplicableFlows } from '../../../../src/core/install/strategies/helpers/flow-helpers.js';
-import type { FlowContext } from '../../../../src/types/flows.js';
-import type { Platform } from '../../../../src/core/platforms.js';
-import type { PackageConversionContext } from '../../../../src/types/conversion-context.js';
-import { clearPlatformsCache } from '../../../../src/core/platforms.js';
-import { installPackageByIndexWithFlows } from '../../../../src/core/install/flow-index-installer.js';
-import { readWorkspaceIndex } from '../../../../src/utils/workspace-index-yml.js';
-import { removeFileMapping } from '../../../../src/core/uninstall/flow-aware-uninstaller.js';
+} from '../../../../packages/core/src/core/install/helpers/conflict-detection.js';
+import { getApplicableFlows } from '../../../../packages/core/src/core/install/strategies/helpers/flow-helpers.js';
+import type { FlowContext } from '../../../../packages/core/src/types/flows.js';
+import type { Platform } from '../../../../packages/core/src/core/platforms.js';
+import type { PackageConversionContext } from '../../../../packages/core/src/types/conversion-context.js';
+import { clearPlatformsCache } from '../../../../packages/core/src/core/platforms.js';
+import { installPackageByIndexWithFlows } from '../../../../packages/core/src/core/install/flow-index-installer.js';
+import { readWorkspaceIndex } from '../../../../packages/core/src/utils/workspace-index-yml.js';
+import { removeFileMapping } from '../../../../packages/core/src/core/uninstall/flow-aware-uninstaller.js';
 
 /**
  * Create a default conversion context for test cases

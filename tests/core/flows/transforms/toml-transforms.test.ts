@@ -11,7 +11,7 @@ import {
   jsonToTomlTransform, 
   tomlToJsonTransform,
   createDefaultTransformRegistry 
-} from '../../../../src/core/flows/flow-transforms.js';
+} from '../../../../packages/core/src/core/flows/flow-transforms.js';
 
 describe('TOML Transforms', () => {
   describe('json-to-toml transform', () => {

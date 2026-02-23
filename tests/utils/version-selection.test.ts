@@ -1,7 +1,7 @@
 import {
   selectVersionWithWipPolicy,
   hasExplicitPrereleaseIntent
-} from '../../src/utils/version-ranges.js';
+} from '../../packages/core/src/utils/version-ranges.js';
 
 function expectEqual<T>(actual: T, expected: T, label: string): void {
   if (actual !== expected) {

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
-import { parsePackageYml, writePackageYml } from '../../../src/utils/package-yml.js';
-import { writeTextFile, readTextFile } from '../../../src/utils/fs.js';
-import { buildInstallContext } from '../../../src/core/install/unified/context-builders.js';
-import type { ExecutionContext } from '../../../src/types/execution-context.js';
+import { parsePackageYml, writePackageYml } from '../../../packages/core/src/utils/package-yml.js';
+import { writeTextFile, readTextFile } from '../../../packages/core/src/utils/fs.js';
+import { buildInstallContext } from '../../../packages/core/src/core/install/unified/context-builders.js';
+import type { ExecutionContext } from '../../../packages/core/src/types/execution-context.js';
 
 describe('Phase 2 Integration: Schema Migration', () => {
   it('should handle complete workflow: old format → parse → context build', async () => {

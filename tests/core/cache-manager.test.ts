@@ -2,7 +2,7 @@ import assert from 'assert';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdir, rm, writeFile } from 'fs/promises';
-import { createCacheManager } from '../../src/core/cache-manager.js';
+import { createCacheManager } from '../../packages/core/src/core/cache-manager.js';
 
 const testDir = join(tmpdir(), `cache-manager-test-${Date.now()}`);
 

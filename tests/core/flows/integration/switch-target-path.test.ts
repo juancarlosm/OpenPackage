@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
-import { DefaultFlowExecutor } from '../../../../src/core/flows/flow-executor.js';
-import type { Flow, FlowContext } from '../../../../src/types/flows.js';
+import { DefaultFlowExecutor } from '../../../../packages/core/src/core/flows/flow-executor.js';
+import type { Flow, FlowContext } from '../../../../packages/core/src/types/flows.js';
 
 describe('Switch Target Path Integration', () => {
   let tempDir: string;

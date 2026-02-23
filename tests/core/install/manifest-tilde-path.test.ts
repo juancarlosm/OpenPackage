@@ -4,13 +4,13 @@ import path from 'node:path';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as yaml from 'js-yaml';
 
-import { buildPathInstallContext } from '../../../src/core/install/unified/index.js';
-import { updateManifestPhase } from '../../../src/core/install/unified/phases/manifest.js';
-import { parsePackageYml } from '../../../src/utils/package-yml.js';
-import { getLocalPackageYmlPath } from '../../../src/utils/paths.js';
-import type { PackageYml } from '../../../src/types/index.js';
-import type { ExecutionContext } from '../../../src/types/execution-context.js';
-import type { InstallationContext } from '../../../src/core/install/unified/context.js';
+import { buildPathInstallContext } from '../../../packages/core/src/core/install/unified/index.js';
+import { updateManifestPhase } from '../../../packages/core/src/core/install/unified/phases/manifest.js';
+import { parsePackageYml } from '../../../packages/core/src/utils/package-yml.js';
+import { getLocalPackageYmlPath } from '../../../packages/core/src/utils/paths.js';
+import type { PackageYml } from '../../../packages/core/src/types/index.js';
+import type { ExecutionContext } from '../../../packages/core/src/types/execution-context.js';
+import type { InstallationContext } from '../../../packages/core/src/core/install/unified/context.js';
 
 function makeExecContext(targetDir: string): ExecutionContext {
   return { sourceCwd: targetDir, targetDir, isGlobal: false };

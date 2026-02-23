@@ -13,8 +13,8 @@ import {
   getNewestCandidate,
   sortCandidatesByMtime,
   type ConflictAnalysisType
-} from '../../../src/core/save/save-conflict-analyzer.js';
-import type { SaveCandidate, SaveCandidateGroup } from '../../../src/core/save/save-types.js';
+} from '../../../packages/core/src/core/save/save-conflict-analyzer.js';
+import type { SaveCandidate, SaveCandidateGroup } from '../../../packages/core/src/core/save/save-types.js';
 
 describe('save-conflict-analyzer', () => {
   // Dummy workspace root for analyzeGroup (required third parameter)

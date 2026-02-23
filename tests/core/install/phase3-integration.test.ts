@@ -12,19 +12,19 @@ import assert from 'node:assert/strict';
 import {
   convertFormatGroup,
   applyImportFlows
-} from '../../../src/core/install/import-flow-converter.js';
+} from '../../../packages/core/src/core/install/import-flow-converter.js';
 import {
   mergeFormatGroups,
   validateMergedPackage
-} from '../../../src/core/install/format-group-merger.js';
+} from '../../../packages/core/src/core/install/format-group-merger.js';
 import {
   createConversionContext,
   recordGroupConversion,
   finalizeConversion,
   getConversionSummary,
   isConversionSuccessful
-} from '../../../src/core/install/conversion-context.js';
-import type { PackageFile, FormatGroup } from '../../../src/core/install/detection-types.js';
+} from '../../../packages/core/src/core/install/conversion-context.js';
+import type { PackageFile, FormatGroup } from '../../../packages/core/src/core/install/detection-types.js';
 
 describe('Phase 3 Integration', () => {
   describe('End-to-end conversion pipeline', () => {

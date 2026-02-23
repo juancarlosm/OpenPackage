@@ -4,8 +4,8 @@ import {
   detectPackageFormat,
   isPlatformSpecific,
   needsConversion
-} from '../../../src/core/install/format-detector.js';
-import type { PackageFile } from '../../../src/types/index.js';
+} from '../../../packages/core/src/core/install/format-detector.js';
+import type { PackageFile } from '../../../packages/core/src/types/index.js';
 
 describe('Format Detector', () => {
   describe('detectPackageFormat', () => {

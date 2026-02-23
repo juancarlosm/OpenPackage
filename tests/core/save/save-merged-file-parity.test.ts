@@ -10,11 +10,11 @@ import assert from 'node:assert/strict';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
-import { ensureDir, writeTextFile, exists, readTextFile } from '../../../src/utils/fs.js';
-import { buildCandidates, materializeLocalCandidate } from '../../../src/core/save/save-candidate-builder.js';
-import { buildCandidateGroups } from '../../../src/core/save/save-group-builder.js';
-import { analyzeGroup } from '../../../src/core/save/save-conflict-analyzer.js';
-import type { WorkspaceIndexFileMapping } from '../../../src/types/workspace-index.js';
+import { ensureDir, writeTextFile, exists, readTextFile } from '../../../packages/core/src/utils/fs.js';
+import { buildCandidates, materializeLocalCandidate } from '../../../packages/core/src/core/save/save-candidate-builder.js';
+import { buildCandidateGroups } from '../../../packages/core/src/core/save/save-group-builder.js';
+import { analyzeGroup } from '../../../packages/core/src/core/save/save-conflict-analyzer.js';
+import type { WorkspaceIndexFileMapping } from '../../../packages/core/src/types/workspace-index.js';
 
 describe('save-merged-file-parity', () => {
   it('should detect no conflicts for freshly installed merged file', async () => {
