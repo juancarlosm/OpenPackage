@@ -34,6 +34,7 @@ export class RegistrySourceLoader implements PackageSourceLoader {
     if (!source.version) {
       const resolved = await resolveRegistryVersion(source.packageName, {
         mode: options.resolutionMode ?? 'default',
+        cwd: execContext.targetDir,
         profile: options.profile,
         apiKey: options.apiKey
       });
