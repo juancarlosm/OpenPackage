@@ -11,9 +11,9 @@ export interface UninstallResult {
 /**
  * Report uninstall results to console
  */
-export function reportUninstallResult(result: UninstallResult, context?: { interactive?: boolean }, output?: OutputPort): void {
+export function reportUninstallResult(result: UninstallResult, context?: { outputMode?: string }, output?: OutputPort): void {
   // Suppress output in interactive mode (spinner handles feedback)
-  if (context?.interactive) return;
+  if (context?.outputMode === 'rich') return;
   
   const out = output ?? resolveOutput();
   const cwd = process.cwd();
@@ -59,9 +59,9 @@ export interface ResourceUninstallResult {
 /**
  * Report resource-level uninstall results to console
  */
-export function reportResourceUninstallResult(result: ResourceUninstallResult, context?: { interactive?: boolean }, output?: OutputPort): void {
+export function reportResourceUninstallResult(result: ResourceUninstallResult, context?: { outputMode?: string }, output?: OutputPort): void {
   // Suppress output in interactive mode (spinner handles feedback)
-  if (context?.interactive) return;
+  if (context?.outputMode === 'rich') return;
   
   const out = output ?? resolveOutput();
   const cwd = process.cwd();

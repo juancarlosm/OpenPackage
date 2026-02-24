@@ -18,7 +18,9 @@ interface UnpublishCommandOptions extends UnpublishOptions {
 
 export async function setupUnpublishCommand(args: any[]): Promise<void> {
   const [packageSpec, options] = args as [string | undefined, UnpublishCommandOptions];
-  const ctx = await createCliExecutionContext();
+  const ctx = await createCliExecutionContext({
+    outputMode: options.interactive ? 'rich' : 'plain',
+  });
   const out = resolveOutput(ctx);
   const prm = resolvePrompt(ctx);
 

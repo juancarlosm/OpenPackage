@@ -14,7 +14,7 @@ import { resolvePrompt } from '@opkg/core/core/ports/resolve.js';
  */
 export async function setupSetCommand(args: any[]): Promise<void> {
   const [packageInput, options] = args as [string | undefined, SetCommandOptions];
-  const ctx = await createCliExecutionContext();
+  const ctx = await createCliExecutionContext({ outputMode: 'rich' });
   const prompt = resolvePrompt(ctx);
   const result = await runSetPipeline(packageInput, options, prompt);
   if (!result.success) {

@@ -1,18 +1,20 @@
 /**
  * CLI Context Factory
  * 
- * Creates ExecutionContext instances with CLI-specific port implementations
- * (Clack output adapter, Clack prompt adapter).
+ * Creates ExecutionContext instances with CLI-specific port implementations.
  * 
- * This is the CLI entry point for creating contexts -- command handlers
- * should use this instead of directly calling createExecutionContext()
- * to ensure ports are properly injected.
+ * Output mode is committed once at context creation. When the mode is not
+ * yet known (e.g. install command that may discover a marketplace), the
+ * context starts in plain mode and provides a `commitOutputMode` callback
+ * that the orchestrator can invoke to upgrade to rich mode before any
+ * visible output is produced.
  */
 
-import type { ExecutionContext, ExecutionOptions } from '@opkg/core/types/execution-context.js';
+import type { ExecutionContext, ExecutionOptions, OutputMode } from '@opkg/core/types/execution-context.js';
 import { createExecutionContext } from '@opkg/core/core/execution-context.js';
 import { createClackOutput, createPlainOutput } from './clack-output-adapter.js';
 import { createClackPrompt } from './clack-prompt-adapter.js';
+import { createPlainPrompt } from './plain-prompt-adapter.js';
 import { createClackProgress, createPlainProgress } from './clack-progress-adapter.js';
 import { nonInteractivePrompt } from '@opkg/core/core/ports/console-prompt.js';
 import type { OutputPort } from '@opkg/core/core/ports/output.js';
@@ -20,103 +22,80 @@ import type { PromptPort } from '@opkg/core/core/ports/prompt.js';
 import type { ProgressPort } from '@opkg/core/core/ports/progress.js';
 
 export interface CliContextOptions extends ExecutionOptions {
-  /** Override interactive mode detection (undefined = auto-detect from TTY) */
-  interactive?: boolean;
   /**
-   * Use clack-styled output (box-drawing characters, note boxes, clack spinners).
-   * Defaults to `interactive` when set, otherwise `false`.
-   * Prompt capability (clack select/confirm) is controlled separately by TTY detection.
+   * Explicit output mode.
+   * - `'rich'`  – Clack output, Clack prompts, Clack progress
+   * - `'plain'` – Console output, readline prompts, plain progress
+   * - When omitted, defaults to `'plain'`.
    */
-  interactiveOutput?: boolean;
+  outputMode?: OutputMode;
 }
 
-/** Cached port singletons for the lifetime of the CLI process. */
+// ── Cached singletons ──────────────────────────────────────────────────────
+
 let cachedClackOutput: OutputPort | undefined;
 let cachedPlainOutput: OutputPort | undefined;
 let cachedClackPrompt: PromptPort | undefined;
+let cachedPlainPrompt: PromptPort | undefined;
 let cachedClackProgress: ProgressPort | undefined;
 let cachedPlainProgress: ProgressPort | undefined;
 
-function getCliPorts(opts: { interactiveOutput: boolean; interactivePrompts: boolean }) {
-  const output = opts.interactiveOutput
-    ? (cachedClackOutput ??= createClackOutput())
-    : (cachedPlainOutput ??= createPlainOutput());
-
-  const prompt = opts.interactivePrompts
-    ? (cachedClackPrompt ??= createClackPrompt())
-    : nonInteractivePrompt;
-
-  const progress = opts.interactiveOutput
-    ? (cachedClackProgress ??= createClackProgress())
-    : (cachedPlainProgress ??= createPlainProgress());
-
-  return { output, prompt, progress };
-}
+// ── TTY detection ──────────────────────────────────────────────────────────
 
 /** Detect whether the current session is interactive (TTY, no CI). */
-function detectInteractive(override?: boolean): boolean {
-  if (override !== undefined) return override;
+function detectInteractive(): boolean {
   const isTTY = process.stdin.isTTY === true;
   return isTTY && process.env.CI !== 'true';
 }
 
+// ── Port assignment ────────────────────────────────────────────────────────
+
+/**
+ * Apply an output mode to an ExecutionContext, setting all three ports
+ * (output, prompt, progress) atomically.
+ */
+function applyOutputMode(ctx: ExecutionContext, mode: OutputMode, isTTY: boolean): void {
+  ctx.outputMode = mode;
+
+  if (mode === 'rich') {
+    ctx.output = cachedClackOutput ??= createClackOutput();
+    ctx.prompt = isTTY
+      ? (cachedClackPrompt ??= createClackPrompt())
+      : nonInteractivePrompt;
+    ctx.progress = cachedClackProgress ??= createClackProgress();
+  } else {
+    ctx.output = cachedPlainOutput ??= createPlainOutput();
+    ctx.prompt = isTTY
+      ? (cachedPlainPrompt ??= createPlainPrompt())
+      : nonInteractivePrompt;
+    ctx.progress = cachedPlainProgress ??= createPlainProgress();
+  }
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────
+
 /**
  * Create an ExecutionContext with CLI-specific ports injected.
- * 
- * Output/progress formatting is plain by default (console.log with simple prefixes).
- * Clack-styled output (box-drawing characters, note boxes) is only used when
- * `interactive` or `interactiveOutput` is explicitly true.
- * 
- * Prompt capability (clack select/confirm) is determined by TTY detection,
- * independent of output formatting, so ambient prompts (platform selection,
- * marketplace plugin pick, etc.) still work on TTY even with plain output.
+ *
+ * The output mode is committed once. If the caller does not know the
+ * mode yet (e.g. the install command before preprocessing), omit
+ * `outputMode` -- the context starts in plain mode and exposes a
+ * `commitOutputMode` callback that core code can invoke to upgrade
+ * to rich mode before any visible output is produced.
  */
 export async function createCliExecutionContext(options: CliContextOptions = {}): Promise<ExecutionContext> {
   const ctx = await createExecutionContext(options);
   const isTTY = detectInteractive();
-  const useClackOutput = options.interactiveOutput ?? options.interactive ?? false;
-  const ports = getCliPorts({
-    interactiveOutput: useClackOutput,
-    interactivePrompts: isTTY,
-  });
+  const initialMode: OutputMode = options.outputMode ?? 'plain';
 
-  ctx.output = ports.output;
-  ctx.prompt = ports.prompt;
-  ctx.progress = ports.progress;
+  applyOutputMode(ctx, initialMode, isTTY);
 
-  // When on TTY with plain default output, stash clack ports as rich ports
-  // so core can temporarily upgrade output during prompt-driven phases
-  // (e.g. marketplace selection, platform detection, ambiguity resolution).
-  if (isTTY && !useClackOutput) {
-    const richPorts = getCliPorts({ interactiveOutput: true, interactivePrompts: true });
-    ctx.richOutput = richPorts.output;
-    ctx.richProgress = richPorts.progress;
-  }
-
-  return ctx;
-}
-
-/**
- * Inject CLI ports into an existing ExecutionContext.
- * Useful when a context is created externally (e.g., scope-traversal)
- * but needs CLI output/prompt support.
- */
-export function injectCliPorts(ctx: ExecutionContext, options?: { interactive?: boolean; interactiveOutput?: boolean }): ExecutionContext {
-  const isTTY = detectInteractive();
-  const useClackOutput = options?.interactiveOutput ?? options?.interactive ?? false;
-  const ports = getCliPorts({
-    interactiveOutput: useClackOutput,
-    interactivePrompts: isTTY,
-  });
-  ctx.output ??= ports.output;
-  ctx.prompt ??= ports.prompt;
-  ctx.progress ??= ports.progress;
-
-  if (isTTY && !useClackOutput) {
-    const richPorts = getCliPorts({ interactiveOutput: true, interactivePrompts: true });
-    ctx.richOutput ??= richPorts.output;
-    ctx.richProgress ??= richPorts.progress;
-  }
+  // Allow core code to change mode (e.g. after install preprocessing
+  // determines marketplace flow). No-op when already in the requested mode.
+  ctx.commitOutputMode = (mode: OutputMode) => {
+    if (ctx.outputMode === mode) return;
+    applyOutputMode(ctx, mode, isTTY);
+  };
 
   return ctx;
 }

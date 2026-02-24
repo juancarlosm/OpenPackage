@@ -201,7 +201,7 @@ async function configureCommand(options: ConfigureOptions, out: OutputPort, prm:
  */
 export async function setupConfigureCommand(args: any[]): Promise<void> {
   const [options] = args as [ConfigureOptions];
-  const ctx = await createCliExecutionContext();
+  const ctx = await createCliExecutionContext({ outputMode: 'rich' });
   const out = resolveOutput(ctx);
   const prm = resolvePrompt(ctx);
   const result = await configureCommand(options, out, prm);

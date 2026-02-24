@@ -28,7 +28,9 @@ interface NewCommandOptions {
 export async function setupNewCommand(args: any[]): Promise<void> {
   let [packageName, options] = args as [string | undefined, NewCommandOptions | undefined];
   const cwd = process.cwd();
-  const ctx = await createCliExecutionContext();
+  const ctx = await createCliExecutionContext({
+    outputMode: !packageName ? 'rich' : 'plain',
+  });
   const out = resolveOutput(ctx);
   const prm = resolvePrompt(ctx);
 

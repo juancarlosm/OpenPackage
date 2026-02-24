@@ -159,6 +159,7 @@ export type {
   ExecutionContext,
   ExecutionOptions,
   ContextVariables,
+  OutputMode,
 } from './types/execution-context.js';
 
 export type {

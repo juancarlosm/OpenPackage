@@ -27,6 +27,7 @@ export async function setupRemoveCommand(args: any[]): Promise<void> {
     global: false,
     cwd: programOpts.cwd,
     interactive,
+    outputMode: interactive ? 'rich' : 'plain',
   });
 
   const policy = createInteractionPolicy({

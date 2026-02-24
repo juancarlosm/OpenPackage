@@ -33,7 +33,7 @@ export async function reportResultsPhase(
     isDependencyInstall,
     namespaced: installResult.namespaced,
     relocatedFiles: installResult.relocatedFiles,
-    interactive: ctx.execution.interactionPolicy?.mode === 'always',
+    interactive: ctx.execution.outputMode === 'rich',
     replacedResources: ctx._replacedResources,
   };
 

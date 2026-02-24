@@ -121,6 +121,7 @@ export async function setupAddCommand(args: any[]): Promise<void> {
     global: false,
     cwd: programOpts.cwd,
     interactive,
+    outputMode: interactive ? 'rich' : 'plain',
   });
 
   const policy = createInteractionPolicy({ interactive, force: options.force });

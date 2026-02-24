@@ -44,6 +44,9 @@ export async function setupInstallCommand(args: any[]): Promise<void> {
     global: options.global,
     cwd: programOpts.cwd,
     interactive: options.interactive,
+    // --interactive is known-interactive; marketplace detection may upgrade
+    // to rich later via commitOutputMode in the orchestrator.
+    outputMode: options.interactive ? 'rich' : undefined,
   });
   
   // Add telemetry collector to context

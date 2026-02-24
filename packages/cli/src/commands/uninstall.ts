@@ -51,11 +51,11 @@ async function uninstallCommand(
     nameArg,
     options,
     traverseOpts,
-    (opts) => createCliExecutionContext(opts),
+    (opts) => createCliExecutionContext({ ...opts, outputMode: opts.interactive ? 'rich' : 'plain' }),
   );
 
   if (result.cancelled) {
-    const ctx = await createCliExecutionContext({ interactive: false });
+    const ctx = await createCliExecutionContext({ interactive: false, outputMode: 'plain' });
     resolveOutput(ctx).info('Uninstall cancelled');
   }
 }
@@ -70,7 +70,7 @@ async function handleListUninstall(
   programOpts: Record<string, any>,
   traverseOpts: { programOpts?: Record<string, any>; globalOnly?: boolean; projectOnly?: boolean }
 ) {
-  const ctx = await createCliExecutionContext({ interactive: true });
+  const ctx = await createCliExecutionContext({ interactive: true, outputMode: 'rich' });
   const out = resolveOutput(ctx);
   const prm = resolvePrompt(ctx);
 
@@ -111,7 +111,7 @@ async function handleListUninstall(
     options,
     collection,
     programOpts,
-    (opts) => createCliExecutionContext(opts),
+    (opts) => createCliExecutionContext({ ...opts, outputMode: opts.interactive ? 'rich' : 'plain' }),
     executeUninstallCandidate
   );
 

@@ -12,6 +12,17 @@ import type { PromptPort } from '../core/ports/prompt.js';
 import type { ProgressPort } from '../core/ports/progress.js';
 
 /**
+ * Output mode for the current session.
+ *
+ * Committed once at command entry (or after install preprocessing).
+ * Controls which port adapters are active for the lifetime of the command.
+ *
+ * - `'rich'`  – Clack output + Clack prompts + Clack spinners (box-drawing UI)
+ * - `'plain'` – Plain console output + readline prompts + braille spinners
+ */
+export type OutputMode = 'rich' | 'plain';
+
+/**
  * ExecutionContext - Single source of truth for directory resolution
  * 
  * Strictly separates:
@@ -63,36 +74,40 @@ export interface ExecutionContext {
   /**
    * Output port for all user-facing messages (info, success, error, warn, etc.).
    * When not provided, defaults to consoleOutput (plain console.log).
-   * CLI provides ClackOutputAdapter; GUI provides its own adapter.
+   * CLI provides ClackOutputAdapter or PlainOutputAdapter based on outputMode.
    */
   output?: OutputPort;
 
   /**
    * Prompt port for all interactive user prompts (confirm, select, text, etc.).
    * When not provided, defaults to nonInteractivePrompt (throws on prompt).
-   * CLI provides ClackPromptAdapter; GUI provides its own adapter.
+   * CLI provides ClackPromptAdapter (rich) or PlainPromptAdapter (plain) based on outputMode.
    */
   prompt?: PromptPort;
 
   /**
    * Progress port for streaming structured progress events to the UI.
    * When not provided, defaults to silentProgress (no-op).
-   * CLI provides ClackProgressAdapter; GUI provides its own adapter.
+   * CLI provides ClackProgressAdapter or PlainProgressAdapter based on outputMode.
    */
   progress?: ProgressPort;
 
   /**
-   * Rich output port for use during prompt-driven phases.
-   * When prompts fire, surrounding output should match their visual style.
-   * Use `withPromptOutput()` to temporarily swap to these ports.
-   * Set by the CLI (or other UI adapter) at context creation; undefined when not available.
+   * The committed output mode for this session.
+   * Set once at command entry or after install preprocessing (via commitOutputMode).
+   * Once set, all ports are locked to this mode for the lifetime of the command.
    */
-  richOutput?: OutputPort;
+  outputMode?: OutputMode;
 
   /**
-   * Rich progress port, paired with richOutput.
+   * Callback to finalize the output mode after command preprocessing.
+   * Set by the CLI adapter at context creation. Called by core code
+   * (e.g. the install orchestrator) when the flow type is determined.
+   *
+   * This is a one-shot operation: calling it when outputMode is already
+   * set to the requested mode is a no-op.
    */
-  richProgress?: ProgressPort;
+  commitOutputMode?: (mode: OutputMode) => void;
 }
 
 /**

@@ -5,6 +5,7 @@ import { resolvePlatforms } from '../../platform-resolution.js';
 import { logger } from '../../../../utils/logger.js';
 import { splitPackageNameForTelemetry } from '../../../../utils/plugin-naming.js';
 import { resolveOutput, resolvePrompt } from '../../../ports/resolve.js';
+import { PromptTier } from '../../../interaction-policy.js';
 
 import type { RelocatedFile } from '../../conflicts/file-conflict-resolver.js';
 
@@ -35,7 +36,7 @@ export async function executeInstallationPhase(
   
   // Resolve platforms if not already set (orchestrator preflight sets for bulk/single)
   if (ctx.platforms.length === 0) {
-    const canPrompt = ctx.execution.interactive ?? false;
+    const canPrompt = ctx.execution.interactionPolicy?.canPrompt(PromptTier.Required) ?? false;
     ctx.platforms = await resolvePlatforms(
       ctx.targetDir,
       ctx.options.platforms,
