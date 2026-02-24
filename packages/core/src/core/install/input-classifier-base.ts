@@ -119,7 +119,7 @@ export async function classifyInputBase(
   // 3. Try parseResourceArg (GitHub URLs, gh@, registry, paths)
   try {
     const spec = await parseResourceArg(input, cwd);
-    return await convertResourceSpec(spec, cwd);
+    return await convertResourceSpec(spec, cwd, input);
   } catch (error) {
     // Fall through to legacy
   }
@@ -142,7 +142,8 @@ export async function classifyInputBase(
  */
 async function convertResourceSpec(
   spec: ResourceSpec,
-  cwd: string
+  cwd: string,
+  originalInput?: string
 ): Promise<BaseInputClassification> {
   switch (spec.type) {
     case 'github-url':
@@ -152,7 +153,7 @@ async function convertResourceSpec(
         gitUrl: spec.gitUrl!,
         gitRef: spec.ref,
         gitPath: spec.path,
-        derivedName: spec.repo
+        derivedName: originalInput ?? spec.repo
       };
 
     case 'filepath': {
