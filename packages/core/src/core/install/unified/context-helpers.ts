@@ -9,6 +9,11 @@ export function shouldResolveDependencies(ctx: InstallationContext): boolean {
   if (ctx.mode === 'apply') {
     return false;
   }
+  // Skip when explicitly marked (e.g. per-resource contexts from interactive selection
+  // where the scoped packageName is not a valid registry identifier).
+  if (ctx._skipDependencyResolution) {
+    return false;
+  }
   // Git/path installs are already fully specified by their source content.
   // The registry dependency resolver expects the root package to exist in a registry;
   // for git/path sources this can incorrectly mark the root as "missing" and trigger

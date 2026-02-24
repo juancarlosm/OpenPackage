@@ -7,11 +7,11 @@ import type {
 } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
-import { buildResourceInstallContexts } from '../../unified/context-builders.js';
+import { createResolvedPackageFromLoaded } from '../../preprocessing/context-population.js';
 import { normalizePlatforms } from '../../../platform/platform-mapper.js';
 import { logger } from '../../../../utils/logger.js';
 import { applyBaseDetection, computePathScoping } from '../../preprocessing/base-resolver.js';
-import { resolveConvenienceResources } from '../../preprocessing/convenience-preprocessor.js';
+import { runConvenienceFilterInstall } from '../../preprocessing/convenience-preprocessor.js';
 import { resolveOutput } from '../../../ports/resolve.js';
 
 export class GitInstallStrategy extends BaseInstallStrategy {
@@ -92,25 +92,11 @@ export class GitInstallStrategy extends BaseInstallStrategy {
     }
 
     // Populate root resolved package so the pipeline can skip re-loading.
-    // (The unified load phase is the only other place that populates ctx.resolvedPackages.)
-    context.resolvedPackages = [
-      {
-        name: context.source.packageName,
-        version: context.source.version || loaded.version,
-        pkg: {
-          metadata: loaded.metadata,
-          files: [],
-          _format: (loaded.metadata as any)?._format || context.source.pluginMetadata?.format
-        },
-        isRoot: true,
-        source: 'git',
-        contentRoot: context.source.contentRoot || loaded.contentRoot
-      } as any
-    ];
-    
-    // Apply convenience filters (--agents, --skills)
+    context.resolvedPackages = [createResolvedPackageFromLoaded(loaded, context)];
+
+    // Apply convenience filters (--agents, --skills, etc.)
     if (options.agents?.length || options.skills?.length || options.rules?.length || options.commands?.length) {
-      return this.handleConvenienceFilters(context, loaded, options, execContext);
+      return this.handleConvenienceFilters(context, loaded, options);
     }
     
     // Warn about unused --plugins flag
@@ -124,24 +110,22 @@ export class GitInstallStrategy extends BaseInstallStrategy {
   
   /**
    * Handle convenience filter options.
+   * Uses context.detectedBase (from applyBaseDetection) when available.
    */
   private async handleConvenienceFilters(
     context: InstallationContext,
     loaded: any,
-    options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    options: NormalizedInstallOptions
   ): Promise<PreprocessResult> {
-    const basePath = context.detectedBase || loaded.contentRoot || execContext.targetDir;
-    const repoRoot = loaded.sourceMetadata?.repoPath || loaded.contentRoot || basePath;
-
-    const resources = await resolveConvenienceResources(basePath, repoRoot, {
+    const convenienceOptions = {
       agents: options.agents,
       skills: options.skills,
       rules: options.rules,
       commands: options.commands
+    };
+    const resourceContexts = await runConvenienceFilterInstall(context, loaded, convenienceOptions, {
+      useDetectedBase: true
     });
-
-    const resourceContexts = buildResourceInstallContexts(context, resources, repoRoot);
     return this.createMultiResourceResult(context, resourceContexts);
   }
 }

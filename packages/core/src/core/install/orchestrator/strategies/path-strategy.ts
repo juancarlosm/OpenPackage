@@ -3,12 +3,16 @@
  *
  * It preloads the source once and populates the root resolved package so the unified
  * pipeline can skip re-loading.
+ * When convenience filters (--agents, --skills, etc.) are specified, routes to
+ * multi-resource install like git/registry strategies.
  */
 import type { InstallationContext, PackageSource } from '../../unified/context.js';
 import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
+import { createResolvedPackageFromLoaded } from '../../preprocessing/context-population.js';
+import { runConvenienceFilterInstall } from '../../preprocessing/convenience-preprocessor.js';
 import { normalizePlatforms } from '../../../platform/platform-mapper.js';
 
 export class PathInstallStrategy extends BaseInstallStrategy {
@@ -59,26 +63,24 @@ export class PathInstallStrategy extends BaseInstallStrategy {
     context.source.version = loaded.version;
     context.source.contentRoot = loaded.contentRoot;
     context.source.pluginMetadata = loaded.pluginMetadata;
+    context.resolvedPackages = [createResolvedPackageFromLoaded(loaded, context)];
 
-    context.resolvedPackages = [
-      {
-        name: context.source.packageName,
-        version: context.source.version || loaded.version,
-        pkg: {
-          metadata: loaded.metadata,
-          files: [],
-          _format: (loaded.metadata as any)?._format || context.source.pluginMetadata?.format
-        },
-        isRoot: true,
-        source: 'path',
-        contentRoot: context.source.contentRoot || loaded.contentRoot
-      } as any
-    ];
-    
     if (loaded.pluginMetadata?.pluginType === 'marketplace') {
       return this.createMarketplaceResult(context);
     }
-    
+
+    // Apply convenience filters (--agents, --skills, etc.) - same as git/registry strategies
+    if (options.agents?.length || options.skills?.length || options.rules?.length || options.commands?.length) {
+      const convenienceOptions = {
+        agents: options.agents,
+        skills: options.skills,
+        rules: options.rules,
+        commands: options.commands
+      };
+      const resourceContexts = await runConvenienceFilterInstall(context, loaded, convenienceOptions);
+      return this.createMultiResourceResult(context, resourceContexts);
+    }
+
     return this.createNormalResult(context);
   }
 }

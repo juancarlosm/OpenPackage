@@ -118,7 +118,7 @@ export function displayInstallationResults(data: InstallReportData, output: Outp
     }
     summaryText += ' with 0 installs';
     output.success(`${summaryText}`);
-    output.info(`💡 No files matched. The package directory may be empty or filters excluded all content.`);
+    output.info(`  No files matched. The package directory may be empty or filters excluded all content.`);
     if (isDependencyInstall) {
       output.info(`   The dependency has been recorded in your manifest.`);
     }

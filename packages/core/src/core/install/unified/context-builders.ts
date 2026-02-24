@@ -439,6 +439,23 @@ function buildResourceMatchedPattern(
 }
 
 /**
+ * Prepare resource contexts for multi-resource pipeline: set _skipDependencyResolution
+ * and localPath for path sources so the pipeline skips reload and uses the correct root.
+ */
+export function prepareResourceContextsForMultiInstall(
+  contexts: InstallationContext[],
+  repoRoot: string
+): InstallationContext[] {
+  return contexts.map(rc => {
+    rc._skipDependencyResolution = true;
+    if (rc.source.type === 'path') {
+      rc.source.localPath = repoRoot;
+    }
+    return rc;
+  });
+}
+
+/**
  * Build multiple contexts for resource-centric installations.
  * For single-file installs from plugins, scopes the package name to the resource path
  * so the workspace index key is e.g. gh@user/repo/plugin/agents/foo.md rather than the plugin root.

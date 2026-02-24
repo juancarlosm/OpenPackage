@@ -374,7 +374,6 @@ export class InstallOrchestrator {
         return { success: true, data: { installed: 0, skipped: 0 } };
       }
       
-      out.info(`Marketplace: ${marketplace.name}`);
       out.message(`Installing ${valid.length} plugin${valid.length === 1 ? '' : 's'}: ${valid.join(', ')}`);
       
       // Install each plugin in full mode (non-interactive)
