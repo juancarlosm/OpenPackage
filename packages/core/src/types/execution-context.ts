@@ -84,7 +84,7 @@ export interface ExecutionContext {
   /**
    * Rich output port for use during prompt-driven phases.
    * When prompts fire, surrounding output should match their visual style.
-   * Use `withRichOutput()` to temporarily swap to these ports.
+   * Use `withPromptOutput()` to temporarily swap to these ports.
    * Set by the CLI (or other UI adapter) at context creation; undefined when not available.
    */
   richOutput?: OutputPort;

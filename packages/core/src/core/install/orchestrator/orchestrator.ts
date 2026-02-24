@@ -15,7 +15,7 @@ import {
 import { createInteractionPolicy, PromptTier } from '../../interaction-policy.js';
 import type { InteractionPolicy } from '../../interaction-policy.js';
 import type { OutputPort } from '../../ports/output.js';
-import { resolveOutput, resolvePrompt, withRichOutput } from '../../ports/resolve.js';
+import { resolveOutput, resolvePrompt, withPromptOutput } from '../../ports/resolve.js';
 import {
   parseMarketplace,
   promptPluginSelection,
@@ -140,17 +140,15 @@ export class InstallOrchestrator {
 
     switch (specialHandling) {
       case 'marketplace':
-        // Marketplace flow uses prompts (plugin selection, install mode).
-        // Upgrade to rich output so prompt rendering is visually consistent.
-        return withRichOutput(execContext, () =>
-          this.handleMarketplace(result, options, execContext, policy, resolveOutput(execContext))
-        );
+        // Marketplace flow may use prompts (plugin selection, install mode).
+        // Prompt-scoped output upgrades are handled within the marketplace
+        // handler around actual prompt invocations.
+        return this.handleMarketplace(result, options, execContext, policy, out);
       
       case 'ambiguous':
         // Ambiguity resolution may prompt for base selection.
-        return withRichOutput(execContext, () =>
-          this.handleAmbiguous(result, options, execContext, policy)
-        );
+        // Prompt-scoped output upgrades are handled at the prompt call site.
+        return this.handleAmbiguous(result, options, execContext, policy);
       
       case 'multi-resource':
         return this.handleMultiResource(result, options, execContext, policy);
@@ -170,7 +168,7 @@ export class InstallOrchestrator {
         // Normal pipeline flow: resolve platforms once if not set
         if (context.platforms.length === 0) {
           // Platform resolution may prompt if no platforms are auto-detected.
-          context.platforms = await withRichOutput(execContext, () =>
+          context.platforms = await withPromptOutput(execContext, () =>
             resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) })
           );
         }
@@ -265,7 +263,7 @@ export class InstallOrchestrator {
     const platforms =
       context.platforms.length > 0
         ? context.platforms
-        : await withRichOutput(execContext, () =>
+        : await withPromptOutput(execContext, () =>
             resolvePlatforms(context.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false, output: resolveOutput(execContext), prompt: resolvePrompt(execContext) })
           );
 
@@ -679,7 +677,9 @@ export class InstallOrchestrator {
       selectedMatch = handleAmbiguityNonInteractive(matches, resolveOutput(execContext));
     } else {
       const resourcePath = context.source.resourcePath || context.source.gitPath || '';
-      selectedMatch = await promptBaseSelection(resourcePath, matches, repoRoot, resolveOutput(execContext), resolvePrompt(execContext));
+      selectedMatch = await withPromptOutput(execContext, () =>
+        promptBaseSelection(resourcePath, matches, repoRoot, resolveOutput(execContext), resolvePrompt(execContext))
+      );
     }
     
     // Update context with selection
@@ -730,7 +730,7 @@ export class InstallOrchestrator {
       (workspaceContext?.platforms.length === 0);
 
     if (needsPlatforms) {
-      const resolvedPlatforms = await withRichOutput(execContext, () =>
+      const resolvedPlatforms = await withPromptOutput(execContext, () =>
         resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) })
       );
       for (const ctx of dependencyContexts) {
@@ -837,7 +837,7 @@ export class InstallOrchestrator {
     const policy = execContext.interactionPolicy;
     let platforms = workspaceContext?.platforms?.length
       ? workspaceContext.platforms
-      : await withRichOutput(execContext, () =>
+      : await withPromptOutput(execContext, () =>
           resolvePlatforms(execContext.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false, output: resolveOutput(execContext), prompt: resolvePrompt(execContext) })
         );
 

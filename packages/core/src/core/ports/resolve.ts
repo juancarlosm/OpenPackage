@@ -43,23 +43,21 @@ export function resolveProgress(ctx?: ExecutionContext | { progress?: ProgressPo
 }
 
 /**
- * Run a callback with rich output/progress ports temporarily active on
- * the ExecutionContext. Restores the original ports after the callback
- * completes (or throws).
+ * Execute a prompt-bearing callback with rich output/progress temporarily
+ * active on the ExecutionContext. Restores the original ports afterward.
  *
- * Use this around prompt-driven phases (marketplace selection, platform
- * detection, ambiguity resolution, conflict confirmation) so that
- * prompt rendering is visually consistent with surrounding output.
+ * This MUST only be used to wrap code that actually invokes prompts
+ * (and any immediately adjacent output that should match the prompt style).
+ * It must NOT be used to wrap entire handlers or pipelines.
  *
  * If rich ports are not available (e.g. non-CLI environment or already
  * using rich output), the callback runs with the existing ports unchanged.
  */
-export async function withRichOutput<T>(
+export async function withPromptOutput<T>(
   ctx: ExecutionContext,
   fn: () => Promise<T>
 ): Promise<T> {
   if (!ctx.richOutput) {
-    // No rich ports available -- run with current ports unchanged
     return fn();
   }
   const prev = { output: ctx.output, progress: ctx.progress };

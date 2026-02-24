@@ -15,7 +15,7 @@ import { UserCancellationError } from '../../utils/errors.js';
 import { cleanupEmptyParents } from '../../utils/cleanup-empty-parents.js';
 import { resolveSourceOperationArguments } from '../../utils/source-operation-arguments.js';
 import { buildWorkspacePackageContext } from '../workspace-package-context.js';
-import { withRichOutput } from '../ports/resolve.js';
+import { withPromptOutput } from '../ports/resolve.js';
 
 export interface RemoveFromSourceOptions {
   force?: boolean;
@@ -167,13 +167,13 @@ export async function runRemoveFromSourcePipeline(
   });
 
   // Confirm removal with user (unless --force or --dry-run).
-  // Use withRichOutput so the confirmation prompt uses the interactive
+  // Use withPromptOutput so the confirmation prompt uses the interactive
   // (clack) output adapter when available on TTY.
   const execCtx = options.execContext;
   const doConfirm = () => confirmRemoval(resolvedName, entries, options);
   try {
     if (execCtx) {
-      await withRichOutput(execCtx, doConfirm);
+      await withPromptOutput(execCtx, doConfirm);
     } else {
       await doConfirm();
     }

@@ -9,7 +9,7 @@ import { detectPluginType, detectPluginWithMarketplace, validatePluginManifest }
 import type { CommandResult, InstallOptions, ExecutionContext } from '../../types/index.js';
 import type { OutputPort } from '../ports/output.js';
 import type { PromptPort } from '../ports/prompt.js';
-import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
+import { resolveOutput, resolvePrompt, withPromptOutput } from '../ports/resolve.js';
 import { runMultiContextPipeline } from './unified/multi-context-pipeline.js';
 import { getLoaderForSource } from './sources/loader-factory.js';
 import { applyBaseDetection } from './preprocessing/base-resolver.js';
@@ -158,24 +158,31 @@ export async function promptPluginSelection(
 ): Promise<string> {
   const out = resolveOutput(execContext);
   const prompt = resolvePrompt(execContext);
-  // Display marketplace description (header is shown by the spinner stop in orchestrator)
-  if (marketplace.description) {
-    out.message(marketplace.description);
-  }
 
-  const choices = marketplace.plugins
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(plugin => ({
-      title: plugin.name,
-      value: plugin.name,
-      description: plugin.description || ''
-    }));
-  
-  try {
-    const selectedPlugin = await prompt.select(
+  const doPrompt = async () => {
+    // Display marketplace description (header is shown by the spinner stop in orchestrator)
+    if (marketplace.description) {
+      out.message(marketplace.description);
+    }
+
+    const choices = marketplace.plugins
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(plugin => ({
+        title: plugin.name,
+        value: plugin.name,
+        description: plugin.description || ''
+      }));
+    
+    return prompt.select(
       'Select a plugin to install:',
       choices
     );
+  };
+
+  try {
+    const selectedPlugin = execContext
+      ? await withPromptOutput(execContext, doPrompt)
+      : await doPrompt();
     
     logger.info('User selected plugin', { selected: selectedPlugin });
     return selectedPlugin as string;
@@ -201,22 +208,27 @@ export type InstallMode = 'full' | 'partial';
  */
 export async function promptInstallMode(pluginName: string, execContext?: ExecutionContext): Promise<InstallMode | ''> {
   const prompt = resolvePrompt(execContext);
+
+  const doPrompt = () => prompt.select(
+    `How would you like to install ${pluginName}?`,
+    [
+      { 
+        title: 'Install full plugin', 
+        value: 'full' as const,
+        description: 'Install all resources from this plugin' 
+      },
+      { 
+        title: 'Select individual resources', 
+        value: 'partial' as const,
+        description: 'Choose specific agents, skills, commands, etc.' 
+      }
+    ]
+  );
+
   try {
-    const mode = await prompt.select(
-      `How would you like to install ${pluginName}?`,
-      [
-        { 
-          title: 'Install full plugin', 
-          value: 'full' as const,
-          description: 'Install all resources from this plugin' 
-        },
-        { 
-          title: 'Select individual resources', 
-          value: 'partial' as const,
-          description: 'Choose specific agents, skills, commands, etc.' 
-        }
-      ]
-    );
+    const mode = execContext
+      ? await withPromptOutput(execContext, doPrompt)
+      : await doPrompt();
     
     logger.info('User selected install mode', { mode });
     return mode as InstallMode;
@@ -274,12 +286,15 @@ async function installPluginPartial(
   }
   
   // Prompt for resource selection
-  const selected: SelectedResource[] = await promptResourceSelection(
-    discovery,
-    context.source.packageName || pluginEntry.name,
-    context.source.version,
-    resolveOutput(context.execution),
-    resolvePrompt(context.execution)
+  const selected: SelectedResource[] = await withPromptOutput(
+    context.execution,
+    () => promptResourceSelection(
+      discovery,
+      context.source.packageName || pluginEntry.name,
+      context.source.version,
+      resolveOutput(context.execution),
+      resolvePrompt(context.execution)
+    )
   );
   
   if (selected.length === 0) {
