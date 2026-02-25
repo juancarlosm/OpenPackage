@@ -1,4 +1,8 @@
 /**
+ * @deprecated Use the wave-based BFS resolver at `../wave-resolver/index.js` instead.
+ * This module is retained for backward compatibility but all callers have been
+ * migrated to `resolveWave()` + `buildInstallContexts()`.
+ *
  * Dependency resolution executor.
  * Orchestrates discovery, loading, planning, and execution.
  */
@@ -21,6 +25,9 @@ import type {
 } from './types.js';
 import { logger } from '../../../utils/logger.js';
 
+/**
+ * @deprecated Use `resolveWave()` from `../wave-resolver/index.js` instead.
+ */
 export class DependencyResolutionExecutor {
   private graphBuilder: DependencyGraphBuilder;
   private packageLoader: PackageLoader;

@@ -120,7 +120,7 @@ export function displayInstallationResults(data: InstallReportData, output: Outp
     output.success(`${summaryText}`);
     output.info(`  No files matched. The package directory may be empty or filters excluded all content.`);
     if (isDependencyInstall) {
-      output.info(`   The dependency has been recorded in your manifest.`);
+      output.info(`  The dependency has been recorded in your manifest.`);
     }
     return;
   }

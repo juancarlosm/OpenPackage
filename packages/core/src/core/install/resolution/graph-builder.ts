@@ -1,4 +1,7 @@
 /**
+ * @deprecated Use the wave-based BFS resolver at `../wave-resolver/wave-engine.js` instead.
+ * This module is retained for backward compatibility.
+ *
  * Dependency graph builder.
  * Phase 1: Recursively discovers all dependencies and builds the graph without installing.
  */
@@ -73,6 +76,9 @@ function resolveSourceFromDeclaration(
   };
 }
 
+/**
+ * @deprecated Use `resolveWave()` from `../wave-resolver/wave-engine.js` instead.
+ */
 export class DependencyGraphBuilder {
   private nodes: Map<string, ResolutionDependencyNode> = new Map();
   private visiting: Set<string> = new Set();

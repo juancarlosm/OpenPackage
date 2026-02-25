@@ -81,6 +81,10 @@ export async function setupInstallCommand(args: any[]): Promise<void> {
     if (result.error === 'Package not found') {
       return; // Already displayed message
     }
+    if (result.error?.endsWith('failed to install')) {
+      process.exitCode = 1;
+      return; // Already displayed detailed failure info
+    }
     throw new Error(result.error || 'Installation operation failed');
   }
 }

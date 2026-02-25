@@ -1,4 +1,7 @@
 /**
+ * @deprecated Use `buildInstallContexts()` from `../wave-resolver/context-builder.js` instead.
+ * This module is retained for backward compatibility.
+ *
  * Installation planner: builds InstallationContexts from loaded graph nodes.
  * Phase 3: Creates installation plan in topological order.
  */

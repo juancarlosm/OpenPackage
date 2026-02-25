@@ -31,13 +31,15 @@ import { assertTargetDirOutsideMetadata, validateResolutionFlags } from '../vali
 import { runUnifiedInstallPipeline } from '../unified/pipeline.js';
 import { runMultiContextPipeline } from '../unified/multi-context-pipeline.js';
 import { createAllStrategies } from './strategies/index.js';
-import { DependencyResolutionExecutor } from '../resolution/executor.js';
+import { resolveWave, updateWorkspaceIndex } from '../wave-resolver/index.js';
+import type { WaveResolverOptions, WaveVersionConflict, WaveNode } from '../wave-resolver/types.js';
 import { getManifestPathAtContentRoot } from '../resolution/manifest-reader.js';
 import { handleListSelection } from '../list-handler.js';
 import { discoverResources } from '../resource-discoverer.js';
 import { promptResourceSelection } from '../resource-selection-menu.js';
 import { buildResourceInstallContexts } from '../unified/context-builders.js';
 import { logger } from '../../../utils/logger.js';
+import { getInstalledPackageVersion } from '../../openpackage.js';
 import type { ResourceInstallationSpec } from '../convenience-matchers.js';
 import type { SelectedResource, ResourceDiscoveryResult, DiscoveredResource, ResourceType } from '../resource-types.js';
 import { checkSubsumption, resolveSubsumption } from './subsumption-resolver.js';
@@ -179,19 +181,45 @@ export class InstallOrchestrator {
           // Platform resolution may prompt if no platforms are auto-detected.
           context.platforms = await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy.canPrompt(PromptTier.Required), output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
         }
+
+        // When _skipDependencyInstall is set, we are being called from the wave
+        // resolver loop. Just run the pipeline for this single package -- do not
+        // recurse into dependency installation again.
+        if (options._skipDependencyInstall) {
+          context._skipDependencyResolution = true;
+          return runUnifiedInstallPipeline(context);
+        }
+
         // For path/git sources with manifests, install root first (updates manifest),
-        // then run executor for dependencies only (with skipManifestUpdate)
+        // then run wave resolver for dependencies only (with skipManifestUpdate)
         const isPathOrGit = context.source.type === 'path' || context.source.type === 'git';
         const contentRoot = context.source.contentRoot;
         const rootManifestPath =
           isPathOrGit && contentRoot ? await getManifestPathAtContentRoot(contentRoot) : null;
         if (rootManifestPath) {
+          // Skip legacy dep resolution -- the wave resolver handles it
+          context._skipDependencyResolution = true;
           // Install root package first (this updates the workspace manifest)
           const rootResult = await runUnifiedInstallPipeline(context);
-          // Then install dependencies via executor (skipManifestUpdate for deps)
+          // Then install dependencies via wave resolver (skipManifestUpdate for deps)
           return this.installDependenciesOnly(rootManifestPath, rootResult, context, options, execContext);
         }
-        return runUnifiedInstallPipeline(context);
+
+        // Run unified pipeline (handles load, resolve metadata, convert, conflicts, execute, manifest)
+        // Skip legacy dep resolution -- the orchestrator handles deps via the wave resolver below
+        context._skipDependencyResolution = true;
+        const pipelineResult = await runUnifiedInstallPipeline(context);
+
+        // After installing a registry package, check if it has a manifest with
+        // dependencies that need recursive installation.
+        if (context.source.type === 'registry' && context.source.contentRoot) {
+          const pkgManifestPath = await getManifestPathAtContentRoot(context.source.contentRoot);
+          if (pkgManifestPath) {
+            return this.installDependenciesOnly(pkgManifestPath, pipelineResult, context, options, execContext);
+          }
+        }
+
+        return pipelineResult;
       }
     }
   }
@@ -257,7 +285,9 @@ export class InstallOrchestrator {
 
   /**
    * Install dependencies only (after root package is already installed).
-   * The root package is installed separately via unified pipeline to ensure manifest is updated.
+   * Uses the wave-based BFS resolver to discover the dependency graph, then
+   * routes each dependency through this.execute() so every source type gets
+   * full strategy preprocessing (base detection, marketplace handling, etc.).
    */
   private async installDependenciesOnly(
     rootManifestPath: string,
@@ -267,53 +297,136 @@ export class InstallOrchestrator {
     execContext: ExecutionContext
   ): Promise<CommandResult> {
     const policy = execContext.interactionPolicy;
-    const platforms =
-      context.platforms.length > 0
-        ? context.platforms
-        : await resolvePlatforms(context.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false, output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
-
     const skipCache = options.resolutionMode === 'remote-primary';
-    
-    const executor = new DependencyResolutionExecutor(execContext, {
-      graphOptions: {
-        workspaceRoot: execContext.targetDir,
-        rootManifestPath,
-        includeRoot: false, // Root already installed, just deps
-        includeDev: true,
-        maxDepth: 10,
-        skipCache
-      },
-      loaderOptions: {
-        parallel: true,
-        cacheEnabled: !skipCache,
-        installOptions: { ...options, skipManifestUpdate: true }
-      },
-      plannerOptions: {
-        platforms,
-        installOptions: { ...options, skipManifestUpdate: true },
-        force: options.force ?? false
-      },
-      dryRun: options.dryRun ?? false,
-      failFast: false
-    });
 
-    const execResult = await executor.execute();
-    
+    // Build wave resolver options
+    const waveOptions: WaveResolverOptions = {
+      workspaceRoot: execContext.targetDir,
+      rootManifestPath,
+      includeRoot: false, // Root already installed, just deps
+      includeDev: true,
+      force: options.force ?? false,
+      skipCache,
+      resolutionMode: options.resolutionMode ?? 'default',
+      profile: options.profile,
+      apiKey: options.apiKey
+    };
+
+    // Set up interactive conflict handler if prompting is available
+    if (!options.force && policy?.canPrompt(PromptTier.ConflictResolution)) {
+      const p = execContext.prompt ?? resolvePrompt(execContext);
+      waveOptions.onConflict = async (conflict: WaveVersionConflict, versions: string[]) => {
+        const choices = versions.map(v => ({ title: v, value: v }));
+        const rangesStr = conflict.ranges.join(', ');
+        return p.select<string>(
+          `Select version of '${conflict.packageName}' (requested ranges: ${rangesStr}):`,
+          choices,
+          'Use arrow keys to navigate, Enter to select'
+        );
+      };
+    }
+
+    // Resolve dependency graph via wave BFS
+    const waveResult = await resolveWave(waveOptions);
+
+    // Check for unresolved conflicts
+    if (waveResult.versionSolution.conflicts.length > 0 && !options.force) {
+      const conflictNames = waveResult.versionSolution.conflicts.map(c => c.packageName).join(', ');
+      return {
+        success: false,
+        error: `Version conflicts detected for: ${conflictNames}`,
+        data: { packageName: context.source.packageName, installed: 0, skipped: 0 },
+        warnings: waveResult.graph.warnings
+      };
+    }
+
+    // Install each dependency by routing through the full orchestrator pipeline.
+    // This ensures every source type (git, path, registry) gets full strategy
+    // preprocessing -- base detection, marketplace handling, plugin transformation, etc.
+    const depOptions: NormalizedInstallOptions = {
+      ...options,
+      skipManifestUpdate: true,
+      _skipDependencyInstall: true // Prevent recursive dep resolution
+    };
+    const force = options.force ?? false;
+
+    let depInstalled = 0;
+    let depFailed = 0;
+    let depSkipped = 0;
+    const depResults: Array<{ id: string; success: boolean; error?: string }> = [];
+
+    for (const nodeId of waveResult.graph.installOrder) {
+      const node = waveResult.graph.nodes.get(nodeId);
+      if (!node) continue;
+
+      // Skip marketplace nodes
+      if (node.isMarketplace) {
+        depSkipped++;
+        continue;
+      }
+
+      const packageName = node.source.packageName ?? node.metadata?.name ?? node.displayName;
+
+      // Check already-installed (unless force)
+      if (!force) {
+        const installedVersion = await getInstalledPackageVersion(packageName, execContext.targetDir);
+        if (installedVersion) {
+          depSkipped++;
+          continue;
+        }
+      }
+
+      // Reconstruct install input from the node's declaration
+      const input = nodeToInstallInput(node);
+      if (!input) {
+        logger.warn(`Could not reconstruct install input for ${packageName}, skipping`);
+        depSkipped++;
+        continue;
+      }
+
+      try {
+        const result = await this.execute(input, depOptions, execContext);
+        if (result.success) {
+          depInstalled++;
+          depResults.push({ id: packageName, success: true });
+        } else {
+          depFailed++;
+          depResults.push({ id: packageName, success: false, error: result.error });
+        }
+      } catch (error) {
+        depFailed++;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        logger.warn(`Failed to install dependency ${packageName}: ${errMsg}`);
+        depResults.push({ id: packageName, success: false, error: errMsg });
+      }
+    }
+
+    // Update workspace index with dependency information
+    await updateWorkspaceIndex(execContext.targetDir, waveResult.graph);
+
     // Combine root result with dependency results
     const rootInstalled = (rootResult.data as { installed?: number })?.installed ?? 0;
-    const depInstalled = execResult.summary?.installed ?? 0;
-    const depSkipped = (execResult.summary?.skipped ?? 0) + (execResult.summary?.failed ?? 0);
+
+    if (depFailed > 0) {
+      const out = resolveOutput(execContext);
+      const failedDeps = depResults.filter(r => !r.success);
+      const failedLines = failedDeps.map(r => {
+        const reason = r.error ?? 'unknown error';
+        return `  ${r.id}: ${reason}`;
+      });
+      out.warn(`${depFailed} dependencies failed to install:\n${failedLines.join('\n')}`);
+    }
 
     return {
-      success: rootResult.success && execResult.success,
+      success: rootResult.success && depFailed === 0,
       data: {
         packageName: context.source.packageName,
         installed: rootInstalled + depInstalled,
         skipped: depSkipped,
-        results: execResult.results
+        results: depResults
       },
-      error: execResult.error ?? rootResult.error,
-      warnings: execResult.warnings ?? rootResult.warnings
+      error: depFailed > 0 ? `${depFailed} dependencies failed to install` : rootResult.error,
+      warnings: waveResult.graph.warnings.length > 0 ? waveResult.graph.warnings : rootResult.warnings
     };
   }
   
@@ -715,7 +828,7 @@ export class InstallOrchestrator {
   
   /**
    * Handle multi-resource installation (bulk install or convenience filters).
-   * For bulk install (opkg i), uses DependencyResolutionExecutor for recursive dependency resolution.
+   * For bulk install (opkg i), uses wave-based BFS resolver for recursive dependency resolution.
    */
   private async handleMultiResource(
     result: PreprocessResult,
@@ -817,7 +930,9 @@ export class InstallOrchestrator {
   }
 
   /**
-   * Run bulk install using recursive dependency resolution (graph + pipeline per package).
+   * Run bulk install using wave-based BFS dependency resolution.
+   * Resolves the full dependency graph from workspace manifest, then installs
+   * each package through this.execute() for full strategy preprocessing.
    */
   private async runRecursiveBulkInstall(
     options: NormalizedInstallOptions,
@@ -833,51 +948,130 @@ export class InstallOrchestrator {
       }
     }
 
-    // Reuse platforms from workspace context when available (avoid duplicate prompt)
-    const policy = execContext.interactionPolicy;
-    let platforms = workspaceContext?.platforms?.length
-      ? workspaceContext.platforms
-      : await resolvePlatforms(execContext.targetDir, options.platforms, { interactive: policy?.canPrompt(PromptTier.Required) ?? false, output: resolveOutput(execContext), prompt: resolvePrompt(execContext) });
-
     const skipCache = options.resolutionMode === 'remote-primary';
-    
-    const executor = new DependencyResolutionExecutor(execContext, {
-      graphOptions: {
-        workspaceRoot: execContext.targetDir,
-        includeDev: true,
-        maxDepth: 10,
-        skipCache
-      },
-      loaderOptions: {
-        parallel: true,
-        cacheEnabled: !skipCache,
-        // Recursive dependency installs should not modify workspace openpackage.yml
-        installOptions: { ...options, skipManifestUpdate: true }
-      },
-      plannerOptions: {
-        platforms,
-        // Recursive dependency installs should not modify workspace openpackage.yml
-        installOptions: { ...options, skipManifestUpdate: true },
-        force: options.force ?? false
-      },
-      dryRun: options.dryRun ?? false,
-      failFast: false
-    });
 
-    const execResult = await executor.execute();
+    // Build wave resolver options
+    const waveOptions: WaveResolverOptions = {
+      workspaceRoot: execContext.targetDir,
+      includeDev: true,
+      force: options.force ?? false,
+      skipCache,
+      resolutionMode: options.resolutionMode ?? 'default',
+      profile: options.profile,
+      apiKey: options.apiKey
+    };
 
-    const summary = execResult.summary;
-    if (summary) {
-      out.success(`Installation complete: ${summary.installed} installed${summary.failed > 0 ? `, ${summary.failed} failed` : ''}${summary.skipped > 0 ? `, ${summary.skipped} skipped` : ''}`);
+    // Set up interactive conflict handler if prompting is available
+    const policy = execContext.interactionPolicy;
+    if (!options.force && policy?.canPrompt(PromptTier.ConflictResolution)) {
+      const p = execContext.prompt ?? resolvePrompt(execContext);
+      waveOptions.onConflict = async (conflict: WaveVersionConflict, versions: string[]) => {
+        const choices = versions.map(v => ({ title: v, value: v }));
+        const rangesStr = conflict.ranges.join(', ');
+        return p.select<string>(
+          `Select version of '${conflict.packageName}' (requested ranges: ${rangesStr}):`,
+          choices,
+          'Use arrow keys to navigate, Enter to select'
+        );
+      };
     }
 
+    // Resolve dependency graph via wave BFS
+    const waveResult = await resolveWave(waveOptions);
+
+    // Check for unresolved conflicts
+    if (waveResult.versionSolution.conflicts.length > 0 && !options.force) {
+      for (const conflict of waveResult.versionSolution.conflicts) {
+        const ranges = conflict.ranges.join(', ');
+        const requesters = conflict.requestedBy.join(', ');
+        logger.error(`Version conflict for ${conflict.packageName}: ranges [${ranges}] requested by [${requesters}]`);
+      }
+      return {
+        success: false,
+        error: `Version conflicts detected for: ${waveResult.versionSolution.conflicts.map(c => c.packageName).join(', ')}`,
+        data: { installed: 0, skipped: 0 },
+        warnings: waveResult.graph.warnings
+      };
+    }
+
+    // Install each dependency by routing through the full orchestrator pipeline.
+    const depOptions: NormalizedInstallOptions = {
+      ...options,
+      // Recursive dependency installs should not modify workspace openpackage.yml
+      skipManifestUpdate: true,
+      _skipDependencyInstall: true // Prevent recursive dep resolution
+    };
+    const force = options.force ?? false;
+
+    let installed = 0;
+    let failed = 0;
+    let skipped = 0;
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+
+    for (const nodeId of waveResult.graph.installOrder) {
+      const node = waveResult.graph.nodes.get(nodeId);
+      if (!node) continue;
+
+      // Skip marketplace nodes
+      if (node.isMarketplace) {
+        skipped++;
+        continue;
+      }
+
+      const packageName = node.source.packageName ?? node.metadata?.name ?? node.displayName;
+
+      // Check already-installed (unless force)
+      if (!force) {
+        const installedVersion = await getInstalledPackageVersion(packageName, execContext.targetDir);
+        if (installedVersion) {
+          skipped++;
+          continue;
+        }
+      }
+
+      // Reconstruct install input from the node's declaration
+      const input = nodeToInstallInput(node);
+      if (!input) {
+        logger.warn(`Could not reconstruct install input for ${packageName}, skipping`);
+        skipped++;
+        continue;
+      }
+
+      try {
+        const result = await this.execute(input, depOptions, execContext);
+        if (result.success) {
+          installed++;
+          results.push({ id: packageName, success: true });
+        } else {
+          failed++;
+          results.push({ id: packageName, success: false, error: result.error });
+        }
+      } catch (error) {
+        failed++;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        logger.warn(`Failed to install ${packageName}: ${errMsg}`);
+        results.push({ id: packageName, success: false, error: errMsg });
+      }
+    }
+
+    // Update workspace index with dependency information
+    await updateWorkspaceIndex(execContext.targetDir, waveResult.graph);
+
+    if (failed > 0) {
+      const failedItems = results.filter((r: { success: boolean }) => !r.success);
+      const failedLines = failedItems.map((r: { id: string; error?: string }) => {
+        const reason = r.error ?? 'unknown error';
+        return `  ${r.id}: ${reason}`;
+      });
+      out.warn(`${failed} packages failed to install:\n${failedLines.join('\n')}`);
+    }
+    out.success(`Installation complete: ${installed} installed${failed > 0 ? `, ${failed} failed` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+
     return {
-      success: execResult.success,
-      data: summary
-        ? { installed: summary.installed, skipped: summary.failed + summary.skipped, results: execResult.results }
-        : { installed: 0, skipped: 0 },
-      error: execResult.error,
-      warnings: execResult.warnings
+      success: failed === 0,
+      data: { installed, skipped: failed + skipped, results },
+      error: failed > 0 ? `${failed} packages failed to install` : undefined,
+      warnings: waveResult.graph.warnings
     };
   }
   
@@ -909,6 +1103,44 @@ export class InstallOrchestrator {
       error: result.success ? undefined : `${failedCount} resource${failedCount === 1 ? '' : 's'} failed to install`
     };
   }
+}
+
+/**
+ * Reconstruct an install input string from a WaveNode's declaration.
+ * This produces the same format that classifyInput() expects:
+ *   - Git deps: the declaration name (e.g. 'gh@owner/repo/path/to/resource')
+ *   - Path deps: the absolute filesystem path
+ *   - Registry deps: 'name@version' or just 'name'
+ */
+function nodeToInstallInput(node: WaveNode): string | null {
+  const decl = node.declarations[0];
+  if (!decl) return null;
+
+  if (node.sourceType === 'git') {
+    // Git deps: the declaration name is already in gh@owner/repo/path form.
+    // If not (e.g. bare URL deps), reconstruct from url + path.
+    if (decl.name && decl.name.startsWith('gh@')) {
+      return decl.name;
+    }
+    // Fallback: reconstruct from url
+    if (decl.url) {
+      let input = decl.url;
+      if (decl.ref) input += `#${decl.ref}`;
+      return input;
+    }
+    return decl.name || null;
+  }
+
+  if (node.sourceType === 'path') {
+    // Path deps: use the absolute path from the resolved source
+    return node.source.absolutePath ?? node.source.contentRoot ?? decl.path ?? null;
+  }
+
+  // Registry deps: name with optional version
+  const name = decl.name;
+  if (!name) return null;
+  const version = node.resolvedVersion ?? decl.version;
+  return version && version !== '*' ? `${name}@${version}` : name;
 }
 
 /**

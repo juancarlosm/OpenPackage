@@ -16,6 +16,8 @@ export interface NormalizedInstallOptions extends InstallOptions {
   rules?: string[];
   commands?: string[];
   interactive?: boolean;
+  /** Internal: skip recursive dependency installation (set by wave resolver loop to prevent re-entry) */
+  _skipDependencyInstall?: boolean;
 }
 
 /**

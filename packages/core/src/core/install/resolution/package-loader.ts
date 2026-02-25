@@ -1,4 +1,7 @@
 /**
+ * @deprecated The wave resolver fetches metadata inline; this loader is no longer needed.
+ * See `../wave-resolver/fetcher.js` for the replacement.
+ *
  * Package loader for dependency graph nodes.
  * Phase 2: Loads package content using existing source loaders.
  */

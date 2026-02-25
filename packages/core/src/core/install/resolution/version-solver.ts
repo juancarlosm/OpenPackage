@@ -1,4 +1,7 @@
 /**
+ * @deprecated Use `WaveVersionSolver` from `../wave-resolver/version-solver.js` instead.
+ * This module is retained for backward compatibility.
+ *
  * Semver constraint resolution for registry packages in the dependency graph.
  * Finds compatible versions across multiple declarations with different constraints.
  */

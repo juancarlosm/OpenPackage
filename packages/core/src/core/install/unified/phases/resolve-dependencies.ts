@@ -115,7 +115,13 @@ async function resolveDependenciesForInstall(
 }
 
 /**
- * Resolve dependencies phase
+ * Resolve dependencies phase.
+ *
+ * Populates ctx.resolvedPackages with transitive dependency metadata
+ * for use by downstream pipeline phases (conflict detection, reporting).
+ *
+ * Actual recursive dependency *installation* is handled at the orchestrator
+ * level via the wave-based BFS resolver (installDependenciesOnly).
  */
 export async function resolveDependenciesPhase(ctx: InstallationContext): Promise<void> {
   try {
