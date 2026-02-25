@@ -36,9 +36,9 @@ export async function loadPackagePhase(ctx: InstallationContext, output?: Output
     // Load package
     const loaded = await loader.load(ctx.source, ctx.options, ctx.execution);
     
-    // Stop spinner with the resolved package identity
-    const version = loaded.version ? `@${loaded.version}` : '';
-    spinner.stop(`Installed ${loaded.packageName}${version}`);
+    // Stop spinner silently; the report phase will display the "Installed <name>@<version>" header
+    // so that both root packages and pre-loaded dependencies get consistent output.
+    spinner.stop();
 
     // Update context
     ctx.source.packageName = loaded.packageName;

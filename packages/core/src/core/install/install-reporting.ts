@@ -126,9 +126,13 @@ export function displayInstallationResults(data: InstallReportData, output: Outp
   }
 
   // ── Main success header ───────────────────────────────────────────────
-  // The load-package spinner always displays "Installed <name>@<version>" on completion,
-  // so we skip the duplicate header in both rich (Clack) and plain (console) modes.
-  // (Plain mode's spinner.stop now includes the checkmark for consistency.)
+  {
+    let headerText = `Installed ${packageName}`;
+    if (mainPackage?.version) {
+      headerText += `@${mainPackage.version}`;
+    }
+    output.success(headerText);
+  }
 
   // ── Dependency packages ───────────────────────────────────────────────
   const dependencyPackages = resolvedPackages.filter(f => !f.isRoot);
