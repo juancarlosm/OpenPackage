@@ -57,8 +57,27 @@ export async function loadPackageFromDirectory(
     return pkg;
   }
   
-  // If it's a marketplace, we need to handle plugin selection (done upstream in install command)
+  // If it's a marketplace, we need to handle plugin selection (done upstream in install command).
+  // However, when a resourcePath is set, the user explicitly requested a specific resource within
+  // the marketplace — treat it as a marketplace-defined plugin rather than blocking with an error.
+  // This provides defense-in-depth in case upstream content root resolution has an edge case.
   if (pluginDetection.isPlugin && pluginDetection.type === 'marketplace') {
+    if (context?.resourcePath) {
+      logger.info('Marketplace directory loaded with explicit resourcePath, treating as marketplace-defined plugin', {
+        dirPath,
+        resourcePath: context.resourcePath
+      });
+      const syntheticEntry: MarketplacePluginEntry = {
+        strict: false,
+        name: context?.packageName ?? basename(dirPath),
+        source: '.'
+      };
+      const { package: pkg } = await transformPluginToPackage(dirPath, {
+        ...context,
+        marketplaceEntry: syntheticEntry
+      });
+      return pkg;
+    }
     throw new ValidationError(
       `Directory '${dirPath}' is a Claude Code plugin marketplace. ` +
       `Marketplace installation requires plugin selection and should be handled by the install command.`

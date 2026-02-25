@@ -8,8 +8,8 @@ import { detectPluginType } from '../plugin-detector.js';
 import { detectBase } from '../base-detector.js';
 import { getPlatformsState } from '../../../core/platforms.js';
 import { logger } from '../../../utils/logger.js';
-import { exists } from '../../../utils/fs.js';
-import { resolve, relative } from 'path';
+import { stat } from 'fs/promises';
+import { resolve, dirname } from 'path';
 
 /**
  * Loads packages from git repositories
@@ -109,16 +109,65 @@ export class GitSourceLoader implements PackageSourceLoader {
         };
       }
       
-      // Use detected base as content root if available
-      // When resourcePath is specified and detected base equals repo root (pattern matched at top level),
-      // use the resource subpath so we load from the user-requested directory (e.g. skills/skill-creator)
-      // instead of the marketplace root.
-      let contentRoot = detectedBaseInfo?.base || result.sourcePath;
-      if (source.resourcePath && contentRoot === result.repoPath) {
-        const subpathRoot = resolve(result.repoPath, source.resourcePath);
-        if (await exists(subpathRoot)) {
-          contentRoot = subpathRoot;
+      // Determine content root.
+      // When resourcePath is specified, it is authoritative — the user explicitly requested
+      // this specific resource. The detected base serves as validation/metadata, not resolution.
+      //
+      // Use detectedBase when it has a meaningful containment relationship with resourceRoot:
+      //   - detectedBase is at or within resourceRoot (base detection found something more
+      //     specific, e.g. a nested plugin.json)
+      //   - resourceRoot is within detectedBase AND detectedBase is NOT the repo root
+      //     (base detection found the plugin/package root that contains the resource file,
+      //     e.g. plugin.json at plugins/codebase-cleanup while resource is
+      //     plugins/codebase-cleanup/agents/code-reviewer.md)
+      //
+      // The repo root is explicitly excluded from the ancestor check because every
+      // resourceRoot trivially starts with repoPath + '/'. When detectedBase collapses
+      // to the repo root (e.g. marketplace or top-level pattern match), it does not
+      // represent a meaningful package base for the specific resource.
+      //
+      // Fall back to resourceRoot when detectedBase is unrelated, absent, or the repo root.
+      // If resourceRoot is a file, use its parent directory since a content root must be
+      // a directory.
+      let contentRoot: string;
+      if (source.resourcePath) {
+        const resourceRoot = resolve(result.repoPath, source.resourcePath);
+        const detectedBase = detectedBaseInfo?.base;
+        
+        if (detectedBase && (
+          detectedBase.startsWith(resourceRoot) ||   // detectedBase at or within resourceRoot
+          (                                          // resourceRoot within detectedBase (file-in-plugin)
+            detectedBase !== result.repoPath &&      //   but NOT the repo root (trivially matches everything)
+            resourceRoot.startsWith(detectedBase + '/')
+          )
+        )) {
+          // Detected base has a meaningful containment relationship — use it (always a directory).
+          contentRoot = detectedBase;
+        } else if (detectedBase && detectedBase !== result.repoPath) {
+          // Detected base is a meaningful directory that isn't the repo root.
+          // This handles cases where base detection found a valid package root
+          // that doesn't strictly contain resourceRoot but is still relevant.
+          contentRoot = detectedBase;
+        } else {
+          // Detected base is absent, is the repo root (marketplace/pattern collapsed),
+          // or has no relationship. Fall back to resourceRoot, using dirname if it's a file.
+          try {
+            const s = await stat(resourceRoot);
+            contentRoot = s.isDirectory() ? resourceRoot : dirname(resourceRoot);
+          } catch {
+            // If stat fails (path doesn't exist), use dirname as safe default
+            contentRoot = dirname(resourceRoot);
+          }
         }
+        
+        logger.info('Content root resolved via resourcePath', {
+          resourcePath: source.resourcePath,
+          detectedBase,
+          contentRoot
+        });
+      } else {
+        // No resourcePath: use detected base or sourcePath as before.
+        contentRoot = detectedBaseInfo?.base || result.sourcePath;
       }
       
       // Load individual package/plugin
@@ -133,6 +182,12 @@ export class GitSourceLoader implements PackageSourceLoader {
       // Detect plugin type at content root
       const pluginDetection = await detectPluginType(contentRoot);
       
+      // When resourcePath is set, the user explicitly requested a specific resource.
+      // Never propagate pluginType 'marketplace' in this case — it would trigger the
+      // marketplace selection prompt in applyBaseDetection, which is wrong because we
+      // already have enough information to install directly.
+      const suppressMarketplace = source.resourcePath && pluginDetection.type === 'marketplace';
+      
       const packageName = sourcePackage.metadata.name;
       const version = sourcePackage.metadata.version || '0.0.0';
       
@@ -143,7 +198,7 @@ export class GitSourceLoader implements PackageSourceLoader {
         version,
         contentRoot,
         source: 'git',
-        pluginMetadata: pluginDetection.isPlugin ? {
+        pluginMetadata: (pluginDetection.isPlugin && !suppressMarketplace) ? {
           isPlugin: true,
           pluginType: pluginDetection.type as any,  // Can be 'individual', 'marketplace', or 'marketplace-defined'
           manifestPath: pluginDetection.manifestPath

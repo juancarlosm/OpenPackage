@@ -9,6 +9,7 @@
  * 2. .claude-plugin/marketplace.json at resource root (triggers selection flow)
  * 3. .claude-plugin/plugin.json at resource root
  * 4. Pattern matching against platforms.jsonc (deepest match)
+ * 5. Resource-direct resolution (explicit resourcePath exists on disk)
  */
 
 import { join, resolve, dirname, relative, isAbsolute, sep } from 'path';
@@ -16,6 +17,7 @@ import { exists, readTextFile } from '../../utils/fs.js';
 import { extractAllFromPatterns, findDeepestMatch, type PatternMatch } from '../../utils/pattern-matcher.js';
 import { logger } from '../../utils/logger.js';
 import { FILE_PATTERNS, CLAUDE_PLUGIN_PATHS } from '../../constants/index.js';
+import { normalizePluginSource } from './plugin-sources.js';
 import { stat } from 'fs/promises';
 
 /**
@@ -30,12 +32,13 @@ export interface BaseDetectionResult {
   
   /** How the base was determined */
   matchType: 
-    | 'openpackage'    // Found openpackage.yml
-    | 'marketplace'    // Found marketplace.json (needs selection)
-    | 'plugin'         // Found plugin.json
-    | 'pattern'        // Matched from pattern
-    | 'ambiguous'      // Multiple patterns at same depth
-    | 'none';          // No match found
+    | 'openpackage'       // Found openpackage.yml
+    | 'marketplace'       // Found marketplace.json (needs selection)
+    | 'plugin'            // Found plugin.json
+    | 'pattern'           // Matched from pattern
+    | 'ambiguous'         // Multiple patterns at same depth
+    | 'resource-direct'   // Resolved directly from explicit resourcePath
+    | 'none';             // No match found
   
   /** For ambiguous cases, all possible matches */
   ambiguousMatches?: Array<{
@@ -132,6 +135,7 @@ export async function detectBase(
   // Marketplace-aware plugin base inference:
   // If this repo is a Claude marketplace AND the user provided a file/dir resource path within it,
   // try to resolve the plugin base from marketplace.json plugin entries (e.g. "./plugins/unit-testing").
+  // Handles both string sources ("./path") and object sources ({ source: 'github', ... }).
   if (marketplaceRoot && resourcePath && !isAbsolute(resourcePath)) {
     try {
       const raw = await readTextFile(marketplaceRoot.manifestPath);
@@ -144,7 +148,30 @@ export async function detectBase(
       let bestMatch: { rel: string; pluginName?: string } | null = null;
       for (const p of plugins) {
         const source = (p as any)?.source;
-        const relRaw = typeof source === 'string' ? source : undefined;
+        if (!source) continue;
+        
+        // Extract relative path from any source format (string or PluginSourceObject)
+        let relRaw: string | undefined;
+        if (typeof source === 'string') {
+          relRaw = source;
+        } else {
+          // Handle PluginSourceObject ({ source: 'github', ... } or { source: 'url', ... })
+          // These point to external repos and have an optional `path` field for subdirectory.
+          // For local marketplace inference, only the `path` field is meaningful as a relative
+          // location within the marketplace repo. If there's no `path`, this entry points to
+          // an external repo root and can't be matched against a local resourcePath.
+          try {
+            const normalized = normalizePluginSource(source, p?.name || 'unknown');
+            if (normalized.type === 'relative-path') {
+              relRaw = normalized.relativePath;
+            }
+            // Git-type sources (github/url) reference external repos, not local paths.
+            // Skip them for local marketplace base inference.
+          } catch {
+            // Invalid source spec; skip this entry.
+          }
+        }
+        
         if (!relRaw) continue;
         const rel = normalizeRel(relRaw);
         if (!rel) continue;
@@ -172,6 +199,32 @@ export async function detectBase(
   const patternResult = await detectBaseFromPatterns(resourcePath, repoRoot, platformsConfig);
   if (patternResult.matchType !== 'none') {
     return patternResult;
+  }
+
+  // Priority 5: Resource-direct resolution.
+  // When an explicit resourcePath was provided and all other detection methods failed or
+  // resolved to the repo root (marketplace fallback), resolve directly to the resource path.
+  // This ensures that "install this specific resource" always wins over "this is a marketplace."
+  // A base must always be a directory, so if resourcePath points to a file, use its parent.
+  if (resourcePath && !isAbsolute(resourcePath)) {
+    const directPath = resolve(repoRootResolved, resourcePath);
+    if (await exists(directPath)) {
+      let directBase: string;
+      try {
+        const s = await stat(directPath);
+        directBase = s.isDirectory() ? directPath : dirname(directPath);
+      } catch {
+        directBase = directPath;
+      }
+      logger.info('Base resolved directly from explicit resourcePath', {
+        resourcePath,
+        base: directBase
+      });
+      return {
+        base: directBase,
+        matchType: 'resource-direct'
+      };
+    }
   }
 
   // Fallback: if we discovered a marketplace root and nothing else matched, return marketplace.
