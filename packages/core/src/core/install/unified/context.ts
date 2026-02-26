@@ -5,6 +5,16 @@ import type { WorkspaceIndex } from '../../../types/workspace-index.js';
 import type { ConflictSummary } from '../operations/installation-executor.js';
 
 /**
+ * Describes the scope of files this install context covers.
+ * - 'full': All files in the package/plugin base directory are being installed.
+ * - 'subset': A filtered set of files (specific resources, e.g., --agents code-reviewer).
+ * 
+ * This is a first-class concept used by the conversion cache to isolate cache directories
+ * per scope, preventing contamination between full and subset installs.
+ */
+export type InstallScope = 'full' | 'subset';
+
+/**
  * Source information for package installation
  */
 export interface PackageSource {
@@ -136,6 +146,21 @@ export interface InstallationContext {
   
   /** Pattern that matched (for pattern-based detection) */
   matchedPattern?: string;
+
+  /**
+   * Explicit scope of this installation: 'full' (all files) or 'subset' (filtered).
+   * 
+   * Determined at context creation time based on how the install was initiated:
+   * - 'full': No resource filters, or matchedPattern is '**' (resource IS the base).
+   * - 'subset': Resource filters active (e.g., --agents code-reviewer), or matchedPattern
+   *   targets a specific file/directory within the package.
+   * 
+   * Used by the conversion cache to isolate cache directories per scope, preventing
+   * stale files from one scope contaminating another.
+   * 
+   * Defaults to 'full' when not explicitly set.
+   */
+  installScope?: InstallScope;
   
   /** Internal flag: Path scoping has been computed (prevents redundant computation) */
   _pathScopingPerformed?: boolean;
@@ -152,6 +177,18 @@ export interface InstallationContext {
    * to a full package, so the report phase can display them.
    */
   _replacedResources?: string[];
+
+  /**
+   * Temporary conversion directory to clean up after install completes.
+   * Only set for non-git-cache sources (local path installs).
+   */
+  _tempConversionRoot?: string;
+
+  /**
+   * Original content root before conversion redirect.
+   * Stored so downstream phases (e.g., index writing) can reference the source location.
+   */
+  _originalContentRoot?: string;
   
   /** Ambiguous matches awaiting user resolution */
   ambiguousMatches?: Array<{

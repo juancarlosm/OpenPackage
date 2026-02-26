@@ -148,6 +148,7 @@ export async function buildInstallContexts(
       mode: 'install',
       options: options.installOptions as InstallationContext['options'],
       platforms: options.platforms,
+      installScope: 'full', // Default to full; narrowed below if resource scoping applies
       resolvedPackages: resolvedPackage ? [resolvedPackage] : [],
       warnings: [],
       errors: [],
@@ -171,6 +172,8 @@ export async function buildInstallContexts(
               result.pattern.length > ctx.matchedPattern.replace('/**', '').length)
           ) {
             ctx.matchedPattern = result.pattern;
+            // Update installScope: '**' means the resource IS the base (full), anything else is a subset
+            ctx.installScope = result.pattern === '**' ? 'full' : 'subset';
           }
         }
       } catch {

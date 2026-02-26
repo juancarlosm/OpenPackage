@@ -765,6 +765,8 @@ export class InstallOrchestrator {
     context.matchedPattern = selectedMatch.pattern;
     context.baseSource = 'user-selection';
     context.baseRelative = relative(repoRoot, selectedMatch.base) || '.';
+    // Ambiguous base resolution selects a base, not a subset within a base
+    context.installScope = 'full';
     
     logger.info('Ambiguous base resolved', {
       base: context.detectedBase,

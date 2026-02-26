@@ -1,6 +1,6 @@
 import { basename, join, relative } from 'path';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
-import type { InstallationContext, PackageSource } from './context.js';
+import type { InstallationContext, PackageSource, InstallScope } from './context.js';
 import { classifyPackageInput } from '../package-input.js';
 import { normalizePlatforms } from '../../platform/platform-mapper.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
@@ -42,6 +42,7 @@ export async function buildRegistryInstallContext(
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
+    installScope: 'full',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -72,6 +73,7 @@ export async function buildPathInstallContext(
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
+    installScope: 'full',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -101,6 +103,7 @@ export async function buildGitInstallContext(
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
+    installScope: 'full',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -158,6 +161,7 @@ export async function buildWorkspaceRootInstallContext(
     mode,
     options: mode === 'apply' ? { ...options, force: true } : options,
     platforms: normalizePlatforms(options.platforms) || [],
+    installScope: 'full',
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -330,6 +334,7 @@ async function buildBulkInstallContexts(
         mode: 'install',
         options,
         platforms: normalizePlatforms(options.platforms) || [],
+        installScope: 'full',
         resolvedPackages: [],
         warnings: [],
         errors: []
@@ -410,6 +415,7 @@ export async function buildResourceInstallContext(
     mode: 'install',
     options,
     platforms: normalizePlatforms(options.platforms) || [],
+    installScope: 'full', // May be narrowed to 'subset' during path scoping
     resolvedPackages: [],
     warnings: [],
     errors: []
@@ -458,6 +464,9 @@ export function prepareResourceContextsForMultiInstall(
  * Build multiple contexts for resource-centric installations.
  * For single-file installs from plugins, scopes the package name to the resource path
  * so the workspace index key is e.g. gh@user/repo/plugin/agents/foo.md rather than the plugin root.
+ * 
+ * All contexts produced here are 'subset' scope -- they install a filtered set of files
+ * from the package, not the entire package.
  */
 export function buildResourceInstallContexts(
   baseContext: InstallationContext,
@@ -508,7 +517,8 @@ export function buildResourceInstallContexts(
       detectedBase: effectiveBase,
       baseRelative: baseRelative === '' ? '.' : baseRelative,
       baseSource: baseContext.baseSource,
-      matchedPattern
+      matchedPattern,
+      installScope: 'subset'
     };
   });
 }

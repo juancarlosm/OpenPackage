@@ -65,7 +65,7 @@ export async function runUnifiedInstallPipeline(
     // Phase 2: Convert package format if needed.
     await convertPhase(ctx);
 
-    tempConversionRoot = (ctx as any)._tempConversionRoot ?? null;
+    tempConversionRoot = ctx._tempConversionRoot ?? null;
     
     // Phase 4: Process conflicts (always)
     const shouldProceed = await processConflictsPhase(ctx);

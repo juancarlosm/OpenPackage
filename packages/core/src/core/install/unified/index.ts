@@ -8,7 +8,8 @@
 // Core types
 export type {
   PackageSource,
-  InstallationContext
+  InstallationContext,
+  InstallScope
 } from './context.js';
 
 // Context builders

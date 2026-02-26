@@ -199,6 +199,11 @@ export async function computePathScoping(
 
   ctx.matchedPattern = result.pattern;
 
+  // Set installScope based on the scoping result:
+  // If the resource IS the base directory (pattern "**"), it's a full install.
+  // Otherwise it's a subset install targeting a specific file or subdirectory.
+  ctx.installScope = result.pattern === '**' ? 'full' : 'subset';
+
   // Mark as performed
   ctx._pathScopingPerformed = true;
 }

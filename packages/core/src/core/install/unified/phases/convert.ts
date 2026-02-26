@@ -22,7 +22,9 @@ import {
   createTempPackageDirectory, 
   writeTempPackageFiles,
   createConversionCacheDirectory,
-  cleanupTempDirectory
+  cleanupTempDirectory,
+  cleanupStaleScopeDirs,
+  type ConversionCacheScope
 } from '../../strategies/helpers/temp-directory.js';
 
 /**
@@ -54,7 +56,7 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
       targetDir: ctx.targetDir,
       matchedPattern: ctx.matchedPattern
     });
-    
+
     if (files.length === 0) {
       logger.warn('No files found in package, skipping conversion');
       return;
@@ -106,29 +108,38 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
       let shouldCleanup = false;
       
       if (isGitCache) {
-        // Git cache: Store converted files in .opkg-converted subdirectory
+        // Git cache: Store converted files in scope-isolated .opkg-converted subdirectory.
         // Extract the git cache root (without any subdirectory)
         const gitCacheMatch = originalContentRoot.match(/(.+\.openpackage\/cache\/git\/[^\/]+\/[^\/]+)/);
         const gitCacheRoot = gitCacheMatch ? gitCacheMatch[1] : originalContentRoot;
         
-        const isResourceScoped = Boolean(ctx.matchedPattern);
-        
-        if (!isResourceScoped) {
-          // Full install: wipe any existing conversion cache first.
-          // A prior resource-scoped install (e.g. --agents code-reviewer) may have
-          // populated the cache with only a subset of files. Stale files that no
-          // longer exist in the source would survive a write-over and get installed.
-          const existingCache = join(gitCacheRoot, '.opkg-converted');
-          await cleanupTempDirectory(existingCache);
+        // Determine the cache scope from the explicit installScope field.
+        // This replaces the old string-heuristic check on matchedPattern.
+        const cacheScope: ConversionCacheScope = ctx.installScope === 'subset' && ctx.matchedPattern
+          ? { type: 'subset', pattern: ctx.matchedPattern }
+          : { type: 'full' };
+
+        // Always wipe the target scope directory before writing.
+        // Each scope gets its own isolated directory, so wiping is safe and prevents
+        // stale files from prior installs of the same scope from surviving.
+        const scopedCacheDir = await createConversionCacheDirectory(gitCacheRoot, cacheScope);
+        await cleanupTempDirectory(scopedCacheDir);
+
+        // On full installs, also clean up any stale subset scope directories.
+        // The full cache supersedes all subset caches.
+        if (cacheScope.type === 'full') {
+          await cleanupStaleScopeDirs(gitCacheRoot, cacheScope);
         }
 
-        conversionRoot = await createConversionCacheDirectory(gitCacheRoot);
+        // Recreate the scope directory and write converted files
+        conversionRoot = await createConversionCacheDirectory(gitCacheRoot, cacheScope);
         await writeTempPackageFiles(conversionResult.files, conversionRoot);
         shouldCleanup = false;
-        logger.info(isResourceScoped
-          ? 'Patched conversion cache with resource-scoped files'
+        logger.info(cacheScope.type === 'subset'
+          ? 'Created isolated conversion cache for resource-scoped install'
           : 'Created fresh conversion cache for full install', {
           conversionRoot,
+          scope: cacheScope.type,
           fileCount: conversionResult.files.length
         });
       } else {
@@ -141,11 +152,11 @@ export async function convertPhase(ctx: InstallationContext): Promise<void> {
 
       // Track temp dir for cleanup in the pipeline (only for non-git-cache)
       if (shouldCleanup) {
-        (ctx as any)._tempConversionRoot = conversionRoot;
+        ctx._tempConversionRoot = conversionRoot;
       }
       
       // Store original content root for index writing
-      (ctx as any)._originalContentRoot = originalContentRoot;
+      ctx._originalContentRoot = originalContentRoot;
 
       // Update content roots so installation uses converted files
       ctx.source.contentRoot = conversionRoot;
