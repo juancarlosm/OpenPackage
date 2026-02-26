@@ -11,6 +11,7 @@ import { logger } from '../../../utils/logger.js';
 import { createWorkspacePackageYml } from '../../package-management.js';
 import { cleanupTempDirectory } from '../strategies/helpers/temp-directory.js';
 import { resolveOutput } from '../../ports/resolve.js';
+import { checkSubsumption, resolveSubsumption } from '../orchestrator/subsumption-resolver.js';
 
 function assertPipelineContextComplete(ctx: InstallationContext): void {
   if (!ctx.source.type) {
@@ -27,6 +28,46 @@ function assertPipelineContextComplete(ctx: InstallationContext): void {
   }
   if (!ctx.resolvedPackages.some(p => (p as any).isRoot)) {
     throw new Error('Pipeline context invalid: ctx.resolvedPackages must contain an isRoot package');
+  }
+}
+
+/**
+ * Subsumption phase: detect and resolve overlapping installations.
+ *
+ * Runs after the load phase (so packageName is populated) and before convert.
+ * Returns 'skip' when the incoming install is already covered by a broader
+ * package, 'proceed' otherwise (including after resolving upgrade scenarios).
+ *
+ * Skipped when:
+ * - force flag is set (user explicitly wants to reinstall)
+ * - _subsumptionChecked is true (already filtered by runMultiContextPipeline)
+ *
+ * Exported for testability.
+ */
+export async function subsumptionPhase(ctx: InstallationContext): Promise<'proceed' | 'skip'> {
+  if (ctx.options?.force || ctx._subsumptionChecked) {
+    return 'proceed';
+  }
+
+  const result = await checkSubsumption(ctx.source, ctx.targetDir);
+
+  switch (result.type) {
+    case 'upgrade':
+      await resolveSubsumption(result, ctx.execution);
+      ctx._replacedResources = result.entriesToRemove.map(e => e.packageName);
+      return 'proceed';
+
+    case 'already-covered': {
+      const out = resolveOutput(ctx.execution);
+      const resourcePath = ctx.source.resourcePath ||
+        ctx.source.packageName.replace(/^.*?\/[^/]+\/[^/]+\//, '');
+      out.info(`Skipped: ${resourcePath} is already installed via ${result.coveringPackage}`);
+      return 'skip';
+    }
+
+    case 'none':
+    default:
+      return 'proceed';
   }
 }
 
@@ -61,6 +102,13 @@ export async function runUnifiedInstallPipeline(
     
     // Assert context is complete after load phase
     assertPipelineContextComplete(ctx);
+
+    // Phase 1.5: Subsumption — detect overlapping installations.
+    // Must run after load (packageName is now set) and before convert (avoid wasted work).
+    const subsumptionOutcome = await subsumptionPhase(ctx);
+    if (subsumptionOutcome === 'skip') {
+      return createAlreadyCoveredResult(ctx);
+    }
 
     // Phase 2: Convert package format if needed.
     await convertPhase(ctx);
@@ -124,6 +172,21 @@ function createCancellationResult(ctx: InstallationContext): CommandResult {
       installed: 0,
       skipped: 1,
       totalPackages: 0
+    }
+  };
+}
+
+/**
+ * Create result when install is skipped because a covering package already exists.
+ */
+function createAlreadyCoveredResult(ctx: InstallationContext): CommandResult {
+  return {
+    success: true,
+    data: {
+      packageName: ctx.source.packageName,
+      installed: 0,
+      skipped: 1,
+      reason: 'Already installed via broader package'
     }
   };
 }

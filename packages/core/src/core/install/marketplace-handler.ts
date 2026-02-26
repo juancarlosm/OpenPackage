@@ -7,8 +7,6 @@ import type { InstallationContext } from './unified/context.js';
 import { runUnifiedInstallPipeline } from './unified/pipeline.js';
 import { detectPluginType, detectPluginWithMarketplace, validatePluginManifest } from './plugin-detector.js';
 import type { CommandResult, InstallOptions, ExecutionContext } from '../../types/index.js';
-import type { OutputPort } from '../ports/output.js';
-import type { PromptPort } from '../ports/prompt.js';
 import { resolveOutput, resolvePrompt } from '../ports/resolve.js';
 import { runMultiContextPipeline } from './unified/multi-context-pipeline.js';
 import { getLoaderForSource } from './sources/loader-factory.js';
@@ -25,6 +23,7 @@ import {
   type PluginSourceSpec,
   type NormalizedPluginSource
 } from './plugin-sources.js';
+import { generateGitHubPackageName } from '../../utils/plugin-naming.js';
 
 /**
  * Claude Code marketplace manifest schema.
@@ -492,6 +491,12 @@ async function installRelativePathPlugin(
     ctx.detectedBase = pluginDir;
     ctx.baseRelative = relative(marketplaceDir, pluginDir) || '.';
 
+    // Set packageName for resource scoping (gh@owner/repo/path format)
+    ctx.source.packageName = generateGitHubPackageName({
+      gitUrl: marketplaceGitUrl,
+      path: pluginSubdir
+    });
+
     const resources = await resolveConvenienceResources(pluginDir, marketplaceDir, convenienceOptions ?? {});
 
     const resourceContexts = buildResourceInstallContexts(ctx, resources, marketplaceDir).map(rc => {
@@ -500,6 +505,9 @@ async function installRelativePathPlugin(
       }
       return rc;
     });
+
+    // Subsumption filtering is handled centrally by runMultiContextPipeline
+
     const multiResult = await runMultiContextPipeline(resourceContexts, {
       groupReport: true,
       groupReportPackageName: pluginEntry.name
@@ -592,7 +600,9 @@ async function installRelativePathPlugin(
     pluginType: detection.type as any,
     manifestPath: detection.manifestPath
   };
-  
+
+  // Subsumption is handled centrally by the pipeline's subsumption phase
+
   // Run the unified pipeline — it handles its own spinner and reports results
   const pipelineResult = await runUnifiedInstallPipeline(ctx);
   
@@ -722,6 +732,8 @@ async function installGitPlugin(
   logger.info('Using full install mode for git plugin', {
     plugin: pluginEntry.name
   });
+
+  // Subsumption is handled centrally by the pipeline's subsumption phase
 
   const pipelineResult = await runUnifiedInstallPipeline(ctx);
   

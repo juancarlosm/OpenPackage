@@ -4,6 +4,8 @@ import type { InstallReportData } from '../install-reporting.js';
 import { displayInstallationResults } from '../install-reporting.js';
 import { runUnifiedInstallPipeline } from './pipeline.js';
 import { resolveOutput } from '../../ports/resolve.js';
+import { checkSubsumption } from '../orchestrator/subsumption-resolver.js';
+import type { OutputPort } from '../../ports/output.js';
 
 export interface MultiContextPipelineOptions {
   /** When true, suppress per-context reports and emit one grouped report at the end */
@@ -23,14 +25,32 @@ export async function runMultiContextPipeline(
   }
 
   const { groupReport, groupReportPackageName, failFast } = options ?? {};
+  const out = resolveOutput(contexts[0].execution);
+
+  // Pre-filter: remove contexts already covered by a broader installed package.
+  // Mark surviving contexts so the pipeline phase does not re-check.
+  const { active: activeContexts, skippedCount: preSkipped } =
+    await filterSubsumedContexts(contexts, out);
+
+  if (activeContexts.length === 0) {
+    return {
+      success: true,
+      data: {
+        installed: 0,
+        skipped: preSkipped,
+        results: [],
+        reason: 'All resources already installed via full package'
+      }
+    };
+  }
 
   let installed = 0;
-  let skipped = 0;
+  let skipped = preSkipped;
   let failed = 0;
   const results: Array<{ name: string; success: boolean; error?: string }> = [];
   const reportDataList: InstallReportData[] = [];
 
-  for (const ctx of contexts) {
+  for (const ctx of activeContexts) {
     if (groupReport) {
       ctx._deferredReport = true;
     }
@@ -83,6 +103,43 @@ export async function runMultiContextPipeline(
     },
     error: success ? undefined : `${failed} resource${failed === 1 ? '' : 's'} failed to install`
   };
+}
+
+/**
+ * Filter out contexts whose resources are already covered by a broader
+ * installed package (subsumption "already-covered" check).
+ *
+ * Contexts that survive filtering have `_subsumptionChecked` set to true
+ * so the pipeline's own subsumption phase does not re-check them.
+ * Exported for testability.
+ */
+export async function filterSubsumedContexts(
+  contexts: InstallationContext[],
+  out: OutputPort
+): Promise<{ active: InstallationContext[]; skippedCount: number }> {
+  const active: InstallationContext[] = [];
+  let skippedCount = 0;
+
+  for (const ctx of contexts) {
+    if (ctx.options?.force) {
+      ctx._subsumptionChecked = true;
+      active.push(ctx);
+      continue;
+    }
+
+    const result = await checkSubsumption(ctx.source, ctx.targetDir);
+    if (result.type === 'already-covered') {
+      const resourcePath = ctx.source.resourcePath ||
+        ctx.source.packageName.replace(/^.*?\/[^/]+\/[^/]+\//, '');
+      out.info(`Skipped: ${resourcePath} is already installed via ${result.coveringPackage}`);
+      skippedCount++;
+    } else {
+      ctx._subsumptionChecked = true;
+      active.push(ctx);
+    }
+  }
+
+  return { active, skippedCount };
 }
 
 export function mergeInstallReportData(

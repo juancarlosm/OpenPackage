@@ -179,6 +179,13 @@ export interface InstallationContext {
   _replacedResources?: string[];
 
   /**
+   * Internal flag: subsumption has already been checked for this context.
+   * Set by runMultiContextPipeline after filtering, so the pipeline phase
+   * does not re-check the same context.
+   */
+  _subsumptionChecked?: boolean;
+
+  /**
    * Temporary conversion directory to clean up after install completes.
    * Only set for non-git-cache sources (local path installs).
    */

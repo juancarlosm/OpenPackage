@@ -13,6 +13,7 @@ import {
   extractSourceIdentity
 } from '../../../packages/core/src/core/install/orchestrator/subsumption-resolver.js';
 import type { PackageSource } from '../../../packages/core/src/core/install/unified/context.js';
+import type { InstallationContext } from '../../../packages/core/src/core/install/unified/context.js';
 import {
   getWorkspaceIndexPath,
   readWorkspaceIndex,
@@ -21,6 +22,8 @@ import {
 import { createWorkspacePackageYml } from '../../../packages/core/src/core/package-management.js';
 import { getLocalPackageYmlPath } from '../../../packages/core/src/utils/paths.js';
 import { createExecutionContext } from '../../../packages/core/src/core/execution-context.js';
+import { subsumptionPhase } from '../../../packages/core/src/core/install/unified/pipeline.js';
+import { filterSubsumedContexts } from '../../../packages/core/src/core/install/unified/multi-context-pipeline.js';
 
 let testDir: string;
 
@@ -622,6 +625,383 @@ async function testMarketplaceSubpath_SamePluginReinstall() {
 }
 
 // ============================================================================
+// Centralized subsumption: pipeline phase tests
+// ============================================================================
+
+/**
+ * Helper to create a minimal InstallationContext for subsumption testing.
+ * Only the fields used by subsumptionPhase are populated.
+ */
+function createMinimalContext(
+  source: PackageSource,
+  targetDir: string,
+  overrides?: Partial<InstallationContext>
+): InstallationContext {
+  const execCtx = {
+    targetDir,
+    sourceCwd: targetDir,
+    isGlobal: false,
+    output: { info: () => {}, warn: () => {}, error: () => {}, success: () => {}, message: () => {}, spinner: () => ({ start: () => {}, stop: () => {} }) },
+    prompt: { select: async () => '', confirm: async () => false, multiselect: async () => [] }
+  } as any;
+  return {
+    execution: execCtx,
+    targetDir,
+    source,
+    mode: 'install',
+    options: {},
+    platforms: [],
+    resolvedPackages: [],
+    warnings: [],
+    errors: [],
+    ...overrides
+  } as InstallationContext;
+}
+
+async function testPipelinePhase_NoneSubsumption() {
+  await setup();
+  try {
+    // Empty workspace index — no overlap
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@user/repo',
+      gitUrl: 'https://github.com/user/repo'
+    };
+    const ctx = createMinimalContext(source, testDir);
+    const result = await subsumptionPhase(ctx);
+    assert.equal(result, 'proceed', 'Should proceed when no overlap exists');
+    assert.equal(ctx._replacedResources, undefined, 'No resources should be replaced');
+    console.log('  Pipeline phase: none subsumption passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testPipelinePhase_AlreadyCovered() {
+  await setup();
+  try {
+    // Full package already installed
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo': {
+            path: '.openpackage/cache/git/abc/def',
+            version: '1.0.0',
+            files: { 'agents/a.md': ['.claude/agents/a.md'] }
+          }
+        }
+      }
+    });
+
+    // Incoming resource-scoped install should be skipped
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@user/repo/agents/a',
+      gitUrl: 'https://github.com/user/repo',
+      resourcePath: 'agents/a'
+    };
+    const ctx = createMinimalContext(source, testDir);
+    const result = await subsumptionPhase(ctx);
+    assert.equal(result, 'skip', 'Should skip when already covered');
+    console.log('  Pipeline phase: already-covered passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testPipelinePhase_Upgrade() {
+  await setup();
+  try {
+    // Resource-scoped entry exists
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo/agents/agent1': {
+            path: '.openpackage/cache/git/abc/def/agents/agent1',
+            version: '1.0.0',
+            files: { 'agents/agent1.md': ['.claude/agents/agent1.md'] }
+          }
+        }
+      }
+    });
+
+    // Also set up workspace manifest so uninstall can remove the dependency
+    const manifestPath = getLocalPackageYmlPath(testDir);
+    fs.writeFileSync(manifestPath, `name: test-workspace
+dependencies:
+  - name: gh@user/repo/agents/agent1
+    url: https://github.com/user/repo
+    path: agents/agent1
+dev-dependencies: []
+`, 'utf-8');
+
+    // Full package install should upgrade (remove resource, proceed)
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@user/repo',
+      gitUrl: 'https://github.com/user/repo'
+    };
+    const execContext = await createExecutionContext({ cwd: testDir });
+    const ctx = createMinimalContext(source, testDir, { execution: execContext });
+    const result = await subsumptionPhase(ctx);
+    assert.equal(result, 'proceed', 'Should proceed after upgrade');
+    assert.ok(ctx._replacedResources, 'Should have replaced resources');
+    assert.ok(ctx._replacedResources!.includes('gh@user/repo/agents/agent1'),
+      'Should track the replaced resource name');
+
+    // Verify the resource entry was removed from workspace index
+    const wsRecord = await readWorkspaceIndex(testDir);
+    assert.ok(!wsRecord.index.packages['gh@user/repo/agents/agent1'],
+      'Resource entry should be removed after upgrade');
+
+    console.log('  Pipeline phase: upgrade passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testPipelinePhase_ForceBypass() {
+  await setup();
+  try {
+    // Full package already installed
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo': {
+            path: '.openpackage/cache/git/abc/def',
+            version: '1.0.0',
+            files: {}
+          }
+        }
+      }
+    });
+
+    // With force, should proceed even if already covered
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@user/repo/agents/a',
+      gitUrl: 'https://github.com/user/repo',
+      resourcePath: 'agents/a'
+    };
+    const ctx = createMinimalContext(source, testDir, { options: { force: true } } as any);
+    const result = await subsumptionPhase(ctx);
+    assert.equal(result, 'proceed', 'Should proceed when force is set');
+    console.log('  Pipeline phase: force bypass passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testPipelinePhase_SubsumptionCheckedBypass() {
+  await setup();
+  try {
+    // Full package already installed
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo': {
+            path: '.openpackage/cache/git/abc/def',
+            version: '1.0.0',
+            files: {}
+          }
+        }
+      }
+    });
+
+    // With _subsumptionChecked = true, should skip the check
+    const source: PackageSource = {
+      type: 'git',
+      packageName: 'gh@user/repo/agents/a',
+      gitUrl: 'https://github.com/user/repo',
+      resourcePath: 'agents/a'
+    };
+    const ctx = createMinimalContext(source, testDir, { _subsumptionChecked: true } as any);
+    const result = await subsumptionPhase(ctx);
+    assert.equal(result, 'proceed', 'Should proceed when _subsumptionChecked is true');
+    console.log('  Pipeline phase: _subsumptionChecked bypass passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+// ============================================================================
+// Centralized subsumption: multi-context filtering tests
+// ============================================================================
+
+/** Noop output adapter for tests */
+const noopOutput = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  success: () => {},
+  message: () => {},
+  spinner: () => ({ start: () => {}, stop: () => {} })
+} as any;
+
+async function testFilterSubsumedContexts_FiltersCovered() {
+  await setup();
+  try {
+    // Full package already installed
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo': {
+            path: '.openpackage/cache/git/abc/def',
+            version: '1.0.0',
+            files: {}
+          }
+        }
+      }
+    });
+
+    const contexts = [
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@user/repo/agents/a',
+        gitUrl: 'https://github.com/user/repo',
+        resourcePath: 'agents/a'
+      }, testDir),
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@other/repo/skills/s1',
+        gitUrl: 'https://github.com/other/repo',
+        resourcePath: 'skills/s1'
+      }, testDir)
+    ];
+
+    const { active, skippedCount } = await filterSubsumedContexts(contexts, noopOutput);
+    assert.equal(skippedCount, 1, 'One context should be skipped (covered by gh@user/repo)');
+    assert.equal(active.length, 1, 'One context should remain active');
+    assert.equal(active[0].source.packageName, 'gh@other/repo/skills/s1',
+      'The non-covered context should survive');
+    assert.equal(active[0]._subsumptionChecked, true,
+      'Surviving context should have _subsumptionChecked set');
+    console.log('  filterSubsumedContexts: filters covered passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testFilterSubsumedContexts_AllCovered() {
+  await setup();
+  try {
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo': {
+            path: '.openpackage/cache/git/abc/def',
+            version: '1.0.0',
+            files: {}
+          }
+        }
+      }
+    });
+
+    const contexts = [
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@user/repo/agents/a',
+        gitUrl: 'https://github.com/user/repo',
+        resourcePath: 'agents/a'
+      }, testDir),
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@user/repo/skills/s1',
+        gitUrl: 'https://github.com/user/repo',
+        resourcePath: 'skills/s1'
+      }, testDir)
+    ];
+
+    const { active, skippedCount } = await filterSubsumedContexts(contexts, noopOutput);
+    assert.equal(skippedCount, 2, 'Both contexts should be skipped');
+    assert.equal(active.length, 0, 'No active contexts should remain');
+    console.log('  filterSubsumedContexts: all covered passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testFilterSubsumedContexts_ForceBypass() {
+  await setup();
+  try {
+    const indexPath = getWorkspaceIndexPath(testDir);
+    await writeWorkspaceIndex({
+      path: indexPath,
+      index: {
+        packages: {
+          'gh@user/repo': {
+            path: '.openpackage/cache/git/abc/def',
+            version: '1.0.0',
+            files: {}
+          }
+        }
+      }
+    });
+
+    // Context with force: true should not be filtered
+    const contexts = [
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@user/repo/agents/a',
+        gitUrl: 'https://github.com/user/repo',
+        resourcePath: 'agents/a'
+      }, testDir, { options: { force: true } } as any)
+    ];
+
+    const { active, skippedCount } = await filterSubsumedContexts(contexts, noopOutput);
+    assert.equal(skippedCount, 0, 'No contexts should be skipped when force is set');
+    assert.equal(active.length, 1, 'Forced context should remain active');
+    assert.equal(active[0]._subsumptionChecked, true,
+      'Forced context should have _subsumptionChecked set');
+    console.log('  filterSubsumedContexts: force bypass passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testFilterSubsumedContexts_NoCoverage() {
+  await setup();
+  try {
+    // Empty workspace index — no coverage
+    const contexts = [
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@user/repo/agents/a',
+        gitUrl: 'https://github.com/user/repo',
+        resourcePath: 'agents/a'
+      }, testDir),
+      createMinimalContext({
+        type: 'git',
+        packageName: 'gh@other/repo/skills/s1',
+        gitUrl: 'https://github.com/other/repo',
+        resourcePath: 'skills/s1'
+      }, testDir)
+    ];
+
+    const { active, skippedCount } = await filterSubsumedContexts(contexts, noopOutput);
+    assert.equal(skippedCount, 0, 'No contexts should be skipped');
+    assert.equal(active.length, 2, 'All contexts should remain active');
+    assert.ok(active.every(c => c._subsumptionChecked === true),
+      'All contexts should have _subsumptionChecked set');
+    console.log('  filterSubsumedContexts: no coverage passed');
+  } finally {
+    await cleanup();
+  }
+}
+
+// ============================================================================
 // Run all tests
 // ============================================================================
 
@@ -640,6 +1020,19 @@ try {
   await testMarketplaceSubpath_ResourcesThenPlugin();
   await testMarketplaceSubpath_PluginThenResource();
   await testMarketplaceSubpath_SamePluginReinstall();
+
+  // Centralized subsumption: pipeline phase tests
+  await testPipelinePhase_NoneSubsumption();
+  await testPipelinePhase_AlreadyCovered();
+  await testPipelinePhase_Upgrade();
+  await testPipelinePhase_ForceBypass();
+  await testPipelinePhase_SubsumptionCheckedBypass();
+
+  // Centralized subsumption: multi-context filtering tests
+  await testFilterSubsumedContexts_FiltersCovered();
+  await testFilterSubsumedContexts_AllCovered();
+  await testFilterSubsumedContexts_ForceBypass();
+  await testFilterSubsumedContexts_NoCoverage();
 
   console.log('\nsubsumption-resolver tests passed');
 } catch (error) {

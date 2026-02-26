@@ -43,7 +43,6 @@ import { logger } from '../../../utils/logger.js';
 import { getInstalledPackageVersion } from '../../openpackage.js';
 import type { ResourceInstallationSpec } from '../convenience-matchers.js';
 import type { SelectedResource, ResourceDiscoveryResult, DiscoveredResource, ResourceType } from '../resource-types.js';
-import { checkSubsumption, resolveSubsumption } from './subsumption-resolver.js';
 
 /**
  * InstallOrchestrator coordinates the entire install flow.
@@ -188,11 +187,7 @@ export class InstallOrchestrator {
           return this.handleList(context, options, execContext);
         }
         
-        // Check for subsumption (resource/package overlap)
-        const subsumptionResult = await this.checkAndResolveSubsumption(context, options, out);
-        if (subsumptionResult) {
-          return subsumptionResult;
-        }
+        // Subsumption is handled centrally by the pipeline's subsumption phase
         
         // Normal pipeline flow: resolve platforms once if not set
         if (context.platforms.length === 0) {
@@ -234,65 +229,6 @@ export class InstallOrchestrator {
 
         return pipelineResult;
       }
-    }
-  }
-
-  /**
-   * Check for subsumption (resource/package overlap) and resolve if needed.
-   * 
-   * Returns a CommandResult if the install should be skipped (already-covered),
-   * or null to proceed with normal installation.
-   * 
-   * For upgrade scenarios (resource -> full package), cleans up the old entries
-   * and returns null so the full install proceeds.
-   */
-  private async checkAndResolveSubsumption(
-    context: InstallationContext,
-    options: NormalizedInstallOptions,
-    out: OutputPort
-  ): Promise<CommandResult | null> {
-    // --force bypasses subsumption checks entirely
-    if (options.force) {
-      return null;
-    }
-
-    try {
-      const result = await checkSubsumption(context.source, context.targetDir);
-
-      switch (result.type) {
-        case 'upgrade': {
-          // Resource entries exist that will be subsumed by the full package.
-          // Silently resolve; the report phase will show replaced resources.
-          const replacedNames = result.entriesToRemove.map(e => e.packageName);
-          await resolveSubsumption(result, context.execution);
-          context._replacedResources = replacedNames;
-          return null; // Proceed with install
-        }
-
-        case 'already-covered': {
-          // Full package already installed; skip resource install
-          const resourcePath = context.source.resourcePath || 
-            context.source.packageName.replace(/^.*?\/[^/]+\/[^/]+\//, '');
-          out.info(`Skipped: ${resourcePath} is already installed via ${result.coveringPackage}`);
-          return {
-            success: true,
-            data: {
-              packageName: context.source.packageName,
-              installed: 0,
-              skipped: 1,
-              reason: `Already installed via ${result.coveringPackage}`
-            }
-          };
-        }
-
-        case 'none':
-        default:
-          return null;
-      }
-    } catch (error) {
-      // Subsumption check is non-fatal; log and proceed with normal install
-      logger.warn(`Subsumption check failed (proceeding with install): ${error}`);
-      return null;
     }
   }
 
@@ -838,42 +774,7 @@ export class InstallOrchestrator {
       return this.runRecursiveBulkInstall(options, execContext, workspaceContext ?? undefined);
     }
 
-    // For non-bulk multi-resource installs (convenience filters), check subsumption
-    // per resource context and filter out already-covered ones
-    if (!options.force && dependencyContexts.length > 0) {
-      const filteredContexts: InstallationContext[] = [];
-      let skippedCount = 0;
-
-      for (const ctx of dependencyContexts) {
-        const subsumptionResult = await checkSubsumption(ctx.source, ctx.targetDir);
-        if (subsumptionResult.type === 'already-covered') {
-          const resourcePath = ctx.source.resourcePath ||
-            ctx.source.packageName.replace(/^.*?\/[^/]+\/[^/]+\//, '');
-          out.info(`Skipped: ${resourcePath} is already installed via ${subsumptionResult.coveringPackage}`);
-          skippedCount++;
-        } else {
-          filteredContexts.push(ctx);
-        }
-      }
-
-      if (filteredContexts.length === 0) {
-        return {
-          success: true,
-          data: {
-            packageName: context.source.packageName,
-            installed: 0,
-            skipped: skippedCount,
-            reason: 'All resources already installed via full package'
-          }
-        };
-      }
-
-      // Replace with filtered list
-      if (skippedCount > 0) {
-        dependencyContexts.length = 0;
-        dependencyContexts.push(...filteredContexts);
-      }
-    }
+    // Subsumption filtering is handled centrally by runMultiContextPipeline
 
     if (dependencyContexts.length > 0) {
       out.success(`Installing ${dependencyContexts.length} package${dependencyContexts.length === 1 ? '' : 's'} from openpackage.yml`);
