@@ -153,9 +153,10 @@ export function createPlainOutput(): OutputPort {
         },
         stop(finalMessage?: string) {
           if (s) {
-            s.stop();
             if (finalMessage) {
-              console.log(`✓ ${finalMessage}`);
+              s.succeed(finalMessage);
+            } else {
+              s.stop();
             }
             s = null;
           }

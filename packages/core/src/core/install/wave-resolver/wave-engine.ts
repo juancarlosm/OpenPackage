@@ -42,8 +42,11 @@ export async function resolveWave(options: WaveResolverOptions): Promise<WaveRes
     maxNodes = DEFAULT_MAX_NODES,
     onConflict,
     profile,
-    apiKey
+    apiKey,
+    output
   } = options;
+  
+  const spinner = output?.spinner();
 
   // 1. Read root manifest
   const manifestPath = rootManifestPath ?? getLocalPackageYmlPath(workspaceRoot);
@@ -110,6 +113,8 @@ export async function resolveWave(options: WaveResolverOptions): Promise<WaveRes
   };
 
   // 5. Wave loop
+  spinner?.start('Resolving dependencies');
+  
   while (queue.length > 0) {
     waveNumber++;
 
@@ -216,6 +221,8 @@ export async function resolveWave(options: WaveResolverOptions): Promise<WaveRes
     }
 
     // Parallel fetch all in this wave
+    spinner?.message(`Resolving dependencies (wave ${waveNumber}, ${resolved.size} resolved)`);
+    
     const fetchResults = await Promise.all(
       toFetch.map(async (item) => {
         const fetcher = createFetcher(item.decl);
@@ -340,6 +347,8 @@ export async function resolveWave(options: WaveResolverOptions): Promise<WaveRes
     warnings
   };
 
+  spinner?.stop(`Resolved ${resolved.size} dependencies in ${waveNumber} wave${waveNumber !== 1 ? 's' : ''}`);
+  
   logger.info(`Wave resolution complete: ${resolved.size} packages in ${waveNumber} waves`);
 
   return { graph, versionSolution };

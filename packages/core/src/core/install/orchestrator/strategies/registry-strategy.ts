@@ -9,6 +9,7 @@
 import type { InstallationContext, PackageSource } from '../../unified/context.js';
 import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
+import type { UnifiedSpinner } from '../../../ports/output.js';
 import { BaseInstallStrategy } from './base.js';
 import { normalizePlatforms } from '../../../platform/platform-mapper.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
@@ -54,11 +55,12 @@ export class RegistryInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<PreprocessResult> {
     // Apply convenience filters (--agents, --skills, etc.) - same as git/path strategies
     if (options.agents?.length || options.skills?.length || options.rules?.length || options.commands?.length) {
-      return this.handleConvenienceFilters(context, options, execContext);
+      return this.handleConvenienceFilters(context, options, execContext, spinner);
     }
 
     // Registry sources are handled by the pipeline's load phase
@@ -72,10 +74,11 @@ export class RegistryInstallStrategy extends BaseInstallStrategy {
   private async handleConvenienceFilters(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    _execContext: ExecutionContext
+    _execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<PreprocessResult> {
     const loader = getLoaderForSource(context.source);
-    const loaded = await loader.load(context.source, options, _execContext);
+    const loaded = await loader.load(context.source, options, _execContext, spinner);
 
     context.source.packageName = loaded.packageName;
     context.source.version = loaded.version;

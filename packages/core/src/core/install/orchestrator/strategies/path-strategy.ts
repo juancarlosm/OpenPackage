@@ -9,6 +9,7 @@
 import type { InstallationContext, PackageSource } from '../../unified/context.js';
 import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
+import type { UnifiedSpinner } from '../../../ports/output.js';
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
 import { createResolvedPackageFromLoaded } from '../../preprocessing/context-population.js';
@@ -54,10 +55,11 @@ export class PathInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<PreprocessResult> {
     const loader = getLoaderForSource(context.source);
-    const loaded = await loader.load(context.source, options, execContext);
+    const loaded = await loader.load(context.source, options, execContext, spinner);
     
     context.source.packageName = loaded.packageName;
     context.source.version = loaded.version;

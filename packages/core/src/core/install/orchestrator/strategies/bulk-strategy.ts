@@ -7,6 +7,7 @@
 import type { InstallationContext } from '../../unified/context.js';
 import type { ExecutionContext } from '../../../../types/index.js';
 import type { NormalizedInstallOptions, InputClassification, PreprocessResult } from '../types.js';
+import type { UnifiedSpinner } from '../../../ports/output.js';
 import { BaseInstallStrategy } from './base.js';
 import { buildInstallContext, type BulkInstallContextsResult } from '../../unified/context-builders.js';
 
@@ -41,7 +42,8 @@ export class BulkInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    _spinner?: UnifiedSpinner
   ): Promise<PreprocessResult> {
     // Build workspace + dependency contexts from openpackage.yml
     const raw = await buildInstallContext(execContext, undefined, options);

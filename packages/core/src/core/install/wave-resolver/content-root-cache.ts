@@ -6,6 +6,7 @@
 import { join } from 'path';
 import { loadPackageFromGit } from '../git-package-loader.js';
 import type { ResolvedSource } from './types.js';
+import type { UnifiedSpinner } from '../../ports/output.js';
 
 export interface ContentRootResult {
   contentRoot: string | undefined;
@@ -28,6 +29,7 @@ function getCacheKey(source: ResolvedSource): string {
 
 export interface EnsureContentRootOptions {
   skipCache?: boolean;
+  spinner?: UnifiedSpinner; // Optional spinner to forward to git operations
 }
 
 /**
@@ -61,7 +63,8 @@ export async function ensureContentRoot(
       ref: source.gitRef,
       path: undefined,
       resourcePath: source.resourcePath,
-      skipCache: options.skipCache
+      skipCache: options.skipCache,
+      spinner: options.spinner
     });
 
     const contentRoot = source.resourcePath

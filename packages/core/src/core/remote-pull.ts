@@ -14,6 +14,8 @@ import { formatVersionLabel } from './package-versioning.js';
 import { normalizeRegistryPath } from './platform/registry-entry-filter.js';
 import { mergePackageFiles } from '../utils/package-merge.js';
 import { createCacheManager } from './cache-manager.js';
+import type { OutputPort, UnifiedSpinner } from './ports/output.js';
+import { resolveOutput } from './ports/resolve.js';
 
 const NETWORK_ERROR_PATTERN = /(fetch failed|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|network)/i;
 
@@ -53,6 +55,8 @@ export interface RemotePullOptions {
   recursive?: boolean;
   paths?: string[];
   skipLocalCheck?: boolean; // For --remote flag, bypass local registry check
+  output?: OutputPort; // Optional output port for spinner feedback
+  spinner?: UnifiedSpinner; // Optional pre-existing spinner to reuse (avoids nested spinners)
 }
 
 export interface RemoteBatchPullOptions extends RemotePullOptions {
@@ -296,6 +300,19 @@ export async function pullDownloadsBatchFromRemote(
   const failed: BatchDownloadItemResult[] = [];
   const warnings: string[] = [];
   const stateCache = new Map<string, PackageVersionState>();
+  
+  const out = options.quiet ? undefined : options.output;
+  const externalSpinner = options.spinner;
+  const ownedSpinner = !externalSpinner ? out?.spinner() : undefined;
+  const spinner = externalSpinner ?? ownedSpinner;
+  const totalCount = downloads.length;
+  let completedCount = 0;
+  
+  if (externalSpinner) {
+    spinner?.message(`Downloading ${totalCount} dependencies`);
+  } else {
+    ownedSpinner?.start(`Downloading ${totalCount} dependencies`);
+  }
 
   const getLocalState = async (name: string, version: string): Promise<PackageVersionState> => {
     const key = `${name}@${formatVersionLabel(version)}`;
@@ -319,6 +336,8 @@ export async function pullDownloadsBatchFromRemote(
       const message = error instanceof Error ? error.message : String(error);
       logger.warn(`Skipping download '${identifier}': ${message}`);
       failed.push({ name: identifier, version: '', downloadUrl: download.downloadUrl, success: false, error: message });
+      completedCount++;
+      spinner?.message(`Downloading dependencies (${completedCount}/${totalCount})`);
       return;
     }
 
@@ -327,6 +346,8 @@ export async function pullDownloadsBatchFromRemote(
 
     try {
       if (options.filter && !options.filter(name, version, download)) {
+        completedCount++;
+        spinner?.message(`Downloading dependencies (${completedCount}/${totalCount})`);
         return;
       }
 
@@ -335,6 +356,8 @@ export async function pullDownloadsBatchFromRemote(
         logger.warn(warning);
         warnings.push(warning);
         failed.push({ name, version, downloadUrl: download.downloadUrl, success: false, error: 'download-url-missing' });
+        completedCount++;
+        spinner?.message(`Downloading dependencies (${completedCount}/${totalCount})`);
         return;
       }
 
@@ -345,12 +368,16 @@ export async function pullDownloadsBatchFromRemote(
           logger.info(skipMessage);
           warnings.push(skipMessage);
           pulled.push({ name, version, downloadUrl: download.downloadUrl, success: true });
+          completedCount++;
+          spinner?.message(`Downloading dependencies (${completedCount}/${totalCount})`);
           return;
         }
       }
 
       if (options.dryRun) {
         pulled.push({ name, version, downloadUrl: download.downloadUrl, success: true });
+        completedCount++;
+        spinner?.message(`Downloading dependencies (${completedCount}/${totalCount})`);
         return;
       }
 
@@ -374,9 +401,17 @@ export async function pullDownloadsBatchFromRemote(
         error: error instanceof Error ? error.message : String(error)
       });
     }
+    completedCount++;
+    spinner?.message(`Downloading dependencies (${completedCount}/${totalCount})`);
   });
 
   await Promise.all(tasks);
+
+  if (externalSpinner) {
+    spinner?.message(`Downloaded ${pulled.length} dependencies${failed.length > 0 ? ` (${failed.length} failed)` : ''}`);
+  } else {
+    ownedSpinner?.stop(`Downloaded ${pulled.length} dependencies${failed.length > 0 ? ` (${failed.length} failed)` : ''}`);
+  }
 
   return {
     success: failed.length === 0,
@@ -454,6 +489,14 @@ export async function pullPackageFromRemote(
   version?: string,
   options: RemotePullOptions = {}
 ): Promise<RemotePullResult> {
+  // When an external spinner is provided (from loadPackagePhase), reuse it —
+  // only update its message text; the caller owns start/stop lifecycle.
+  // Otherwise fall back to creating a new spinner from the output port.
+  const externalSpinner = options.spinner;
+  const out = options.quiet ? undefined : options.output;
+  const ownedSpinner = !externalSpinner ? out?.spinner() : undefined;
+  const spinner = externalSpinner ?? ownedSpinner;
+  
   try {
     // CACHE CHECK: If specific version requested, check if already in local registry
     // Skip this check if skipLocalCheck is set (--remote flag forces fresh fetch)
@@ -476,17 +519,26 @@ export async function pullPackageFromRemote(
       }
     }
     
+    const versionLabel = version ? `@${version}` : '';
+    if (externalSpinner) {
+      spinner?.message(`Fetching ${name}${versionLabel} from registry`);
+    } else {
+      ownedSpinner?.start(`Fetching ${name}${versionLabel} from registry`);
+    }
+    
     const metadataResult = options.preFetchedResponse
       ? await createResultFromPrefetched(options)
       : await fetchRemotePackageMetadata(name, version, options);
 
     if (!metadataResult.success) {
+      ownedSpinner?.stop();
       return metadataResult;
     }
 
     const { context, response } = metadataResult;
     const primaryDownload = resolvePrimaryDownload(response);
     if (!primaryDownload?.downloadUrl) {
+      ownedSpinner?.stop();
       return {
         success: false,
         reason: 'access-denied',
@@ -494,11 +546,15 @@ export async function pullPackageFromRemote(
       };
     }
 
+    const resolvedVersion = formatVersionLabel(response.version.version);
+    spinner?.message(`Downloading ${name}@${resolvedVersion}`);
+    
     const isPartial = isPartialDownload(primaryDownload);
     const tarballBuffer = await downloadPackageTarball(context.httpClient, primaryDownload.downloadUrl);
 
     const expectedSize = isPartial ? undefined : response.version.tarballSize;
     if (!verifyTarballIntegrity(tarballBuffer, expectedSize)) {
+      ownedSpinner?.stop();
       return {
         success: false,
         reason: 'integrity',
@@ -506,16 +562,23 @@ export async function pullPackageFromRemote(
       };
     }
 
+    spinner?.message(`Extracting ${name}@${resolvedVersion}`);
     const extracted = await extractPackageFromTarball(tarballBuffer);
 
     await savePackageToLocalRegistry(response, extracted, {
       partial: isPartial
     });
 
+    if (externalSpinner) {
+      spinner?.message(`Fetched ${name}@${resolvedVersion}`);
+    } else {
+      ownedSpinner?.stop(`Fetched ${name}@${resolvedVersion}`);
+    }
+
     return {
       success: true,
       name: response.package.name,
-      version: formatVersionLabel(response.version.version),
+      version: resolvedVersion,
       response,
       extracted,
       registryUrl: context.registryUrl,
@@ -524,6 +587,7 @@ export async function pullPackageFromRemote(
       tarballSize: response.version.tarballSize
     };
   } catch (error) {
+    ownedSpinner?.stop();
     return mapErrorToFailure(error);
   }
 }

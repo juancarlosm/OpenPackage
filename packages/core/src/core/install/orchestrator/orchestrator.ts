@@ -109,7 +109,24 @@ export class InstallOrchestrator {
     const context = await strategy.buildContext(classification, options, execContext);
     
     // Step 5: Preprocess (load, detect base, check special handling)
-    const preprocessResult = await strategy.preprocess(context, options, execContext);
+    // Create a spinner for strategies that load sources during preprocessing
+    // (git, path with convenience filters). For bulk installs (no input) the
+    // bulk strategy manages its own output, so we skip the spinner.
+    const out = resolveOutput(execContext);
+    const spinner = input ? out.spinner() : undefined;
+    if (spinner) {
+      spinner.start(`Loading ${input}`);
+    }
+    
+    let preprocessResult: PreprocessResult;
+    try {
+      preprocessResult = await strategy.preprocess(context, options, execContext, spinner);
+    } finally {
+      // Stop the spinner regardless of success/failure.
+      // On success the strategy may have updated its message to a completion note;
+      // we stop silently so the pipeline or route handler can print its own output.
+      spinner?.stop();
+    }
     
     // Step 6: Route based on result
     return this.routeToHandler(preprocessResult, options, execContext, policy);
@@ -305,7 +322,8 @@ export class InstallOrchestrator {
       skipCache,
       resolutionMode: options.resolutionMode ?? 'default',
       profile: options.profile,
-      apiKey: options.apiKey
+      apiKey: options.apiKey,
+      output: resolveOutput(execContext)
     };
 
     // Set up interactive conflict handler if prompting is available
@@ -903,7 +921,8 @@ export class InstallOrchestrator {
       skipCache,
       resolutionMode: options.resolutionMode ?? 'default',
       profile: options.profile,
-      apiKey: options.apiKey
+      apiKey: options.apiKey,
+      output: resolveOutput(execContext)
     };
 
     // Set up interactive conflict handler if prompting is available

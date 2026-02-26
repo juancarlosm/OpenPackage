@@ -149,6 +149,7 @@ export async function installInWaves(
   let aborted = false;
 
   const waveGroups = groupByWave(waveResult);
+  const totalWaves = waveGroups.size;
 
   for (const [waveNum, nodes] of waveGroups) {
     if (aborted) break;
@@ -181,6 +182,8 @@ export async function installInWaves(
     }
 
     if (installableNodes.length === 0) continue;
+
+    logger.info(`Installing wave ${waveNum}/${totalWaves} (${installableNodes.length} package${installableNodes.length !== 1 ? 's' : ''})`);
 
     // Determine if this wave should run in parallel
     const useParallel = installableNodes.length > 1 && concurrencyLimit > 1;

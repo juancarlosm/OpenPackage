@@ -33,8 +33,8 @@ export async function loadPackagePhase(ctx: InstallationContext, output?: Output
     const spinnerMsg = `Loading ${displayName}`;
     spinner.start(spinnerMsg);
     
-    // Load package
-    const loaded = await loader.load(ctx.source, ctx.options, ctx.execution);
+    // Load package (pass spinner so inner operations can update its message)
+    const loaded = await loader.load(ctx.source, ctx.options, ctx.execution, spinner);
     
     // Stop spinner silently; the report phase will display the "Installed <name>@<version>" header
     // so that both root packages and pre-loaded dependencies get consistent output.

@@ -5,6 +5,7 @@ import type {
   InputClassification, 
   PreprocessResult 
 } from '../types.js';
+import type { UnifiedSpinner } from '../../../ports/output.js';
 import { BaseInstallStrategy } from './base.js';
 import { getLoaderForSource } from '../../sources/loader-factory.js';
 import { createResolvedPackageFromLoaded } from '../../preprocessing/context-population.js';
@@ -54,11 +55,12 @@ export class GitInstallStrategy extends BaseInstallStrategy {
   async preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<PreprocessResult> {
-    // Load the source
+    // Load the source (forward spinner so git clone shows progress)
     const loader = getLoaderForSource(context.source);
-    const loaded = await loader.load(context.source, options, execContext);
+    const loaded = await loader.load(context.source, options, execContext, spinner);
     
     // Update context with loaded info
     context.source.packageName = loaded.packageName;

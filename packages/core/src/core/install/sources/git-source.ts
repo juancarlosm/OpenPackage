@@ -1,6 +1,7 @@
 import type { PackageSourceLoader, LoadedPackage } from './base.js';
 import type { PackageSource } from '../unified/context.js';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
+import type { UnifiedSpinner } from '../../ports/output.js';
 import { SourceLoadError } from './base.js';
 import { loadPackageFromGit } from '../git-package-loader.js';
 import { loadPackageFromPath } from '../path-package-loader.js';
@@ -22,7 +23,8 @@ export class GitSourceLoader implements PackageSourceLoader {
   async load(
     source: PackageSource,
     options: InstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<LoadedPackage> {
     if (!source.gitUrl) {
       throw new SourceLoadError(source, 'Git URL is required for git sources');
@@ -37,7 +39,8 @@ export class GitSourceLoader implements PackageSourceLoader {
         ref: source.gitRef,
         path: source.gitPath,
         resourcePath: source.resourcePath,
-        skipCache
+        skipCache,
+        spinner
       });
       
       // Phase 5: If manifest base is present, skip detection (reproducibility)

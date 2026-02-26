@@ -2,6 +2,7 @@ import { cloneRepoToCache } from '../git-clone.js';
 import { loadPackageFromPath } from './path-package-loader.js';
 import { detectPluginType } from './plugin-detector.js';
 import type { Package } from '../../types/index.js';
+import type { UnifiedSpinner } from '../ports/output.js';
 
 export interface GitPackageLoadOptions {
   url: string;
@@ -9,6 +10,7 @@ export interface GitPackageLoadOptions {
   path?: string;
   resourcePath?: string;
   skipCache?: boolean; // Force fresh clone (for --remote flag)
+  spinner?: UnifiedSpinner; // Optional pre-existing spinner to reuse
 }
 
 export interface GitPackageLoadResult {
@@ -24,7 +26,8 @@ export async function loadPackageFromGit(options: GitPackageLoadOptions): Promis
     url: options.url, 
     ref: options.ref,
     subdir: options.path,
-    skipCache: options.skipCache
+    skipCache: options.skipCache,
+    spinner: options.spinner
   });
   
   const { path: sourcePath, repoPath, commitSha } = cloneResult;

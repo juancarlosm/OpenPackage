@@ -3,6 +3,7 @@ import type { PackageSource } from '../unified/context.js';
 import type { InstallOptions } from '../../../types/index.js';
 import type { EnhancedPackageFormat } from '../detection-types.js';
 import type { ConversionContext } from '../conversion-context.js';
+import type { UnifiedSpinner } from '../../ports/output.js';
 
 /**
  * Result of loading a package from a source
@@ -77,11 +78,13 @@ export interface PackageSourceLoader {
    * @param source - Package source information
    * @param options - Install options
    * @param execContext - Execution context (uses sourceCwd for resolving inputs)
+   * @param spinner - Optional spinner from the calling phase for progress updates
    */
   load(
     source: PackageSource,
     options: InstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<LoadedPackage>;
 }
 

@@ -7,18 +7,23 @@ import { logger } from '../utils/logger.js';
 import { ValidationError } from '../utils/errors.js';
 import { exists, ensureDir } from '../utils/fs.js';
 import { DIR_PATTERNS, FILE_PATTERNS } from '../constants/index.js';
+import type { OutputPort, UnifiedSpinner } from './ports/output.js';
 
 /**
- * Lightweight spinner for git operations.
- * Core package cannot depend on terminal-specific Spinner from CLI.
- * Uses simple console.log for progress indication.
+ * Create a spinner for git operations.
+ * When an OutputPort is provided, uses a real animated spinner.
+ * Otherwise falls back to debug-level logger (no terminal animation).
  */
-class GitSpinner {
-  private message: string;
-  constructor(message: string) { this.message = message; }
-  start() { logger.debug(this.message); }
-  update(text: string) { this.message = text; logger.debug(text); }
-  stop() { /* no-op */ }
+function createGitSpinner(output?: OutputPort): UnifiedSpinner {
+  if (output) {
+    return output.spinner();
+  }
+  // Fallback: logger-only spinner (core package default, no terminal dependency)
+  return {
+    start(message: string) { logger.debug(message); },
+    stop(_finalMessage?: string) { /* no-op */ },
+    message(text: string) { logger.debug(text); },
+  };
 }
 
 import {
@@ -41,6 +46,8 @@ export interface GitCloneOptions {
   ref?: string; // branch/tag/sha
   subdir?: string; // subdir within repository
   skipCache?: boolean; // Force fresh clone, bypass ref cache (for --remote flag)
+  output?: OutputPort; // Optional output port for spinner feedback
+  spinner?: UnifiedSpinner; // Optional pre-existing spinner to reuse (avoids nested spinners)
 }
 
 export interface GitCloneResult {
@@ -115,7 +122,7 @@ function isImmutableRef(ref: string): boolean {
  * Returns the path to the cloned repository (or subdir if specified).
  */
 export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitCloneResult> {
-  const { url, ref, subdir, skipCache } = options;
+  const { url, ref, subdir, skipCache, output, spinner: externalSpinner } = options;
   
   // Format URL for display (extract repo name from URL)
   const getDisplayUrl = () => {
@@ -163,11 +170,16 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     // Always do ls-remote to get current SHA, then check cache
     // This is the key fix: we now handle ref === undefined
     const refDisplay = ref ? `#${ref}` : '';
-    const spinner = new GitSpinner(`Checking ${getDisplayUrl()}${refDisplay}`);
-    spinner.start();
+    const ownedLsRemoteSpinner = !externalSpinner ? createGitSpinner(output) : undefined;
+    
+    if (externalSpinner) {
+      externalSpinner.message(`Checking ${getDisplayUrl()}${refDisplay}`);
+    } else {
+      ownedLsRemoteSpinner!.start(`Checking ${getDisplayUrl()}${refDisplay}`);
+    }
     
     const resolvedSha = await resolveRefWithLsRemote(url, ref);
-    spinner.stop();
+    ownedLsRemoteSpinner?.stop();
     
     if (resolvedSha) {
       // Update ref cache for future lookups
@@ -205,18 +217,26 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
   logger.debug(`Cloning repository to cache`, { url, ref, subdir });
   
   // Create spinner for git operations
-  const refDisplay = ref ? `#${ref}` : '';
-  const spinner = new GitSpinner(`Cloning repository from ${url}${refDisplay}`);
-  spinner.start();
+  // When an external spinner is provided, reuse it (only update messages).
+  // Otherwise create and own a new spinner.
+  const cloneRefDisplay = ref ? `#${ref}` : '';
+  const ownedSpinner = !externalSpinner ? createGitSpinner(output) : undefined;
+  const spinner = externalSpinner ?? ownedSpinner!;
+  
+  if (externalSpinner) {
+    spinner.message(`Cloning ${getDisplayUrl()}${cloneRefDisplay}`);
+  } else {
+    spinner.start(`Cloning ${getDisplayUrl()}${cloneRefDisplay}`);
+  }
   
   try {
     // Clone repository
     if (ref && isSha(ref)) {
       // SHA: shallow clone default branch, then fetch the sha
       await runGit(['clone', '--depth', '1', url, tempClonePath]);
-      spinner.update(`Fetching commit ${ref}`);
+      spinner.message(`Fetching commit ${ref}`);
       await runGit(['fetch', '--depth', '1', 'origin', ref], tempClonePath);
-      spinner.update(`Checking out commit ${ref}`);
+      spinner.message(`Checking out commit ${ref}`);
       await runGit(['checkout', ref], tempClonePath);
     } else if (ref) {
       // Branch or tag
@@ -227,7 +247,7 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     }
     
     // Get the actual commit SHA
-    spinner.update('Resolving commit SHA');
+    spinner.message('Resolving commit SHA');
     const commitSha = await getCurrentCommitSha(tempClonePath);
     const commitDir = getGitCommitCacheDir(url, commitSha);
     
@@ -235,7 +255,7 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     if (await isCommitCached(url, commitSha)) {
       logger.debug(`Commit already cached, using existing`, { commitSha, commitDir });
       
-      spinner.stop();
+      ownedSpinner?.stop();
       
       // Clean up temp clone
       await rm(tempClonePath, { recursive: true, force: true });
@@ -320,10 +340,15 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
       );
     }
     
-    spinner.stop();
-    
     const refPart = ref ? `#${ref}` : '';
     const subdirPart = subdir ? `&subdirectory=${subdir}` : '';
+    
+    if (externalSpinner) {
+      spinner.message(`Cloned ${getDisplayUrl()}${refPart} [${commitSha}]`);
+    } else {
+      ownedSpinner!.stop(`Cloned ${getDisplayUrl()}${refPart} [${commitSha}]`);
+    }
+    
     logger.info(`Cloned git repository ${url}${refPart}${subdirPart} to cache [${commitSha}]`);
     
     return {
@@ -333,7 +358,7 @@ export async function cloneRepoToCache(options: GitCloneOptions): Promise<GitClo
     };
     
   } catch (error) {
-    spinner.stop();
+    ownedSpinner?.stop();
     // Clean up temp clone on error
     if (await exists(tempClonePath)) {
       await rm(tempClonePath, { recursive: true, force: true });

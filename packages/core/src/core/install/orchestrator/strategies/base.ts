@@ -6,6 +6,7 @@ import type {
   PreprocessResult,
   InstallStrategy 
 } from '../types.js';
+import type { UnifiedSpinner } from '../../../ports/output.js';
 
 /**
  * Abstract base class for install strategies.
@@ -25,7 +26,8 @@ export abstract class BaseInstallStrategy implements InstallStrategy {
   abstract preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<PreprocessResult>;
   
   /**

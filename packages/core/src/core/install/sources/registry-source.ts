@@ -1,6 +1,7 @@
 import type { PackageSourceLoader, LoadedPackage } from './base.js';
 import type { PackageSource } from '../unified/context.js';
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
+import type { UnifiedSpinner } from '../../ports/output.js';
 import { SourceLoadError } from './base.js';
 import { parsePackageYml } from '../../../utils/package-yml.js';
 import {
@@ -24,7 +25,8 @@ export class RegistrySourceLoader implements PackageSourceLoader {
   async load(
     source: PackageSource,
     options: InstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<LoadedPackage> {
     if (!source.packageName) {
       throw new SourceLoadError(source, 'Package name is required for registry sources');
@@ -52,7 +54,8 @@ export class RegistrySourceLoader implements PackageSourceLoader {
       const pullResult = await pullPackageFromRemote(source.packageName, source.version, {
         profile: options.profile,
         apiKey: options.apiKey,
-        skipLocalCheck: mode === 'remote-primary'
+        skipLocalCheck: mode === 'remote-primary',
+        spinner
       });
       if (!pullResult.success) {
         const reason = pullResult.reason ?? 'unknown';
@@ -66,7 +69,8 @@ export class RegistrySourceLoader implements PackageSourceLoader {
       const pullResult = await pullPackageFromRemote(source.packageName, source.version, {
         profile: options.profile,
         apiKey: options.apiKey,
-        skipLocalCheck: true
+        skipLocalCheck: true,
+        spinner
       });
       if (!pullResult.success) {
         const reason = pullResult.reason ?? 'unknown';

@@ -1,69 +1,44 @@
 /**
- * Simple spinner utility for showing loading indicators in CLI
+ * Ora-backed spinner utility for showing loading indicators in plain/non-interactive CLI mode.
+ *
+ * Wraps the `ora` package to provide a simple API surface
+ * (.start / .update / .stop / .succeed) consumed by createPlainOutput().
  */
 
+import ora, { type Ora } from 'ora';
+
 export class Spinner {
-  private intervalId: NodeJS.Timeout | null = null;
-  private message: string;
-  private frames: string[];
-  private currentFrame: number = 0;
-  private isRunning: boolean = false;
+  private spinner: Ora;
 
   constructor(message: string = 'Loading...') {
-    this.message = message;
-    // Different spinner frames for variety
-    this.frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    this.spinner = ora({ text: message, spinner: 'dots' });
   }
 
   /**
    * Start the spinner animation
    */
   start(): void {
-    if (this.isRunning) {
-      return;
-    }
-
-    this.isRunning = true;
-    this.currentFrame = 0;
-
-    // Hide cursor for cleaner output
-    process.stdout.write('\x1B[?25l');
-
-    this.intervalId = setInterval(() => {
-      const frame = this.frames[this.currentFrame % this.frames.length];
-      process.stdout.write(`\r${frame} ${this.message}`);
-      this.currentFrame++;
-    }, 80); // Update every 80ms for smooth animation
+    this.spinner.start();
   }
 
   /**
    * Update the spinner message
    */
   update(message: string): void {
-    this.message = message;
+    this.spinner.text = message;
   }
 
   /**
-   * Stop the spinner
+   * Stop the spinner (clears the line)
    */
   stop(): void {
-    if (!this.isRunning) {
-      return;
-    }
-
-    this.isRunning = false;
-
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-
-    // Clear the spinner line
-    process.stdout.write('\r' + ' '.repeat(process.stdout.columns || 80) + '\r');
-
-    // Show cursor again
-    process.stdout.write('\x1B[?25h');
+    this.spinner.stop();
   }
 
+  /**
+   * Stop the spinner with a success checkmark and final message
+   */
+  succeed(message: string): void {
+    this.spinner.succeed(message);
+  }
 }
-

@@ -1,6 +1,7 @@
 import type { InstallOptions, ExecutionContext } from '../../../types/index.js';
 import type { InstallResolutionMode } from '../types.js';
 import type { InstallationContext } from '../unified/context.js';
+import type { UnifiedSpinner } from '../../ports/output.js';
 
 /**
  * Normalized install options after CLI boundary processing.
@@ -64,7 +65,8 @@ export interface InstallStrategy {
   preprocess(
     context: InstallationContext,
     options: NormalizedInstallOptions,
-    execContext: ExecutionContext
+    execContext: ExecutionContext,
+    spinner?: UnifiedSpinner
   ): Promise<PreprocessResult>;
 }
 

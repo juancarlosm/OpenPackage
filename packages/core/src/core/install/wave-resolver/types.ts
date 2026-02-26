@@ -7,6 +7,7 @@ import type { PackageYml } from '../../../types/index.js';
 import type { InstallResolutionMode } from '../types.js';
 import type { Platform } from '../../platforms.js';
 import type { InstallOptions } from '../../../types/index.js';
+import type { OutputPort } from '../../ports/output.js';
 
 // ---------------------------------------------------------------------------
 // Types migrated from resolution/types.ts to remove cross-module dependency
@@ -229,4 +230,6 @@ export interface WaveResolverOptions {
   profile?: string;
   /** API key for remote registry */
   apiKey?: string;
+  /** Optional output port for spinner feedback during resolution */
+  output?: OutputPort;
 }
